@@ -13,6 +13,11 @@ type User struct {
 	Complaints []Complaint `json:"Complaints"`
 }
 
+type FullName struct {
+	Name string     `json:"Name"`
+	LastName string `json:"LastName"`
+}
+
 type Note struct {
 	ID int `json:"Id"`
 	UserID int `json:"UserId"`
