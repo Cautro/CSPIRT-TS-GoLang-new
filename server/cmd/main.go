@@ -12,7 +12,10 @@ import (
 )
 
 func main()  {
-	_ = godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+        slog.Error("No .env file found")
+    }
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		slog.Error("JWT_SECRET not set in environment")
@@ -24,17 +27,24 @@ func main()  {
 		}
 	}
 
-	dbPath := "data/storage.db"
-	st, err := storage.NewStorage(dbPath)
+	dbPath := os.Getenv("dbPath")
+
+	s, err := storage.NewStorage(dbPath, jwtSecret)
 	if err != nil {
 		slog.Error("open sqlite storage", "error", err)
 	}
-	defer st.Close()
+	defer s.Close()
 
+	// Gin logic here
 	r := gin.Default()
 	r.GET("/health", handlers.HealthHandler)
+	r.POST("/login", handlers.LoginHandler(s))
 
-	addr := ":8080"
+
+	addr := os.Getenv("PORT")
+	if addr == "" {
+		addr = "8080"
+	}
 	slog.Info("server listening", "addr", addr)
 	if err := r.Run(addr); err != nil {
 		slog.Error("server failed", "error", err)

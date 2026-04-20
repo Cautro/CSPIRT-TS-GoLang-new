@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"cspirt/internal/storage"
-
 	"strings"
 	"log/slog"
 	"net/http"
@@ -43,11 +41,11 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 				slog.Warn("Unexpected signing method")
 				return nil, fmt.Errorf("unexpected signing method")
 			}
-			return []byte(storage.Secret), nil
+			return []byte(jwtSecret), nil
 		})
 		if err != nil || !tok.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
-			slog.Warn("Invalid or expired token: %v", err)
+			slog.Warn("Invalid or expired token", "error", err)
 			c.Abort()
 			return
 		}
