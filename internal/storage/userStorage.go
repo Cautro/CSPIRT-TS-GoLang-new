@@ -23,6 +23,7 @@ func (s *Storage) AddUser(user models.User) error {
 	}
 
 	query := `INSERT INTO users (Name, 
+	FullName,
 	LastName, 
 	Login,
 	Password,
@@ -34,6 +35,7 @@ func (s *Storage) AddUser(user models.User) error {
 
 	_, err = s.db.Exec(query,
 		user.Name, 
+		user.FullName,
         user.LastName, 
         user.Login, 
         user.Password, 
@@ -123,7 +125,7 @@ func (s *Storage) ReadUsers() ([]models.User, error) {
 	defer s.mu.Unlock()
 	s.log.Info("Reading all users")
 
-	rows, err := s.db.Query("SELECT Id, Name, LastName, Login, Password, Rating, Role, Class FROM users")
+	rows, err := s.db.Query("SELECT FullName, Id, Name, LastName, Login, Password, Rating, Role, Class FROM users")
 	if err != nil {
 		s.log.Error("failed to query users", "error", err)
 		return nil, err

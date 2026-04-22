@@ -26,6 +26,7 @@ func (s *Storage) init() error {
 	CREATE TABLE IF NOT EXISTS users (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		Name TEXT,
+		FullName TEXT,
 		LastName TEXT,
 		Login TEXT UNIQUE,
 		Password TEXT,

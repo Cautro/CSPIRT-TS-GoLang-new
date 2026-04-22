@@ -13,11 +13,6 @@ type AuthService struct {
 	log 	  *slog.Logger
 }
 
-type RegisterResult struct {
-	OK    bool   `json:"ok"`
-	Token string `json:"token"`
-}
-
 type LoginResult struct {
 	Token string `json:"token"`
 }
@@ -26,6 +21,7 @@ func NewAuthService(users repo.UserRepository, jwtSecret string) *AuthService {
 	return &AuthService{
 		users:     users,
 		jwtSecret: jwtSecret,
+		log:       slog.Default(),
 	}
 }
 
@@ -35,8 +31,11 @@ func (s *AuthService) Login(in models.LoginInput) (LoginResult, error) {
 		return LoginResult{}, err
 	}
 
-	if err := utils.CheckPasswordHash(in.Password, user.Password); err {
-		s.log.Warn("invalid password", "login", in.Login)
+	if !utils.CheckPasswordHash(in.Password, user.Password) {
+		return LoginResult{}, nil
+	}
+
+	if user == nil {
 		return LoginResult{}, nil
 	}
 

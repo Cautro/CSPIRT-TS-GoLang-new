@@ -2,6 +2,8 @@ package main
 
 import (
 	"cspirt/internal/handlers"
+	utils "cspirt/internal/utils/auth"
+	ServiceUsers "cspirt/internal/service/users"
 	// "cspirt/internal/logger"
 	"cspirt/internal/storage"
 	"log/slog"
@@ -35,15 +37,22 @@ func main()  {
 	}
 	defer s.Close()
 
+	uS := ServiceUsers.NewUsersService(s, jwtSecret)
+
 	// Gin logic here
 	r := gin.Default()
 	r.GET("/health", handlers.HealthHandler)
 	r.POST("/login", handlers.LoginHandler(s))
+	auth := r.Group("/api", utils.AuthMiddleware(jwtSecret))
+	{
+		auth.GET("/users", handlers.GetUsersHandler(uS))
+		auth.PATCH("/user/add", handlers.AddUserHandler(uS))
+	}
 
 
 	addr := os.Getenv("PORT")
 	if addr == "" {
-		addr = "8080"
+		addr = ":8080"
 	}
 	slog.Info("server listening", "addr", addr)
 	if err := r.Run(addr); err != nil {
