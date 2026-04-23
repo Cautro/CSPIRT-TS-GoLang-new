@@ -4,7 +4,7 @@ import (
 	"cspirt/internal/models"
 )
 
-func (s *UsersService) AddUser(user models.User) error {
+func (s *UsersService) AddUserHandlerService(user models.User) error {
 	err := s.users.AddUser(user)
 	if err != nil {
 		return err

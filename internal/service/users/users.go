@@ -19,7 +19,7 @@ func NewUsersService(users repo.UserRepository, jwtSecret string) *UsersService 
 	}
 }
 
-func (s *UsersService) GetUsersHandler() gin.HandlerFunc {
+func (s *UsersService) GetUsersHandlerService() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		users, err := s.users.GetAllUsers()
 		if err != nil {
