@@ -3,7 +3,7 @@ package repo
 import "cspirt/internal/models"
 
 type UserRepository interface {
-	DeleteUser(id int) error
+	DeleteUser(user models.User) error
 	AddUser(user models.User) error
 	SaveUser(user models.User) error
 	ReadUsers() ([]models.User, error)

@@ -2,50 +2,91 @@ package storage
 
 import (
 	"cspirt/internal/models"
+	utils "cspirt/internal/utils/auth"
 	"encoding/json"
+	"database/sql"
 )
 
 func (s *Storage) AddUser(user models.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.log.Info("Adding user", "login", user.Login)
+	if user.Login == "" {
+		s.log.Error("login is required")
+		return nil
+	} else if user.Password == "" {
+		s.log.Error("password is required", "login", user.Login)
+		return nil
+	} else if user.Role == "" {
+		s.log.Error("role is required", "login", user.Login)
+		return nil
+	} else if user.Role != "admin" && user.Role != "owner" && user.Role != "user" && user.Role != "helper" {
+		s.log.Error("invalid role", "login", user.Login, "role", user.Role)
+		return nil
+	} else if user.Class == "" {
+		s.log.Error("class is required", "login", user.Login)
+		return nil
+	} else if user.Rating >= 5000 {
+		s.log.Error("rating must be less than 5000", "login", user.Login, "rating", user.Rating)
+		return nil
+	} else if user.Rating < 0 {
+		s.log.Error("rating must be non-negative", "login", user.Login, "rating", user.Rating)
+		return nil
+	} else if user.Rating == 0 {
+		user.Rating = 500
+	} else if user.FullName == nil {
+		s.log.Error("full name is required", "login", user.Login)
+		return nil
+	} else if user.Name == "" {
+		s.log.Error("name is required", "login", user.Login)
+		return nil
+	} else if user.LastName == "" {
+		s.log.Error("last name is required", "login", user.Login)
+		return nil
+	}
+
+
+	fullNameJSON, err := json.Marshal(user.FullName)
+	if err != nil {
+		return err
+	}
 
 	notesJSON, err := json.Marshal(user.Notes)
 	if err != nil {
-		s.log.Error("failed to marshal notes", "login", user.Login, "error", err)
 		return err
 	}
+
 	complaintsJSON, err := json.Marshal(user.Complaints)
 	if err != nil {
-		s.log.Error("failed to marshal complaints", "login", user.Login, "error", err)
 		return err
 	}
 
-	query := `INSERT INTO users (Name, FullName, LastName, Login, Password, Rating, Role, Class, Notes, Complaints) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	passwordHash, err := utils.HashPassword(user.Password)
+	if err != nil {
+		return err
+	}
 
-	_, err = s.db.Exec(query,
-		user.Name, 
-		user.FullName,
-		user.LastName, 
-		user.Login, 
-		user.Password, 
-		user.Rating, 
-		user.Role, 
-		user.Class, 
+	query := `
+		INSERT INTO users
+		(Name, FullName, LastName, Login, Password, Rating, Role, Class, Notes, Complaints)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err = s.db.Exec(
+		query,
+		user.Name,
+		string(fullNameJSON),
+		user.LastName,
+		user.Login,
+		passwordHash,
+		user.Rating,
+		user.Role,
+		user.Class,
 		string(notesJSON),
 		string(complaintsJSON),
 	)
 
-
-	if err != nil {
-		s.log.Error("failed to insert user", "login", user.Login, "error", err)
-		return err
-	}
-
-	s.log.Info("user added", "login", user.Login)
-	return nil
+	return err
 }
 
 func (s *Storage) SaveUser(user models.User) error {
@@ -97,19 +138,19 @@ func (s *Storage) SaveUser(user models.User) error {
 	return err
 }
 
-func (s *Storage) DeleteUser(id int) error {
+func (s *Storage) DeleteUser(user models.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.log.Info("Deleting user", "id", id)
+	s.log.Info("Deleting user", "id", user.ID)
 
 	query := `DELETE FROM users WHERE Id = ?`
-	_, err := s.db.Exec(query, id)
+	_, err := s.db.Exec(query, user.ID)
 	if err != nil {
-		s.log.Error("failed to delete user", "id", id, "error", err)
+		s.log.Error("failed to delete user", "id", user.ID, "error", err)
 		return err
 	}
 
-	s.log.Info("user deleted", "id", id)
+	s.log.Info("user deleted", "id", user.ID)
 	return err
 }
 
@@ -161,7 +202,7 @@ func (s *Storage) GetAllUsers() ([]models.User, error) {
 	s.log.Info("Getting all users")
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, LastName, Login, Password, Rating, Role, Class, Notes, Complaints
+		SELECT Id, Name, LastName, Login, Rating, Role, Class, Notes, Complaints
 		FROM users
 	`)
 	if err != nil {
@@ -181,7 +222,6 @@ func (s *Storage) GetAllUsers() ([]models.User, error) {
 			&u.Name,
 			&u.LastName,
 			&u.Login,
-			&u.Password,
 			&u.Rating,
 			&u.Role,
 			&u.Class,
@@ -215,52 +255,53 @@ func (s *Storage) GetAllUsers() ([]models.User, error) {
 func (s *Storage) GetUserByLogin(login string) (*models.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.log.Info("Getting user by login", "login", login)
 
-	row, err := s.db.Query("SELECT Id, Name, LastName, Login, Password, Rating, Role, Class, Notes, Complaints FROM users WHERE Login = ?", login)
+	row := s.db.QueryRow(`
+		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class, Notes, Complaints
+		FROM users
+		WHERE Login = ?
+	`, login)
+
+	var u models.User
+	var fullNameJSON string
+	var notesJSON string
+	var complaintsJSON string
+
+	err := row.Scan(
+		&u.ID,
+		&u.Name,
+		&fullNameJSON,
+		&u.LastName,
+		&u.Login,
+		&u.Password,
+		&u.Rating,
+		&u.Role,
+		&u.Class,
+		&notesJSON,
+		&complaintsJSON,
+	)
 	if err != nil {
-		s.log.Warn("failed to query user by login", "login", login, "error", err)
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
-	defer row.Close()
 
-	if row.Next() {
-		var u models.User
-		var notesJSON string
-		var complaintsJSON string
-		if err := row.Scan(
-			&u.ID,
-			&u.Name,
-			&u.LastName,
-			&u.FullName,
-			&u.Login,
-			&u.Password,
-			&u.Rating,
-			&u.Role,
-			&u.Class,
-			&notesJSON,
-			&complaintsJSON,
-		); err != nil {
-			s.log.Warn("failed to scan user by login", "login", login, "error", err)
+	if fullNameJSON != "" {
+		if err := json.Unmarshal([]byte(fullNameJSON), &u.FullName); err != nil {
 			return nil, err
 		}
-
-		if notesJSON != "" {
-			if err := json.Unmarshal([]byte(notesJSON), &u.Notes); err != nil {
-				s.log.Warn("failed to unmarshal notes for user", "login", login, "error", err)
-				return nil, err
-			}
+	}
+	if notesJSON != "" {
+		if err := json.Unmarshal([]byte(notesJSON), &u.Notes); err != nil {
+			return nil, err
 		}
-
-		if complaintsJSON != "" {
-			if err := json.Unmarshal([]byte(complaintsJSON), &u.Complaints); err != nil {
-				s.log.Warn("failed to unmarshal complaints for user", "login", login, "error", err)
-				return nil, err
-			}
+	}
+	if complaintsJSON != "" {
+		if err := json.Unmarshal([]byte(complaintsJSON), &u.Complaints); err != nil {
+			return nil, err
 		}
-		return &u, nil
 	}
 
-	s.log.Warn("user not found", "login", login)
-	return nil, nil
+	return &u, nil
 }

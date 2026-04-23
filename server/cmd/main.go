@@ -20,6 +20,7 @@ func main()  {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		slog.Error("JWT_SECRET not set in environment")
+		return
 	}
 
 	if _, err := os.Stat("data"); os.IsNotExist(err) {
@@ -33,18 +34,32 @@ func main()  {
 	s, err := storage.NewStorage(dbPath, jwtSecret)
 	if err != nil {
 		slog.Error("open sqlite storage", "error", err)
+		return
 	}
 	defer s.Close()
+
+	if os.Getenv("SEED_TEST_USERS") == "1" {
+		if err := s.SeedTestUsers(); err != nil {
+			slog.Error("failed to seed test users", "error", err)
+			return
+		}
+	}
 
 	// Gin logic here
 	r := gin.Default()
 	r.GET("/health", handlers.HealthHandler)
 	r.POST("/login", handlers.LoginHandler(s))
+
 	auth := r.Group("/api", utils.AuthMiddleware(jwtSecret))
 	{
+		// user handlers
 		auth.GET("/users", handlers.GetUsersHandler(s))
 		auth.PATCH("/user/add", handlers.AddUserHandler(s))
+		auth.PATCH("/user/delete", handlers.DeleteUserHandler(s))
+		auth.GET("/me", handlers.GetMeHandler(s))
 	}
+	
+
 
 
 	addr := os.Getenv("PORT")

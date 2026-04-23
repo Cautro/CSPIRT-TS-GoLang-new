@@ -31,17 +31,16 @@ func (s *AuthService) Login(in models.LoginInput) (LoginResult, error) {
 		return LoginResult{}, err
 	}
 
-	if !utils.CheckPasswordHash(in.Password, user.Password) {
+	if user == nil {
 		return LoginResult{}, nil
 	}
 
-	if user == nil {
+	if !utils.CheckPasswordHash(in.Password, user.Password) {
 		return LoginResult{}, nil
 	}
 
 	token, err := utils.GenerateToken(in.Login, s.jwtSecret)
 	if err != nil {
-		s.log.Error("failed to generate JWT", "login", in.Login, "error", err)
 		return LoginResult{}, err
 	}
 
