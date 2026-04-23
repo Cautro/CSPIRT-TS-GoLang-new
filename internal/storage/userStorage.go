@@ -22,29 +22,22 @@ func (s *Storage) AddUser(user models.User) error {
 		return err
 	}
 
-	query := `INSERT INTO users (Name, 
-	FullName,
-	LastName, 
-	Login,
-	Password,
-	Rating,
-	Role,
-	Class,
-	Notes,
-	Complaints) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO users (Name, FullName, LastName, Login, Password, Rating, Role, Class, Notes, Complaints) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	_, err = s.db.Exec(query,
 		user.Name, 
 		user.FullName,
-        user.LastName, 
-        user.Login, 
-        user.Password, 
-        user.Rating, 
-        user.Role, 
-        user.Class, 
+		user.LastName, 
+		user.Login, 
+		user.Password, 
+		user.Rating, 
+		user.Role, 
+		user.Class, 
 		string(notesJSON),
-        string(complaintsJSON),
+		string(complaintsJSON),
 	)
+
 
 	if err != nil {
 		s.log.Error("failed to insert user", "login", user.Login, "error", err)
