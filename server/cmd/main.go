@@ -57,6 +57,9 @@ func main()  {
 		auth.PATCH("/user/add", handlers.AddUserHandler(s))
 		auth.PATCH("/user/delete", handlers.DeleteUserHandler(s))
 		auth.GET("/me", handlers.GetMeHandler(s))
+
+		// Rating handlers
+		auth.GET("/ratings", handlers.GetRatingsHandler(s))
 	}
 	
 

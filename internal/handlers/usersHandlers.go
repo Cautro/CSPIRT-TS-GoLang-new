@@ -102,6 +102,18 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, user)
+		safeUser := models.User{
+			Name:       user.Name,
+			LastName:   user.LastName,
+			FullName:   user.FullName,
+			Login:      user.Login,
+			Rating:     user.Rating,
+			Role:       user.Role,
+			Class:      user.Class,
+			Notes:      user.Notes,
+			Complaints: user.Complaints,
+		}
+
+		c.JSON(http.StatusOK, safeUser)
 	}
 }
