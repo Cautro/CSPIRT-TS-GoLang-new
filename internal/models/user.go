@@ -14,6 +14,19 @@ type User struct {
 	Complaints []Complaint `json:"Complaints"`
 }
 
+type SafeUser struct {
+	ID         int         `json:"Id"`
+	Name       string      `json:"Name"`
+	LastName   string      `json:"LastName"`
+	FullName   []FullName  `json:"FullName"`
+	Login      string      `json:"Login"`
+	Rating     int         `json:"Rating"`
+	Role       string      `json:"Role"`
+	Class      string      `json:"Class"`
+	Notes      []Note      `json:"Notes"`
+	Complaints []Complaint `json:"Complaints"`
+}
+
 type FullName struct {
 	Name string     `json:"Name"`
 	LastName string `json:"LastName"`

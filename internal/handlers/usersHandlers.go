@@ -3,6 +3,7 @@ package handlers
 import (
 	"cspirt/internal/storage"
 	sr "cspirt/internal/service/users"
+	u "cspirt/internal/utils/auth"
 	// "cspirt/internal/repo"
 	"log/slog"
 	"fmt"
@@ -18,6 +19,20 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 
 func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		login := c.GetString("Login")
+		if login == "" {
+			slog.Error("Invalid login or token")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return 
+		}
+
+		err := u.CheckUserRole(s, login, "admin", "owner")
+		if err != nil {
+			slog.Error("Unauthorized access attempt", "login", login, "error", err)
+			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+			return
+		}
+
 		var user models.User
 
 		if err := c.ShouldBindJSON(&user); err != nil {
@@ -102,7 +117,8 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		safeUser := models.User{
+		resp := models.SafeUser{
+			ID:         user.ID,
 			Name:       user.Name,
 			LastName:   user.LastName,
 			FullName:   user.FullName,
@@ -114,6 +130,6 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			Complaints: user.Complaints,
 		}
 
-		c.JSON(http.StatusOK, safeUser)
+		c.JSON(http.StatusOK, resp)
 	}
 }

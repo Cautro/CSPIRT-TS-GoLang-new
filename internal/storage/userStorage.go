@@ -305,3 +305,4 @@ func (s *Storage) GetUserByLogin(login string) (*models.User, error) {
 
 	return &u, nil
 }
+

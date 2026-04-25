@@ -3,6 +3,7 @@ package main
 import (
 	"cspirt/internal/handlers"
 	utils "cspirt/internal/utils/auth"
+	rs "cspirt/internal/service/rating"
 	// "cspirt/internal/logger"
 	"cspirt/internal/storage"
 	"log/slog"
@@ -59,7 +60,13 @@ func main()  {
 		auth.GET("/me", handlers.GetMeHandler(s))
 
 		// Rating handlers
-		auth.GET("/ratings", handlers.GetRatingsHandler(s))
+		auth.GET("/rating", handlers.GetRatingsHandler(s))
+		auth.PATCH("/rating/update", handlers.UpdateRatingsHandler(rs.NewRatingsService(s, s.Secret), s))
+
+		// Notes handlers
+		auth.GET("/notes", handlers.GetNotesHandler(s))
+		auth.PATCH("/note/add", handlers.AddNoteHandler(s))
+		auth.PATCH("/note/delete", handlers.DeleteNoteHandler(s))
 	}
 	
 

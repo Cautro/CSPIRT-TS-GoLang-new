@@ -1,19 +1,23 @@
 package storage
 
 import (
+	"cspirt/internal/repo"
+
 	_ "modernc.org/sqlite"
 
 	"database/sql"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
-	"log/slog"
 )
 
 type Storage struct {
 	db  *sql.DB
 	log *slog.Logger
 	mu  sync.Mutex
+
+	RatingRepo repo.RatingRepository
 
 	Secret string
 }
