@@ -19,9 +19,6 @@ main
 *.log
 data/*.log
 
-node_modules/
-backend/
-
 # Зависимости
 vendor/
 
