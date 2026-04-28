@@ -10,8 +10,7 @@ const (
 )
 
 type RatingInput struct {
-			Rating int `json:"rating"`
-			TargetLogin string `json:"target_login"`
-			Reason string `json:"reason"`
-			Anonymous bool `json:"anonymous"`
-		}
+	Rating int `json:"rating"`
+	TargetLogin string `json:"target_login"`
+	Reason string `json:"reason"`
+}

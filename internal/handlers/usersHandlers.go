@@ -13,6 +13,32 @@ import (
 func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userService := sr.NewUsersService(s, s.Secret)
+
+		user, err := s.GetUserByLogin(c.GetString("Login"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+			return
+		}
+
+		if user.Role == string(models.RoleAdmin) || user.Role == string(models.RoleUser) || user.Role == string(models.RoleHelper) {
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "get_users",
+				Login:   user.Login,
+				Role:    user.Role,
+				Message: "users, helpers and admins view the list of users in the them class",
+			})
+
+			users, err := userService.GetUsersByClassHandlerService(user.Class)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+				return
+			}
+
+			c.JSON(http.StatusOK, users)
+			return
+		}
+
 		users, err := userService.GetUsersHandlerService()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})

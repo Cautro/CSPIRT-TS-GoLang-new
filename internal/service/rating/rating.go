@@ -71,6 +71,12 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput) erro
 
 	check, err := u.CheckUserRole(s.users, login, string(models.RoleAdmin), string(models.RoleOwner))
 	if err != nil || !check {
+		writeLog(logger.LogEntry{
+			Level:   "info",
+			Action:  "update_rating",
+			Login:   login,
+			Message: "User or helper try to update rating",
+		})
 		return errors.New("only admins and owners can update ratings")
 	}
 

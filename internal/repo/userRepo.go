@@ -8,4 +8,5 @@ type UserRepository interface {
 	SaveUser(user models.User) error
 	GetAllUsers() ([]models.SafeUser, error)
 	GetUserByLogin(login string) (*models.User, error)
+	GetUsersByClass(class string) ([]models.SafeUser, error)
 }

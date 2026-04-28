@@ -567,3 +567,94 @@ func (s *Storage) GetUserByLogin(login string) (*models.User, error) {
 
 	return &u, nil
 }
+
+
+func (s *Storage) GetUsersByClass(class string) ([]models.SafeUser, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT Id, Name, LastName, Login, Rating, Role, Class, Notes, Complaints
+		FROM users
+		WHERE Class = ?
+	`, class)
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_users_by_class",
+			Class:   class,
+			Message: "failed to query users: " + err.Error(),
+		})
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]models.SafeUser, 0)
+	for rows.Next() {
+		var u models.SafeUser
+		var notesJSON string
+		var complaintsJSON string
+
+		if err := rows.Scan(
+			&u.ID,
+			&u.Name,
+			&u.LastName,
+			&u.Login,
+			&u.Rating,
+			&u.Role,
+			&u.Class,
+			&notesJSON,
+			&complaintsJSON,
+		); err != nil {
+			writeLog(logger.LogEntry{
+				Level:   "error",
+				Action:  "get_users_by_class",
+				Class:   class,
+				Message: "failed to scan user: " + err.Error(),
+			})
+			return nil, err
+		}
+
+		if notesJSON != "" {
+			if err := json.Unmarshal([]byte(notesJSON), &u.Notes); err != nil {
+				writeLog(logger.LogEntry{
+					Level:   "error",
+					Action:  "get_users_by_class",
+					Class:   class,
+					Login:   u.Login,
+					Role:    u.Role,
+					Message: "failed to unmarshal notes: " + err.Error(),
+				})
+				return nil, err
+			}
+		}
+
+		if complaintsJSON != "" {
+			if err := json.Unmarshal([]byte(complaintsJSON), &u.Complaints); err != nil {
+				writeLog(logger.LogEntry{
+					Level:   "error",
+					Action:  "get_users_by_class",
+					Class:   class,
+					Login:   u.Login,
+					Role:    u.Role,
+					Message: "failed to unmarshal complaints: " + err.Error(),
+				})
+				return nil, err
+			}
+		}
+
+		users = append(users, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_users_by_class",
+			Class:   class,
+			Message: "row iteration failed: " + err.Error(),
+		})
+		return nil, err
+	}
+
+	return users, nil
+}

@@ -22,3 +22,11 @@ func (s *UsersService) GetUsersHandlerService() ([]models.SafeUser, error) {
 	}
 	return users, nil
 }
+
+func (s *UsersService) GetUsersByClassHandlerService(class string) ([]models.SafeUser, error) {
+	users, err := s.users.GetUsersByClass(class)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}

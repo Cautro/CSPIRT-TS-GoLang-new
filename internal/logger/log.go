@@ -14,6 +14,7 @@ type LogEntry struct {
 	Action  string `json:"action"`
 	Login   string `json:"login"`
 	Role    string `json:"role"`
+	Class   string `json:"class"`
 	Message string `json:"message"`
 }
 
