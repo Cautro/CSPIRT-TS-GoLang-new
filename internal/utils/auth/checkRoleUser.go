@@ -1,31 +1,48 @@
 package utils
 
 import (
-	"log/slog"
-	"errors"
+	"cspirt/internal/logger"
 	"cspirt/internal/models"
+	"errors"
 )
 
 type UserProvider interface {
-    GetUserByLogin(login string) (*models.User, error)
+	GetUserByLogin(login string) (*models.User, error)
 }
 
-func CheckUserRole(provider UserProvider, login string, roles ...string) error {
+func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, error) {
 	user, err := provider.GetUserByLogin(login)
 	if err != nil {
-		return err
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "check_user_role",
+			Login:   login,
+			Message: "failed to retrieve user: " + err.Error(),
+		})
+		return false, err
 	}
 	if user == nil {
-		slog.Error("user not found")
-		return errors.New("user not found")
+		writeLog(logger.LogEntry{
+			Level:   "info",
+			Action:  "check_user_role",
+			Login:   login,
+			Message: "user not found",
+		})
+		return false, errors.New("user not found")
 	}
 
 	for _, role := range roles {
 		if user.Role == role {
-			return errors.New("access denied")
+			return true, nil
 		}
 	}
 
-	slog.Error("user does not have the required role")
-	return errors.New("access denied")
+	writeLog(logger.LogEntry{
+		Level:   "info",
+		Action:  "check_user_role",
+		Login:   login,
+		Role:    user.Role,
+		Message: "user does not have the required role",
+	})
+	return false, errors.New("access denied")
 }

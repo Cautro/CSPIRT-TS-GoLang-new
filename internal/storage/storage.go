@@ -6,16 +6,14 @@ import (
 	_ "modernc.org/sqlite"
 
 	"database/sql"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 )
 
 type Storage struct {
-	db  *sql.DB
-	log *slog.Logger
-	mu  sync.Mutex
+	db *sql.DB
+	mu sync.Mutex
 
 	RatingRepo repo.RatingRepository
 
@@ -58,9 +56,8 @@ func NewStorage(path string, jwt_secret string) (*Storage, error) {
 	db.SetMaxOpenConns(1)
 
 	st := &Storage{
-		db: db,
-		log: slog.Default(),
-		mu: sync.Mutex{},
+		db:     db,
+		mu:     sync.Mutex{},
 		Secret: jwt_secret,
 	}
 
@@ -75,4 +72,3 @@ func NewStorage(path string, jwt_secret string) (*Storage, error) {
 func (s *Storage) Close() error {
 	return s.db.Close()
 }
-

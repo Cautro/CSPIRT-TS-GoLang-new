@@ -1,30 +1,24 @@
 package users
 
 import (
+	"cspirt/internal/models"
 	"cspirt/internal/repo"
-	"log/slog"
-	"net/http"
-	"github.com/gin-gonic/gin"
 )
 
 type UsersService struct {
-	users     repo.UserRepository
-	log 	  *slog.Logger
+	users repo.UserRepository
 }
 
 func NewUsersService(users repo.UserRepository, jwtSecret string) *UsersService {
 	return &UsersService{
-		users:     users,
-		log:       slog.Default(),
+		users: users,
 	}
 }
 
-func (s *UsersService) GetUsersHandlerService() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		users, err := s.users.GetAllUsers()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
-			return
-		}
-		c.JSON(http.StatusOK, users)
-}}
+func (s *UsersService) GetUsersHandlerService() ([]models.SafeUser, error) {
+	users, err := s.users.GetAllUsers()
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}

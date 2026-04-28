@@ -1,34 +1,59 @@
 package handlers
 
 import (
-	"cspirt/internal/storage"
-	sr "cspirt/internal/service/users"
-	u "cspirt/internal/utils/auth"
-	// "cspirt/internal/repo"
-	"log/slog"
-	"fmt"
-	"net/http"
-	"github.com/gin-gonic/gin"
+	"cspirt/internal/logger"
 	"cspirt/internal/models"
+	sr "cspirt/internal/service/users"
+	"cspirt/internal/storage"
+	u "cspirt/internal/utils/auth"
+	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
-	userService := sr.NewUsersService(s, s.Secret)
-	return userService.GetUsersHandlerService()
+	return func(c *gin.Context) {
+		userService := sr.NewUsersService(s, s.Secret)
+		users, err := userService.GetUsersHandlerService()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+			return
+		}
+
+		c.JSON(http.StatusOK, users)
+	}
 }
 
 func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
 		if login == "" {
-			slog.Error("Invalid login or token")
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "add_user",
+				Message: "invalid login or token",
+			})
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			return 
+			return
 		}
 
-		err := u.CheckUserRole(s, login, "admin", "owner")
+		targetUser, err := s.GetUserByLogin(login)
 		if err != nil {
-			slog.Error("Unauthorized access attempt", "login", login, "error", err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+		if targetUser == nil {
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "add_user",
+				Login:   login,
+				Message: "user not found",
+			})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		check, err := u.CheckUserRole(s, login, string(models.RoleAdmin), string(models.RoleOwner))
+		if err != nil || !check {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
 			return
 		}
@@ -36,6 +61,13 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 		var user models.User
 
 		if err := c.ShouldBindJSON(&user); err != nil {
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "add_user",
+				Login:   login,
+				Role:    targetUser.Role,
+				Message: "invalid input: " + err.Error(),
+			})
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 			return
 		}
@@ -46,14 +78,32 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
+		writeLog(logger.LogEntry{
+			Level:   "info",
+			Action:  "add_user",
+			Login:   login,
+			Role:    targetUser.Role,
+			Message: "user added successfully: " + user.Login,
+		})
+
 		c.JSON(http.StatusOK, gin.H{"message": "User added successfully"})
 	}
 }
 
 func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
-	return func(c *gin.Context)  {
+	return func(c *gin.Context) {
 		login := c.GetString("Login")
 		var user models.User
+
+		if login == "" {
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "delete_user",
+				Message: "invalid login or token",
+			})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
 
 		foundUser, err := s.GetUserByLogin(login)
 		if err != nil {
@@ -62,32 +112,59 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if foundUser == nil {
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "delete_user",
+				Login:   login,
+				Message: "user not found",
+			})
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
 		}
 
 		switch foundUser.Role {
 		case "admin":
-			// Admins can delete any user
-			slog.Info("Admin user deleting a user", "admin", login)
-			break
 		case "owner":
-			// Owners can delete any user
-			slog.Info("Owner user deleting a user", "owner", login)
-			break
 		case "user":
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "delete_user",
+				Login:   login,
+				Role:    foundUser.Role,
+				Message: "users cannot delete users",
+			})
 			c.JSON(http.StatusForbidden, gin.H{"error": "Users cannot delete users"})
 			return
 		case "helper":
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "delete_user",
+				Login:   login,
+				Role:    foundUser.Role,
+				Message: "helpers cannot delete users",
+			})
 			c.JSON(http.StatusForbidden, gin.H{"error": "Helpers cannot delete users"})
 			return
 		default:
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "delete_user",
+				Login:   login,
+				Role:    foundUser.Role,
+				Message: "unknown role",
+			})
 			c.JSON(http.StatusForbidden, gin.H{"error": "Unknown role"})
 			return
 		}
 
-
 		if err := c.ShouldBindBodyWithJSON(&user); err != nil {
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "delete_user",
+				Login:   login,
+				Role:    foundUser.Role,
+				Message: "invalid input: " + err.Error(),
+			})
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 			return
 		}
@@ -98,14 +175,35 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
+		message := "user deleted successfully"
+		if user.Login != "" {
+			message += ": " + user.Login
+		}
+		writeLog(logger.LogEntry{
+			Level:   "info",
+			Action:  "delete_user",
+			Login:   login,
+			Role:    foundUser.Role,
+			Message: message,
+		})
+
 		c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 	}
 }
 
 func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
-	return func(c *gin.Context)  {
+	return func(c *gin.Context) {
 		login := c.GetString("Login")
-		fmt.Print(login)
+		if login == "" {
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "get_me",
+				Message: "invalid login or token",
+			})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
 		user, err := s.GetUserByLogin(login)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
@@ -113,6 +211,12 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if user == nil {
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "get_me",
+				Login:   login,
+				Message: "user not found",
+			})
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
 		}

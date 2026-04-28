@@ -3,7 +3,6 @@ package handlers
 import (
 	"cspirt/internal/storage"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 func GetNotesHandler(s *storage.Storage) gin.HandlerFunc {

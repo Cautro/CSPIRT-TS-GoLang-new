@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"strings"
-	"log/slog"
-	"net/http"
+	"cspirt/internal/logger"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -16,11 +16,15 @@ type Claims struct {
 }
 
 func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
-	return func (c *gin.Context) {
+	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
 		if auth == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
-			slog.Warn("Authorization header missing")
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "auth_middleware",
+				Message: "authorization header missing",
+			})
 			c.Abort()
 			return
 		}
@@ -28,7 +32,11 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		parts := strings.Split(auth, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header"})
-			slog.Warn("Invalid Authorization header")
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "auth_middleware",
+				Message: "invalid authorization header",
+			})
 			c.Abort()
 			return
 		}
@@ -38,14 +46,26 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 
 		tok, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				slog.Warn("Unexpected signing method")
+				writeLog(logger.LogEntry{
+					Level:   "info",
+					Action:  "auth_middleware",
+					Message: "unexpected signing method",
+				})
 				return nil, fmt.Errorf("unexpected signing method")
 			}
 			return []byte(jwtSecret), nil
 		})
 		if err != nil || !tok.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
-			slog.Warn("Invalid or expired token", "error", err)
+			message := "invalid or expired token"
+			if err != nil {
+				message += ": " + err.Error()
+			}
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "auth_middleware",
+				Message: message,
+			})
 			c.Abort()
 			return
 		}

@@ -1,22 +1,46 @@
 package logger
 
 import (
-	"io"
-	"log/slog"
+	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
+	"time"
 )
 
-func New() (*slog.Logger, *os.File, error) {
-	logFile, err := os.OpenFile("cpirt/data/logs.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil, nil, err
+type LogEntry struct {
+	Time    string `json:"time"`
+	Level   string `json:"level"`
+	Action  string `json:"action"`
+	Login   string `json:"login"`
+	Role    string `json:"role"`
+	Message string `json:"message"`
+}
+
+func Write(entry LogEntry) error {
+	logDir := "data"
+	logPath := filepath.Join(logDir, "log.log")
+
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		return fmt.Errorf("create log dir: %w", err)
 	}
 
-	writer := io.MultiWriter(os.Stdout, logFile)
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("open log file: %w", err)
+	}
+	defer file.Close()
 
-	handler := slog.NewTextHandler(writer, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	})
+	entry.Time = time.Now().Format(time.RFC3339)
 
-	return slog.New(handler), logFile, nil
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("marshal log entry: %w", err)
+	}
+
+	if _, err := file.Write(append(data, '\n')); err != nil {
+		return fmt.Errorf("write log: %w", err)
+	}
+
+	return nil
 }

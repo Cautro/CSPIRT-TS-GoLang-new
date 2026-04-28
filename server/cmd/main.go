@@ -30,9 +30,12 @@ func main()  {
 		}
 	}
 
-	dbPath := os.Getenv("dbPath")
+	DB_PATH := os.Getenv("DB_PATH")
+	if DB_PATH == "" {
+		DB_PATH = "data/storage.db"
+	}
 
-	s, err := storage.NewStorage(dbPath, jwtSecret)
+	s, err := storage.NewStorage(DB_PATH, jwtSecret)
 	if err != nil {
 		slog.Error("open sqlite storage", "error", err)
 		return
