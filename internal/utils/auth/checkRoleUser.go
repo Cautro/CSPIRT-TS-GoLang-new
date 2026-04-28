@@ -4,6 +4,7 @@ import (
 	"cspirt/internal/logger"
 	"cspirt/internal/models"
 	"errors"
+	"strings"
 )
 
 type UserProvider interface {
@@ -21,6 +22,7 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 		})
 		return false, err
 	}
+
 	if user == nil {
 		writeLog(logger.LogEntry{
 			Level:   "info",
@@ -31,8 +33,12 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 		return false, errors.New("user not found")
 	}
 
+	userRole := strings.ToLower(strings.TrimSpace(user.Role))
+
 	for _, role := range roles {
-		if user.Role == role {
+		allowedRole := strings.ToLower(strings.TrimSpace(role))
+
+		if userRole == allowedRole {
 			return true, nil
 		}
 	}
@@ -44,5 +50,6 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 		Role:    user.Role,
 		Message: "user does not have the required role",
 	})
+
 	return false, errors.New("access denied")
 }

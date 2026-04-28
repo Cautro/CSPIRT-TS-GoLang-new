@@ -78,26 +78,26 @@ func UpdateRatingsHandler(rs *rating.RatingsService, s *storage.Storage) gin.Han
 		}
 
 		if err := rs.UpdateRating(login, &input); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to update rating"})
-			return
-		}
-
-		user, err := s.GetUserByLogin(login)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "Failed to retrieve updated user"})
-			return
-		}
-		if user == nil {
-			writeLog(logger.LogEntry{
-				Level:   "info",
-				Action:  "update_rating",
-				Login:   login,
-				Message: "user not found after rating update",
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
 			})
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
 		}
 
-		c.JSON(200, gin.H{"message": "Rating updated successfully", "new_rating": user.Rating})
+		targetUser, err := s.GetUserByLogin(input.TargetLogin)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to retrieve updated target user"})
+			return
+		}
+		if targetUser == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Target user not found"})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"message":    "Rating updated successfully",
+			"target":     targetUser.Login,
+			"new_rating": targetUser.Rating,
+		})
 	}
 }

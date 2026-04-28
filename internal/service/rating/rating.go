@@ -74,6 +74,8 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput) erro
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "update_rating",
+			Role:    user.Role,
+			Class:   user.Class,
 			Login:   login,
 			Message: "User or helper try to update rating",
 		})
@@ -97,7 +99,7 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput) erro
 		Action:  "update_rating",
 		Login:   login,
 		Role:    user.Role,
-		Message: "rating updated for user: " + in.TargetLogin,
+		Message: "rating updated for user: " + in.TargetLogin + ", reason: " + in.Reason,
 	})
 
 	return nil
