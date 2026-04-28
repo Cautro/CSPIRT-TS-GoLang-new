@@ -2,10 +2,10 @@ package main
 
 import (
 	"cspirt/internal/handlers"
-	utils "cspirt/internal/utils/auth"
+	"cspirt/internal/logger"
 	rs "cspirt/internal/service/rating"
-	// "cspirt/internal/logger"
 	"cspirt/internal/storage"
+	utils "cspirt/internal/utils/auth"
 	"log/slog"
 	"os"
 
@@ -13,10 +13,15 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func main()  {
+func main() {
 	if err := godotenv.Load(); err != nil {
-        slog.Error("No .env file found")
-    }
+		slog.Error("No .env file found")
+	}
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			slog.Error("flush logger", "error", err)
+		}
+	}()
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -71,9 +76,6 @@ func main()  {
 		auth.PATCH("/note/add", handlers.AddNoteHandler(s))
 		auth.PATCH("/note/delete", handlers.DeleteNoteHandler(s))
 	}
-	
-
-
 
 	addr := os.Getenv("PORT")
 	if addr == "" {
