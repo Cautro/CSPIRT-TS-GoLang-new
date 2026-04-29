@@ -57,4 +57,15 @@ export class ApiClient {
             token,
         });
     }
+
+    patch<T>(
+        endpoint: string,
+        data: unknown,
+        token?: string | null,
+    ): Promise<ApiResponse<T>> {
+        return this.request<T>("PATCH", endpoint, {
+            data,
+            token,
+        });
+    }
 }

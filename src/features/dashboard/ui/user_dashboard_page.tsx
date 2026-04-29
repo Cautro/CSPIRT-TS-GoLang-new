@@ -1,19 +1,38 @@
-import { useEffect } from "react";
-import { Alert, Box, Button, Container, LinearProgress, Typography } from "@mui/material";
+import { useState } from "react";
+import {
+    Alert,
+    Box,
+    Button,
+    Container,
+    LinearProgress,
+    Typography,
+} from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import { UserActions } from "./user_actions.tsx";
+import type { UserType } from "../../../shared/entities/user/user_types.ts";
+import type { DashboardStatus } from "../store/dashboard_store.ts";
 
-import { useDashboardStore } from "../store/dashboard_store.ts";
+interface UserDashboardPageProps {
+    users: UserType[];
+    status: DashboardStatus;
+    error: string | null;
+    role: string;
+    getUsers: () => Promise<void>;
+}
 
-export function UserDashboardPage() {
-    const users = useDashboardStore((state) => state.users);
-    const status = useDashboardStore((state) => state.status);
-    const error = useDashboardStore((state) => state.error);
-    const getUsers = useDashboardStore((state) => state.getUsers);
+export function UserDashboardPage({
+                                      users,
+                                      status,
+                                      error,
+                                      role,
+                                      getUsers,
+                                  }: UserDashboardPageProps) {
+    const navigate = useNavigate();
+
+    const [showActions, setShowActions] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
 
     const isLoading = status === "loading";
-
-    useEffect(() => {
-        void getUsers();
-    }, [getUsers]);
 
     return (
         <Container maxWidth="lg">
@@ -31,13 +50,23 @@ export function UserDashboardPage() {
                         Дашборд рейтинга
                     </Typography>
 
-                    <Button
-                        variant="contained"
-                        onClick={() => void getUsers()}
-                        disabled={isLoading}
-                    >
-                        Обновить
-                    </Button>
+                    <Box sx={{ display: "flex", gap: 2 }}>
+                        <Button
+                            variant="contained"
+                            onClick={() => void getUsers()}
+                            disabled={isLoading}
+                        >
+                            Обновить
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            onClick={() => navigate("/profile")}
+                            disabled={isLoading}
+                        >
+                            Профиль
+                        </Button>
+                    </Box>
                 </Box>
 
                 {isLoading && <LinearProgress sx={{ mb: 2 }} />}
@@ -67,6 +96,15 @@ export function UserDashboardPage() {
                                     border: "1px solid",
                                     borderColor: "divider",
                                     borderRadius: 3,
+                                    cursor: "pointer",
+                                    transition: "0.15s",
+                                    "&:hover": {
+                                        borderColor: "primary.main",
+                                    },
+                                }}
+                                onClick={() => {
+                                    setSelectedUser(user);
+                                    setShowActions(true);
                                 }}
                             >
                                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -77,13 +115,9 @@ export function UserDashboardPage() {
                                     @{user.Login}
                                 </Typography>
 
-                                <Typography>
-                                    Класс: {user.Class}
-                                </Typography>
+                                <Typography>Класс: {user.Class}</Typography>
 
-                                <Typography>
-                                    Роль: {user.Role}
-                                </Typography>
+                                <Typography>Роль: {user.Role}</Typography>
 
                                 <Typography sx={{ fontWeight: 700 }}>
                                     Рейтинг: {user.Rating}
@@ -99,6 +133,12 @@ export function UserDashboardPage() {
                     )
                 )}
             </Box>
+
+            {selectedUser && showActions && (
+                <Box sx={{ mb: 4 }}>
+                    <UserActions user={selectedUser} role={role} />
+                </Box>
+            )}
         </Container>
     );
 }

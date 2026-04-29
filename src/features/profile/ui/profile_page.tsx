@@ -16,8 +16,11 @@ import {
 import { useAuthStore } from "../../auth/store/auth_store";
 import type { ReactNode } from "react";
 import {UserRoles} from "../../../shared/entities/user/user_types.ts";
+import {useNavigate} from "react-router-dom";
 
 export function ProfilePage() {
+    const navigate = useNavigate();
+    
     const profile = useAuthStore((state) => state.user);
     const getProfile = useAuthStore((state) => state.checkAuth);
     const logout = useAuthStore((state) => state.logout);
@@ -46,7 +49,7 @@ export function ProfilePage() {
 
     const fullName = `${profile.Name ?? ""} ${profile.LastName ?? ""}`.trim();
     const initials = `${profile.Name?.[0] ?? ""}${profile.LastName?.[0] ?? ""}`;
-    const ratingPercent = Math.min(Math.max(profile.Rating ?? 0, 0), 100);
+    const ratingPercent =  (profile.Rating / 5000) * 100
 
     return (
         <Container maxWidth="lg">
@@ -109,6 +112,10 @@ export function ProfilePage() {
                                 </Box>
 
                                 <Box sx={{ display: "flex", gap: 1 }}>
+                                    <Button variant="outlined" onClick={() => navigate("/", {replace: true})}>
+                                        Главная
+                                    </Button>
+                                    
                                     <Button variant="outlined" onClick={() => void getProfile()}>
                                         Обновить
                                     </Button>

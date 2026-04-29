@@ -42,11 +42,13 @@ export const useAuthStore = create<AuthState>()(
 
                 try {
                     const token = await authApi.login(dto);
+                    const userData = await authApi.checkAuth(token);
 
                     set({
-                        token,
+                        token: token,
                         status: "authenticated",
                         error: null,
+                        user: userData
                     });
 
                     return true;
