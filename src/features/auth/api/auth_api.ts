@@ -2,7 +2,6 @@ import { z } from "zod";
 import { ApiClient } from "../../../core/api/api_client";
 import { userSchema, type UserType } from "../../../shared/entities/user/user_types.ts";
 import { LOGIN_REGEX, SECURITY_LIMITS } from "../../../core/security/security_limits.ts";
-import {useAuthStore} from "../store/auth_store.ts";
 
 export interface AuthDto {
     login: string;
@@ -22,6 +21,10 @@ const authDtoSchema = z.object({
 });
 
 const loginResponseSchema = z.object({
+    accessToken: z.string().min(20).max(4096),
+});
+
+const refreshResponseSchema = z.object({
     token: z.string().min(20).max(4096),
 });
 
@@ -50,35 +53,42 @@ export const authApi = {
             throw new Error("Некорректный логин или пароль");
         }
 
-        const response = await client.post<unknown>(
-            "/login",
-            {
-                Login: parsedDto.data.login,
-                Password: parsedDto.data.password,
-            },
-        );
+        const response = await client.post<unknown>("/login", {
+            Login: parsedDto.data.login,
+            Password: parsedDto.data.password,
+        });
 
         if (!response.checkStatus()) {
             throw new Error(getSafeAuthError(response.data));
         }
 
-        const parsedResponse = loginResponseSchema.safeParse(response.data);
+        const parsed = loginResponseSchema.safeParse(response.data);
 
-        if (!parsedResponse.success) {
+        if (!parsed.success) {
             throw new Error("Некорректный ответ сервера авторизации");
         }
 
-        return parsedResponse.data.token;
+        return parsed.data.accessToken;
+    },
+    
+    async refresh(): Promise<string> {
+        const response = await client.post<unknown>("api/refresh");
+        
+        if (!response.checkStatus()) {
+            throw new Error("Не удалось обновить сессию");
+        }
+
+        const parsed = refreshResponseSchema.safeParse(response.data);
+
+        if (!parsed.success) {
+            throw new Error("Некорректный ответ refresh");
+        }
+
+        return parsed.data.token;
     },
 
     async checkAuth(): Promise<UserType> {
-        const token = useAuthStore.getState().token;
-
-        if (!token) {
-            throw new Error("Сессия недействительна")
-        }
-        
-        const response = await client.get<unknown>("/api/me", token);
+        const response = await client.get<unknown>("/api/me", true);
 
         if (!response.checkStatus()) {
             throw new Error("Сессия недействительна");

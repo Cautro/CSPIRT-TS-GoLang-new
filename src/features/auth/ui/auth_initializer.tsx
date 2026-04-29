@@ -6,11 +6,11 @@ interface AuthInitializerProps {
 }
 
 export function AuthInitializer({ children }: AuthInitializerProps) {
-    const checkAuth = useAuthStore((state) => state.checkAuth);
+    const refreshAuth = useAuthStore((state) => state.refreshAuth);
 
     useEffect(() => {
-        void checkAuth();
-    }, [checkAuth]);
+        void refreshAuth();
+    }, [refreshAuth]);
 
     return <>{children}</>;
 }

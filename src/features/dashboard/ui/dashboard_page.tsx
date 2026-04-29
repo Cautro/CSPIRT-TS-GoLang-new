@@ -7,13 +7,17 @@ export function DashboardPage() {
     const role = useAuthStore((state) => state.user?.Role);
 
     const users = useDashboardStore((state) => state.users) ?? [];
+    const notes = useDashboardStore((state) => state.notes) ?? [];
     const status = useDashboardStore((state) => state.status);
     const error = useDashboardStore((state) => state.error);
     const getUsers = useDashboardStore((state) => state.getUsers);
+    const getNotes = useDashboardStore((state) => state.getNotes);
 
     useEffect(() => {
         void getUsers();
-    }, [getUsers]);
+        void getNotes();
+        console.log(notes);
+    }, [getUsers, getNotes]);
 
     if (!role) {
         return null;
@@ -21,6 +25,7 @@ export function DashboardPage() {
 
     return (
         <UserDashboardPage
+            notes={notes}
             role={role}
             users={users}
             error={error}

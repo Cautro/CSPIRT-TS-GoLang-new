@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const nullableArray = <T extends z.ZodTypeAny>(schema: T) =>
+    z.array(schema)
+        .nullish()
+        .transform((value) => value ?? []);
+
 export const userRoleSchema = z.enum(["Owner", "Admin", "Helper", "User"]);
 
 export const fullNameSchema = z.object({
@@ -12,25 +17,15 @@ export const userSchema = z.object({
     Name: z.string().max(100),
     LastName: z.string().max(100),
 
-    FullName: z
-        .array(fullNameSchema)
-        .nullable()
-        .transform((value) => value ?? []),
+    FullName: nullableArray(fullNameSchema),
 
     Login: z.string().min(1).max(64),
     Rating: z.number().int(),
     Role: userRoleSchema,
     Class: z.string().max(32),
 
-    Notes: z
-        .array(z.unknown())
-        .nullable()
-        .transform((value) => value ?? []),
-
-    Complaints: z
-        .array(z.unknown())
-        .nullable()
-        .transform((value) => value ?? []),
+    Notes: nullableArray(z.unknown()),
+    Complaints: nullableArray(z.unknown()),
 });
 
 export const usersSchema = z.array(userSchema);

@@ -6,10 +6,13 @@ export default defineConfig({
 
   server: {
     proxy: {
-      "/backend": {
+      "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/backend/, ""),
+      },
+      "/login": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
       },
     },
   },

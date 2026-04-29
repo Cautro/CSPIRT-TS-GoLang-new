@@ -6,7 +6,7 @@ import {
     SECURITY_LIMITS,
     normalizeText,
 } from "../../../core/security/security_limits.ts";
-import {useAuthStore} from "../../auth/store/auth_store.ts";
+import {noteSchema, type NoteType} from "../../../shared/entities/notes/notes_types.ts";
 
 const errorResponseSchema = z.object({
     error: z.string().optional(),
@@ -16,6 +16,10 @@ const errorResponseSchema = z.object({
 const ratingResponseSchema = z.object({
     new_rating: z.number().int(),
     message: z.string().max(300),
+});
+
+const notesResponseSchema = z.object({
+    All_notes: z.array(noteSchema),
 });
 
 export const ratingChangeSchema = z.object({
@@ -55,14 +59,23 @@ function getApiError(data: unknown): string {
 }
 
 export const dashboardApi = {
+    async getNotes(): Promise<NoteType[]> {
+      const response = await client.get<unknown>("/api/notes", true);
+
+      if (!response.checkStatus()) {
+          throw new Error("Ошибка при получении списка заметок");
+      }
+      
+      const parsed = notesResponseSchema.safeParse(response.data);
+      if (!parsed.success) {
+          throw new Error("Некорректный формат заметок");
+      }
+      
+      return parsed.data.All_notes;
+    },
+    
     async getUsers(): Promise<UserType[]> {
-        const token = useAuthStore.getState().token;
-        
-        if (!token) {
-            throw new Error("Сессия недействительна")
-        }
-        
-        const response = await client.get<unknown>("/api/users", token);
+        const response = await client.get<unknown>("/api/users", true);
 
         if (!response.checkStatus()) {
             throw new Error(getApiError(response.data));
@@ -78,12 +91,6 @@ export const dashboardApi = {
     },
 
     async changeRating(data: RatingChangeDTO): Promise<RatingResponse> {
-        const token = useAuthStore.getState().token;
-
-        if (!token) {
-            throw new Error("Сессия недействительна")
-        }
-        
         const parsedDto = ratingChangeSchema.safeParse(data);
 
         if (!parsedDto.success) {
@@ -93,7 +100,7 @@ export const dashboardApi = {
         const response = await client.patch<unknown>(
             "/api/rating/update",
             parsedDto.data,
-            token,
+            true,
         );
 
         if (!response.checkStatus()) {

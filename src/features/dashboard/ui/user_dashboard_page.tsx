@@ -11,17 +11,22 @@ import { useNavigate } from "react-router-dom";
 import { UserActions } from "./user_actions.tsx";
 import type { UserType } from "../../../shared/entities/user/user_types.ts";
 import type { DashboardStatus } from "../store/dashboard_store.ts";
+import type {NoteType} from "../../../shared/entities/notes/notes_types.ts";
 
 interface UserDashboardPageProps {
     users: UserType[];
+    notes: NoteType[];
     status: DashboardStatus;
     error: string | null;
     role: string;
     getUsers: () => Promise<void>;
 }
 
+type selectedDashboard = | "users" | "notes";
+
 export function UserDashboardPage({
                                       users,
+                                      notes,
                                       status,
                                       error,
                                       role,
@@ -31,6 +36,7 @@ export function UserDashboardPage({
 
     const [showActions, setShowActions] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+    const [selectedDashboard, setSelectedDashboard] = useState<selectedDashboard>("users");
 
     const isLoading = status === "loading";
 
@@ -51,6 +57,27 @@ export function UserDashboardPage({
                     </Typography>
 
                     <Box sx={{ display: "flex", gap: 2 }}>
+                        
+                        {(role === "Admin" || role === "Owner") && (
+                            <Box>
+                                <Button
+                                    variant="contained"
+                                    onClick={() => setSelectedDashboard("users")}
+                                    disabled={selectedDashboard === "users"}
+                                >
+                                    Пользователи
+                                </Button>
+                                
+                                <Button
+                                    variant="contained"
+                                    onClick={() => setSelectedDashboard("notes")}
+                                    disabled={selectedDashboard === "notes"}
+                                >
+                                    Заметки
+                                </Button>
+                            </Box>
+                        )}
+                        
                         <Button
                             variant="contained"
                             onClick={() => void getUsers()}
@@ -66,6 +93,7 @@ export function UserDashboardPage({
                         >
                             Профиль
                         </Button>
+
                     </Box>
                 </Box>
 
@@ -77,59 +105,58 @@ export function UserDashboardPage({
                     </Alert>
                 )}
 
-                {users.length > 0 ? (
-                    <Box
-                        sx={{
-                            display: "grid",
-                            gridTemplateColumns: {
-                                xs: "1fr",
-                                md: "1fr 1fr",
-                            },
-                            gap: 2,
-                        }}
-                    >
-                        {users.map((user) => (
-                            <Box
-                                key={user.Id}
-                                sx={{
-                                    p: 2,
-                                    border: "1px solid",
-                                    borderColor: "divider",
-                                    borderRadius: 3,
-                                    cursor: "pointer",
-                                    transition: "0.15s",
-                                    "&:hover": {
-                                        borderColor: "primary.main",
-                                    },
-                                }}
-                                onClick={() => {
-                                    setSelectedUser(user);
-                                    setShowActions(true);
-                                }}
-                            >
-                                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                    {user.Name} {user.LastName}
-                                </Typography>
+                {selectedDashboard === "notes" && (
+                    notes.length > 0 ? (
+                        <Box sx={{ display: "grid", gap: 2 }}>
+                            {notes.map((note) => (
+                                <Box key={note.ID}>
+                                    <Typography>Контент: {note.Content}</Typography>
+                                </Box>
+                            ))}
+                        </Box>
+                    ) : (
+                        !isLoading && <Alert severity="info">Заметки не найдены</Alert>
+                    )
+                )}
 
-                                <Typography color="text.secondary">
-                                    @{user.Login}
-                                </Typography>
+                {selectedDashboard === "users" && (
+                    users.length > 0 ? (
+                        <Box
+                            sx={{
+                                display: "grid",
+                                gridTemplateColumns: {
+                                    xs: "1fr",
+                                    md: "1fr 1fr",
+                                },
+                                gap: 2,
+                            }}
+                        >
+                            {users.map((user) => (
+                                <Box
+                                    key={user.Id}
+                                    onClick={() => {
+                                        setSelectedUser(user);
+                                        setShowActions(true);
+                                    }}
+                                >
+                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                        {user.Name} {user.LastName}
+                                    </Typography>
 
-                                <Typography>Класс: {user.Class}</Typography>
+                                    <Typography color="text.secondary">
+                                        @{user.Login}
+                                    </Typography>
 
-                                <Typography>Роль: {user.Role}</Typography>
-
-                                <Typography sx={{ fontWeight: 700 }}>
-                                    Рейтинг: {user.Rating}
-                                </Typography>
-                            </Box>
-                        ))}
-                    </Box>
-                ) : (
-                    !isLoading && (
-                        <Alert severity="info">
-                            Пользователи не найдены
-                        </Alert>
+                                    <Typography>Класс: {user.Class}</Typography>
+                                    <Typography>Роль: {user.Role}</Typography>
+                                    <Typography sx={{ fontWeight: 700 }}>
+                                        Рейтинг: {user.Rating}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Box>
+                    ) : (
+                        !isLoading && <Alert severity="info">Пользователи не найдены</Alert>
                     )
                 )}
             </Box>

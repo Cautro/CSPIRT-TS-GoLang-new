@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { authApi, type AuthDto } from "../api/auth_api";
 import type { UserType } from "../../../shared/entities/user/user_types.ts";
-import { AppConfig } from "../../../core/app_core/app_config.ts";
+import {clearAccessToken, setAccessToken} from "../../../core/auth/access_token_memory.ts";
 
 type AuthStatus =
     | "idle"
@@ -10,7 +10,6 @@ type AuthStatus =
     | "unauthenticated";
 
 interface AuthState {
-    token: string | null;
     user: UserType | null;
     error: string | null;
     status: AuthStatus;
@@ -19,6 +18,7 @@ interface AuthState {
     checkAuth: () => Promise<void>;
     logout: () => void;
     clearError: () => void;
+    refreshAuth: () => Promise<void>;
 }
 
 function getPublicErrorMessage(error: unknown): string {
@@ -35,8 +35,7 @@ function getPublicErrorMessage(error: unknown): string {
     return allowedMessages.has(error.message) ? error.message : "Ошибка";
 }
 
-export const useAuthStore = create<AuthState>()((set, get) => ({
-    token: null,
+export const useAuthStore = create<AuthState>()((set) => ({
     user: null,
     error: null,
     status: "idle",
@@ -48,28 +47,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         });
 
         try {
-            const token =
-                AppConfig.AUTH_MODE === "bearer-memory"
-                    ? await authApi.login(dto)
-                    : null;
-
+            const token = await authApi.login(dto);
+            
+            setAccessToken(token);
+            
+            const user = await authApi.checkAuth();
 
             set({
-                token: token,
                 status: "authenticated",
                 error: null,
-            });
-
-            const userData = await authApi.checkAuth();
-            
-            set({
-               user: userData, 
+                user: user,
             });
             
             return true;
         } catch (error) {
             set({
-                token: null,
                 user: null,
                 status: "unauthenticated",
                 error: getPublicErrorMessage(error),
@@ -80,19 +72,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     },
 
     checkAuth: async () => {
-        const token = get().token;
-
-        if (AppConfig.AUTH_MODE === "bearer-memory" && !token) {
-            set({
-                token: null,
-                user: null,
-                status: "unauthenticated",
-                error: null,
-            });
-
-            return;
-        }
-
         set({
             status: "loading",
             error: null,
@@ -107,18 +86,47 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
                 user: userData,
             });
         } catch {
+            clearAccessToken();
+            
             set({
-                token: null,
                 user: null,
                 status: "unauthenticated",
                 error: "Сессия недействительна",
             });
         }
     },
+    
+    refreshAuth: async () => {
+      set({status: "loading", error: null});
+      
+      try {
+          const token = await authApi.refresh();
+          
+          setAccessToken(token);
+          
+          const user = await authApi.checkAuth();
+          
+          set({
+             status: "authenticated",
+             error: null,
+             user: user, 
+          });
+          
+      } catch {
+          clearAccessToken();
+
+          set({
+              user: null,
+              status: "unauthenticated",
+              error: null,
+          });
+      }
+    },
 
     logout: () => {
+        clearAccessToken();
+        
         set({
-            token: null,
             user: null,
             status: "unauthenticated",
             error: null,
