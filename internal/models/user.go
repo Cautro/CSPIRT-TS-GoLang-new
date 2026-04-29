@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type User struct {
 	ID 	 int              `json:"Id"`
 	Name string           `json:"Name"`
@@ -42,4 +44,12 @@ type Complaint struct {
     AuthorID  int	 `json:"AuthorID"`
     Content   string `json:"Content"`
     CreatedAt string `json:"CreatedAt"`
+}
+
+type RefreshToken struct {
+	ID        int
+	UserID    int
+	Token     string
+	ExpiresAt time.Time
+	CreatedAt time.Time
 }

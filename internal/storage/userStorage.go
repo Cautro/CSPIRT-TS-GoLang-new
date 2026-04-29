@@ -498,3 +498,43 @@ func (s *Storage) GetUsersByClass(class string) ([]models.SafeUser, error) {
 	
 	return users, nil
 }
+
+func (s *Storage) GetUserByID(id int) (*models.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	row := s.db.QueryRow(`
+		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class
+		FROM users
+		WHERE Id = ?
+	`, id)
+
+	var u models.User
+	var fullNameJSON string
+
+	err := row.Scan(
+		&u.ID,
+		&u.Name,
+		&fullNameJSON,
+		&u.LastName,
+		&u.Login,
+		&u.Password,
+		&u.Rating,
+		&u.Role,
+		&u.Class,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if fullNameJSON != "" {
+		if err := json.Unmarshal([]byte(fullNameJSON), &u.FullName); err != nil {
+			return nil, err
+		}
+	}
+
+	return &u, nil
+}

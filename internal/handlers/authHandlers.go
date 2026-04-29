@@ -33,13 +33,49 @@ func LoginHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
+		c.SetCookie(
+			"refresh_token",
+			result.RefreshToken,
+			3600*24*7,
+			"/api/refresh",
+			"",
+			false,
+			true,
+		)
+
+		c.JSON(200, gin.H{
+			"accessToken": result.Token,
+		})
+
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "login",
 			Login:   input.Login,
 			Message: "login successful",
 		})
-
-		c.JSON(200, gin.H{"token": result.Token})
 	}
 }
+
+func RefreshHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		refreshToken, err := c.Cookie("refresh_token")
+		if err != nil {
+			c.JSON(401, gin.H{"error": "refresh token missing"})
+			return
+		}
+
+		authService := sr.NewAuthService(s, s.Secret)
+
+		result, err := authService.Refresh(refreshToken)
+		if err != nil {
+			c.JSON(401, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"token": result.Token,
+		})
+	}
+}
+
+

@@ -58,6 +58,7 @@ func main() {
 	r := gin.Default()
 	r.GET("/health", handlers.HealthHandler)
 	r.POST("/login", handlers.LoginHandler(s))
+	r.POST("/api/refresh", handlers.RefreshHandler(s))
 
 	auth := r.Group("/api", utils.AuthMiddleware(jwtSecret))
 	{

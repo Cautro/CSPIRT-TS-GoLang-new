@@ -59,6 +59,24 @@ func (s *Storage) initNoteStorage() error {
 	return err
 }
 
+func (s *Storage) initHTTPOnlyStorage() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `
+	CREATE TABLE IF NOT EXISTS refresh_tokens (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		token TEXT NOT NULL UNIQUE,
+		expires_at DATETIME NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES users(Id) ON DELETE CASCADE
+	);`
+
+	_, err := s.db.Exec(query)
+	return err
+}
+
 func (s *Storage) initComplaintStorage() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -97,58 +115,7 @@ func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
 	if err := st.initUserStorage(); err != nil { return nil, err }
     if err := st.initNoteStorage(); err != nil { return nil, err }
     if err := st.initComplaintStorage(); err != nil { return nil, err }
-
-	return st, nil
-}
-
-func NewNoteStorage(path string, jwt_secret string) (*Storage, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, err
-	}
-
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		return nil, err
-	}
-
-	db.SetMaxOpenConns(1)
-
-	st := &Storage{
-		db:     db,
-		mu:     sync.Mutex{},
-		Secret: jwt_secret,
-	}
-
-	if err := st.initNoteStorage(); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-
-	return st, nil
-}
-
-func NewComplaintStorage(path string, jwt_secret string) (*Storage, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, err
-	}
-
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		return nil, err
-	}
-
-	db.SetMaxOpenConns(1)
-
-	st := &Storage{
-		db:     db,
-		mu:     sync.Mutex{},
-		Secret: jwt_secret,
-	}
-
-	if err := st.initComplaintStorage(); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
+	if err := st.initHTTPOnlyStorage(); err != nil { return nil, err }
 
 	return st, nil
 }
