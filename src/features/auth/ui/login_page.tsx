@@ -12,6 +12,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
+import { LOGIN_REGEX, SECURITY_LIMITS } from "../../../core/security/security_limits.ts";
 
 import { useAuthStore } from "../store/auth_store";
 
@@ -19,7 +20,6 @@ export function LoginPage() {
     const navigate = useNavigate();
 
     const login = useAuthStore((state) => state.login);
-    const token = useAuthStore((state) => state.token);
     const status = useAuthStore((state) => state.status);
     const error = useAuthStore((state) => state.error);
 
@@ -27,12 +27,29 @@ export function LoginPage() {
     const [password, setPassword] = useState("");
 
     const isLoading = status === "loading";
-    const isSubmitDisabled =
-        isLoading || username.trim().length === 0 || password.trim().length === 0;
 
-    if (token && status === "authenticated") {
+    if (status === "authenticated") {
         return <Navigate to="/" replace />;
     }
+
+    const usernameError =
+        username.length > 0 && !LOGIN_REGEX.test(username)
+            ? "Логин может содержать только латиницу, цифры, точку, дефис и подчёркивание"
+            : null;
+
+    const passwordError =
+        password.length > 0 && password.length < SECURITY_LIMITS.passwordMin
+            ? `Пароль должен быть не короче ${SECURITY_LIMITS.passwordMin} символов`
+            : null;
+
+    const isSubmitDisabled =
+        isLoading ||
+        username.trim().length < SECURITY_LIMITS.loginMin ||
+        username.trim().length > SECURITY_LIMITS.loginMax ||
+        password.length < SECURITY_LIMITS.passwordMin ||
+        password.length > SECURITY_LIMITS.passwordMax ||
+        Boolean(usernameError) ||
+        Boolean(passwordError);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -137,6 +154,13 @@ export function LoginPage() {
                                     autoComplete="username"
                                     fullWidth
                                     disabled={isLoading}
+                                    error={Boolean(usernameError)}
+                                    helperText={usernameError ?? " "}
+                                    slotProps={{
+                                        htmlInput: {
+                                            maxLength: SECURITY_LIMITS.loginMax,
+                                        },
+                                    }}
                                 />
 
                                 <TextField
@@ -148,8 +172,16 @@ export function LoginPage() {
                                     autoComplete="current-password"
                                     fullWidth
                                     disabled={isLoading}
+                                    error={Boolean(passwordError)}
+                                    helperText={passwordError ?? " "}
+                                    slotProps={{
+                                        htmlInput: {
+                                            minLength: SECURITY_LIMITS.passwordMin,
+                                            maxLength: SECURITY_LIMITS.passwordMax,
+                                        },
+                                    }}
                                 />
-
+                                
                                 <Button
                                     type="submit"
                                     variant="contained"

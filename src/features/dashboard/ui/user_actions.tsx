@@ -3,7 +3,9 @@ import { UserRoles } from "../../../shared/entities/user/user_types.ts";
 import type { UserType } from "../../../shared/entities/user/user_types.ts";
 import { useState } from "react";
 import { useDashboardStore } from "../store/dashboard_store.ts";
-import type { RatingChangeDTO } from "../api/dashboard_api.ts";
+import {SECURITY_LIMITS} from "../../../core/security/security_limits.ts";
+import { ratingChangeSchema } from "../api/dashboard_api.ts";
+
 
 interface UserActionsProps {
     user: UserType;
@@ -11,6 +13,7 @@ interface UserActionsProps {
 }
 
 export function UserActions({ user, role }: UserActionsProps) {
+    const [formError, setFormError] = useState<string | null>(null);
     const [rating, setRating] = useState<number>(0);
     const [ratingReason, setRatingReason] = useState("");
     const [complaint, setComplaint] = useState("");
@@ -19,22 +22,22 @@ export function UserActions({ user, role }: UserActionsProps) {
     const changeRating = useDashboardStore((state) => state.changeRating);
 
     async function handleChangeRating() {
-        if (rating === 0 || ratingReason.trim() === "") {
-            setRatingReason("");
-            setRating(0);
+        const parsed = ratingChangeSchema.safeParse({
+            rating,
+            reason: ratingReason,
+            target_login: user.Login,
+        });
+
+        if (!parsed.success) {
+            setFormError("Проверь рейтинг и причину изменения");
             return;
         }
 
-        const dto: RatingChangeDTO = {
-            rating: rating,
-            reason: ratingReason.trim(),
-            target_login: user.Login,
-        };
-
+        setFormError(null);
         setRatingReason("");
         setRating(0);
 
-        await changeRating(dto);
+        await changeRating(parsed.data);
     }
 
     return (
@@ -60,6 +63,12 @@ export function UserActions({ user, role }: UserActionsProps) {
                     Рейтинг: {user.Rating}
                 </Typography>
 
+                {formError && (
+                    <Typography variant="body2" color="error">
+                        {formError}
+                    </Typography>
+                )}
+                
                 {(role === "Admin" || role === "Owner") && (
                     <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 2 }}>
                         <TextField
@@ -67,6 +76,12 @@ export function UserActions({ user, role }: UserActionsProps) {
                             type="number"
                             onChange={(e) => setRating(Number(e.target.value))}
                             value={rating}
+                            slotProps={{
+                                htmlInput: {
+                                    min: SECURITY_LIMITS.ratingDeltaMin,
+                                    max: SECURITY_LIMITS.ratingDeltaMax,
+                                },
+                            }}
                         />
 
                         <TextField
@@ -74,6 +89,13 @@ export function UserActions({ user, role }: UserActionsProps) {
                             type="text"
                             onChange={(e) => setRatingReason(e.target.value)}
                             value={ratingReason}
+                            multiline
+                            minRows={2}
+                            slotProps={{
+                                htmlInput: {
+                                    maxLength: SECURITY_LIMITS.ratingReasonMax,
+                                },
+                            }}
                         />
 
                         <Button variant="contained" onClick={() => void handleChangeRating()}>

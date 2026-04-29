@@ -1,25 +1,46 @@
+import { z } from "zod";
 
-export interface FullName {
-    name: string;
-    lastname: string;
-}
+export const userRoleSchema = z.enum(["Owner", "Admin", "Helper", "User"]);
 
-export interface UserType {
-    Id: number;
-    Name: string;
-    LastName: string;
-    FullName: FullName[];
-    Login: string;
-    Rating: number;
-    Role: string;
-    Class: string;
-    Notes: unknown[];
-    Complaints: unknown[];
-}
+export const fullNameSchema = z.object({
+    Name: z.string(),
+    LastName: z.string(),
+});
 
-export const UserRoles = {
-    "Admin": "Администратор",
-    "User": "Пользователь",
-    "Owner": "Owner",
-    "Helper": "Староста"
-}
+export const userSchema = z.object({
+    Id: z.number().int().nonnegative(),
+    Name: z.string().max(100),
+    LastName: z.string().max(100),
+
+    FullName: z
+        .array(fullNameSchema)
+        .nullable()
+        .transform((value) => value ?? []),
+
+    Login: z.string().min(1).max(64),
+    Rating: z.number().int(),
+    Role: userRoleSchema,
+    Class: z.string().max(32),
+
+    Notes: z
+        .array(z.unknown())
+        .nullable()
+        .transform((value) => value ?? []),
+
+    Complaints: z
+        .array(z.unknown())
+        .nullable()
+        .transform((value) => value ?? []),
+});
+
+export const usersSchema = z.array(userSchema);
+
+export type UserType = z.infer<typeof userSchema>;
+export type UserRole = z.infer<typeof userRoleSchema>;
+
+export const UserRoles: Record<UserRole, string> = {
+    Admin: "Администратор",
+    User: "Пользователь",
+    Owner: "Owner",
+    Helper: "Староста",
+};

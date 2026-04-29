@@ -17,6 +17,7 @@ import { useAuthStore } from "../../auth/store/auth_store";
 import type { ReactNode } from "react";
 import {UserRoles} from "../../../shared/entities/user/user_types.ts";
 import {useNavigate} from "react-router-dom";
+import { truncateText } from "../../../core/security/security_limits.ts";
 
 export function ProfilePage() {
     const navigate = useNavigate();
@@ -28,6 +29,23 @@ export function ProfilePage() {
     const error = useAuthStore((state) => state.error);
 
     const isLoading = status === "loading";
+
+    function safeUnknownToText(value: unknown): string {
+        if (typeof value === "string") {
+            return truncateText(value, 500);
+        }
+
+        if (
+            typeof value === "object" &&
+            value !== null &&
+            "Text" in value &&
+            typeof (value as { Text?: unknown }).Text === "string"
+        ) {
+            return truncateText((value as { Text: string }).Text, 500);
+        }
+
+        return "Скрыто: неизвестный формат данных";
+    }
 
     if (!profile) {
         return (
@@ -214,7 +232,7 @@ export function ProfilePage() {
                                     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                                         {notes.map((note, index) => (
                                             <Alert key={index} severity="info">
-                                                {JSON.stringify(note)}
+                                                {safeUnknownToText(note)}
                                             </Alert>
                                         ))}
                                     </Box>

@@ -31,7 +31,7 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
                 throw new Error("Токен авторизации не найден");
             }
 
-            const response = await dashboardApi.getUsers(token);
+            const response = await dashboardApi.getUsers();
 
             set({
                 users: response,
@@ -56,7 +56,7 @@ export const useDashboardStore = create<DashboardState>()((set, get) => ({
                 throw new Error("Токен авторизации не найден");
             }
 
-            const response = await dashboardApi.changeRating(token, data);
+            const response = await dashboardApi.changeRating (data);
 
             set({
                 status: "idle",
