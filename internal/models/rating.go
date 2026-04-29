@@ -3,10 +3,10 @@ package models
 type Role string
 
 const (
-    RoleUser   Role = "user"
-    RoleHelper Role = "helper"
-    RoleAdmin  Role = "admin"
-    RoleOwner  Role = "owner"
+    RoleUser   Role = "User"
+    RoleHelper Role = "Helper"
+    RoleAdmin  Role = "Admin"
+    RoleOwner  Role = "Owner"
 )
 
 type RatingInput struct {

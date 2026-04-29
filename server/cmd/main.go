@@ -40,7 +40,7 @@ func main() {
 		DB_PATH = "data/storage.db"
 	}
 
-	s, err := storage.NewStorage(DB_PATH, jwtSecret)
+	s, err := storage.NewUserStorage(DB_PATH, jwtSecret)
 	if err != nil {
 		slog.Error("open sqlite storage", "error", err)
 		return

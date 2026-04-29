@@ -256,8 +256,6 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			Rating:     user.Rating,
 			Role:       user.Role,
 			Class:      user.Class,
-			Notes:      user.Notes,
-			Complaints: user.Complaints,
 		}
 
 		c.JSON(http.StatusOK, resp)

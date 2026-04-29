@@ -77,7 +77,24 @@ func UpdateRatingsHandler(rs *rating.RatingsService, s *storage.Storage) gin.Han
 			return
 		}
 
-		if err := rs.UpdateRating(login, &input); err != nil {
+		user, err := s.GetUserByLogin(login)
+		if err != nil || user == nil {
+			c.JSON(500, gin.H{"error":"Login invalid or user dont found"})
+			return
+		}
+
+		needUser := &models.SafeUser{
+			ID: user.ID,
+			Name: user.Name,
+			LastName: user.LastName,
+			FullName: user.FullName,
+			Login: user.Login,
+			Role: user.Role,
+			Class: user.Class,
+			Rating: user.Rating,
+		}
+
+		if err := rs.UpdateRating(login, &input, needUser); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})

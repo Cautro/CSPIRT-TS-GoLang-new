@@ -28,7 +28,7 @@ func NewRatingsService(users repo.UserRepository, jwtSecret string) *RatingsServ
 	}
 }
 
-func (s *RatingsService) UpdateRating(login string, in *models.RatingInput) error {
+func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user *models.SafeUser) error {
 	targetUser, err := s.users.GetUserByLogin(in.TargetLogin)
 	if err != nil {
 		writeLog(logger.LogEntry{
@@ -49,16 +49,6 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput) erro
 		return errors.New("target user not found")
 	}
 
-	user, err := s.users.GetUserByLogin(login)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "update_rating",
-			Login:   login,
-			Message: "failed to retrieve current user: " + err.Error(),
-		})
-		return err
-	}
 	if user == nil {
 		writeLog(logger.LogEntry{
 			Level:   "info",
@@ -90,7 +80,18 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput) erro
 		targetUser.Rating = 5000
 	}
 
-	if err := s.users.SaveUser(*targetUser); err != nil {
+	needTargetUser := &models.SafeUser{
+		ID: targetUser.ID,
+		Name: targetUser.Name,
+		LastName: targetUser.LastName,
+		FullName: targetUser.FullName,
+		Login: targetUser.Login,
+		Role: targetUser.Role,
+		Class: targetUser.Class,
+		Rating: targetUser.Rating,
+	}
+
+	if err := s.users.SaveUser(*needTargetUser); err != nil {
 		return err
 	}
 

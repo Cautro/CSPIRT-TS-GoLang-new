@@ -10,8 +10,6 @@ type User struct {
 	Rating int            `json:"Rating"`
 	Role string           `json:"Role"`
 	Class string          `json:"Class"`
-	Notes []Note           `json:"Notes"`
-	Complaints []Complaint `json:"Complaints"`
 }
 
 type SafeUser struct {
@@ -23,8 +21,6 @@ type SafeUser struct {
 	Rating     int         `json:"Rating"`
 	Role       string      `json:"Role"`
 	Class      string      `json:"Class"`
-	Notes      []Note      `json:"Notes"`
-	Complaints []Complaint `json:"Complaints"`
 }
 
 type FullName struct {
@@ -33,13 +29,17 @@ type FullName struct {
 }
 
 type Note struct {
-	ID int         `json:"Id"`
-	UserID int     `json:"UserId"`
-	Content string `json:"Content"`
+    ID        int    `json:"ID"`
+    TargetID  int	 `json:"TargetID"`
+    AuthorID  int	 `json:"AuthorID"`
+    Content   string `json:"Content"`
+    CreatedAt string `json:"CreatedAt"`
 }
 
 type Complaint struct {
-	ID int         `json:"Id"`
-	UserID int     `json:"UserId"`
-	Content string `json:"Content"`
+    ID        int    `json:"ID"`
+    TargetID  int	 `json:"TargetID"`
+    AuthorID  int	 `json:"AuthorID"`
+    Content   string `json:"Content"`
+    CreatedAt string `json:"CreatedAt"`
 }

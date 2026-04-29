@@ -20,7 +20,8 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "login is required",
 		})
 		return errors.New("login is required")
-	} else if user.Password == "" {
+	}
+	if user.Password == "" {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -28,7 +29,8 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "password is required",
 		})
 		return errors.New("password is required")
-	} else if user.Role == "" {
+	}
+	if user.Role == "" {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -36,7 +38,8 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "role is required",
 		})
 		return errors.New("role is required")
-	} else if user.Role != "admin" && user.Role != "owner" && user.Role != "user" && user.Role != "helper" {
+	} 
+	if user.Role != "admin" && user.Role != "owner" && user.Role != "user" && user.Role != "helper" {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -45,7 +48,8 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "invalid role",
 		})
 		return errors.New("invalid role")
-	} else if user.Class == "" {
+	} 
+	if user.Class == "" {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -54,7 +58,8 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "class is required",
 		})
 		return errors.New("class is required")
-	} else if user.Rating >= 5000 {
+	} 
+	if user.Rating >= 5000 {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -63,7 +68,8 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "rating must be less than 5000",
 		})
 		return errors.New("rating must be less than 5000")
-	} else if user.Rating < 0 {
+	} 
+	if user.Rating < 0 {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -72,9 +78,11 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "rating must be non-negative",
 		})
 		return errors.New("rating must be non-negative")
-	} else if user.Rating == 0 {
+	} 
+	if user.Rating == 0 {
 		user.Rating = 500
-	} else if user.FullName == nil {
+	} 
+	if user.FullName == nil {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -83,7 +91,8 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "full name is required",
 		})
 		return errors.New("full name is required")
-	} else if user.Name == "" {
+	} 
+	if user.Name == "" {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -92,7 +101,8 @@ func (s *Storage) AddUser(user models.User) error {
 			Message: "name is required",
 		})
 		return errors.New("name is required")
-	} else if user.LastName == "" {
+	} 
+	if user.LastName == "" {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
@@ -115,30 +125,6 @@ func (s *Storage) AddUser(user models.User) error {
 		return err
 	}
 
-	notesJSON, err := json.Marshal(user.Notes)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "failed to marshal notes: " + err.Error(),
-		})
-		return err
-	}
-
-	complaintsJSON, err := json.Marshal(user.Complaints)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "failed to marshal complaints: " + err.Error(),
-		})
-		return err
-	}
-
 	passwordHash, err := utils.HashPassword(user.Password)
 	if err != nil {
 		writeLog(logger.LogEntry{
@@ -153,8 +139,8 @@ func (s *Storage) AddUser(user models.User) error {
 
 	query := `
 		INSERT INTO users
-		(Name, FullName, LastName, Login, Password, Rating, Role, Class, Notes, Complaints)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		(Name, FullName, LastName, Login, Password, Rating, Role, Class)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = s.db.Exec(
@@ -167,8 +153,6 @@ func (s *Storage) AddUser(user models.User) error {
 		user.Rating,
 		user.Role,
 		user.Class,
-		string(notesJSON),
-		string(complaintsJSON),
 	)
 	if err != nil {
 		writeLog(logger.LogEntry{
@@ -183,7 +167,7 @@ func (s *Storage) AddUser(user models.User) error {
 	return err
 }
 
-func (s *Storage) SaveUser(user models.User) error {
+func (s *Storage) SaveUser(user models.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -195,50 +179,21 @@ func (s *Storage) SaveUser(user models.User) error {
 		Message: "saving user",
 	})
 
-	notesJSON, err := json.Marshal(user.Notes)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "save_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "failed to marshal notes: " + err.Error(),
-		})
-		return err
-	}
-	complaintsJSON, err := json.Marshal(user.Complaints)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "save_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "failed to marshal complaints: " + err.Error(),
-		})
-		return err
-	}
-
 	query := `UPDATE users SET Name = ?,
 	LastName = ?,
 	Login = ?,
-	Password = ?,
 	Rating = ?,
 	Role = ?,
 	Class = ?,
-	Notes = ?,
-	Complaints = ?
 	WHERE Id = ?`
 
-	_, err = s.db.Exec(query,
+	_, err := s.db.Exec(query,
 		user.Name,
 		user.LastName,
 		user.Login,
-		user.Password,
 		user.Rating,
 		user.Role,
 		user.Class,
-		string(notesJSON),
-		string(complaintsJSON),
 		user.ID,
 	)
 	if err != nil {
@@ -297,29 +252,6 @@ func (s *Storage) UpdateUser(user models.SafeUser) error {
 		return errors.New("user not found")
 	}
 
-	notesJSON, err := json.Marshal(user.Notes)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "update_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "failed to marshal notes: " + err.Error(),
-		})
-		return err
-	}
-	complaintsJSON, err := json.Marshal(user.Complaints)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "update_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "failed to marshal complaints: " + err.Error(),
-		})
-		return err
-	}
-
 	query := `UPDATE users SET Name = ?,
 	LastName = ?,
 	Login = ?,
@@ -337,8 +269,6 @@ func (s *Storage) UpdateUser(user models.SafeUser) error {
 		user.Rating,
 		user.Role,
 		user.Class,
-		string(notesJSON),
-		string(complaintsJSON),
 		user.ID,
 	)
 	if err != nil {
@@ -408,7 +338,7 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 	})
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, LastName, Login, Rating, Role, Class, Notes, Complaints
+		SELECT Id, Name, LastName, Login, Rating, Role, Class
 		FROM users
 	`)
 	if err != nil {
@@ -424,8 +354,6 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 	users := make([]models.SafeUser, 0)
 	for rows.Next() {
 		var u models.SafeUser
-		var notesJSON string
-		var complaintsJSON string
 
 		if err := rows.Scan(
 			&u.ID,
@@ -435,8 +363,6 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 			&u.Rating,
 			&u.Role,
 			&u.Class,
-			&notesJSON,
-			&complaintsJSON,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -444,32 +370,6 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 				Message: "failed to scan user: " + err.Error(),
 			})
 			return nil, err
-		}
-
-		if notesJSON != "" {
-			if err := json.Unmarshal([]byte(notesJSON), &u.Notes); err != nil {
-				writeLog(logger.LogEntry{
-					Level:   "error",
-					Action:  "get_all_users",
-					Login:   u.Login,
-					Role:    u.Role,
-					Message: "failed to unmarshal notes: " + err.Error(),
-				})
-				return nil, err
-			}
-		}
-
-		if complaintsJSON != "" {
-			if err := json.Unmarshal([]byte(complaintsJSON), &u.Complaints); err != nil {
-				writeLog(logger.LogEntry{
-					Level:   "error",
-					Action:  "get_all_users",
-					Login:   u.Login,
-					Role:    u.Role,
-					Message: "failed to unmarshal complaints: " + err.Error(),
-				})
-				return nil, err
-			}
 		}
 
 		users = append(users, u)
@@ -492,15 +392,13 @@ func (s *Storage) GetUserByLogin(login string) (*models.User, error) {
 	defer s.mu.Unlock()
 
 	row := s.db.QueryRow(`
-		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class, Notes, Complaints
+		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class
 		FROM users
 		WHERE Login = ?
 	`, login)
 
 	var u models.User
 	var fullNameJSON string
-	var notesJSON string
-	var complaintsJSON string
 
 	err := row.Scan(
 		&u.ID,
@@ -512,8 +410,6 @@ func (s *Storage) GetUserByLogin(login string) (*models.User, error) {
 		&u.Rating,
 		&u.Role,
 		&u.Class,
-		&notesJSON,
-		&complaintsJSON,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -540,34 +436,9 @@ func (s *Storage) GetUserByLogin(login string) (*models.User, error) {
 			return nil, err
 		}
 	}
-	if notesJSON != "" {
-		if err := json.Unmarshal([]byte(notesJSON), &u.Notes); err != nil {
-			writeLog(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_user_by_login",
-				Login:   login,
-				Role:    u.Role,
-				Message: "failed to unmarshal notes: " + err.Error(),
-			})
-			return nil, err
-		}
-	}
-	if complaintsJSON != "" {
-		if err := json.Unmarshal([]byte(complaintsJSON), &u.Complaints); err != nil {
-			writeLog(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_user_by_login",
-				Login:   login,
-				Role:    u.Role,
-				Message: "failed to unmarshal complaints: " + err.Error(),
-			})
-			return nil, err
-		}
-	}
 
 	return &u, nil
 }
-
 
 func (s *Storage) GetUsersByClass(class string) ([]models.SafeUser, error) {
 	s.mu.Lock()
@@ -615,37 +486,6 @@ func (s *Storage) GetUsersByClass(class string) ([]models.SafeUser, error) {
 			return nil, err
 		}
 
-		if notesJSON != "" {
-			if err := json.Unmarshal([]byte(notesJSON), &u.Notes); err != nil {
-				writeLog(logger.LogEntry{
-					Level:   "error",
-					Action:  "get_users_by_class",
-					Class:   class,
-					Login:   u.Login,
-					Role:    u.Role,
-					Message: "failed to unmarshal notes: " + err.Error(),
-				})
-				return nil, err
-			}
-		}
-
-		if complaintsJSON != "" {
-			if err := json.Unmarshal([]byte(complaintsJSON), &u.Complaints); err != nil {
-				writeLog(logger.LogEntry{
-					Level:   "error",
-					Action:  "get_users_by_class",
-					Class:   class,
-					Login:   u.Login,
-					Role:    u.Role,
-					Message: "failed to unmarshal complaints: " + err.Error(),
-				})
-				return nil, err
-			}
-		}
-
-		users = append(users, u)
-	}
-
 	if err := rows.Err(); err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "error",
@@ -654,7 +494,7 @@ func (s *Storage) GetUsersByClass(class string) ([]models.SafeUser, error) {
 			Message: "row iteration failed: " + err.Error(),
 		})
 		return nil, err
-	}
-
+	}}
+	
 	return users, nil
 }

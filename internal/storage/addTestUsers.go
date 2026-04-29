@@ -20,8 +20,6 @@ func (s *Storage) SeedTestUsers() error {
 			Rating:   100,
 			Role:     "Owner",
 			Class:    "10A",
-			Notes:    []models.Note{},
-			Complaints: []models.Complaint{},
 		},
 		{
 			Name:     "Petr",
@@ -32,8 +30,6 @@ func (s *Storage) SeedTestUsers() error {
 			Rating:   90,
 			Role:     "Admin",
 			Class:    "10A",
-			Notes:    []models.Note{},
-			Complaints: []models.Complaint{},
 		},
 		{
 			Name:     "Olga",
@@ -44,20 +40,16 @@ func (s *Storage) SeedTestUsers() error {
 			Rating:   80,
 			Role:     "Helper",
 			Class:    "10A",
-			Notes:    []models.Note{},
-			Complaints: []models.Complaint{},
 		},
 		{
-			Name:     "Sidor",
-			LastName: "Parent",
-			FullName: []models.FullName{{Name: "Sidor", LastName: "Parent"}},
+			Name:     "Sidr",
+			LastName: "MrLoveSidr",
+			FullName: []models.FullName{{Name: "Sidr", LastName: "MrLoveSidr"}},
 			Login:    "User",
 			Password: "123456",
 			Rating:   70,
 			Role:     "User",
 			Class:    "10A",
-			Notes:    []models.Note{},
-			Complaints: []models.Complaint{},
 		},
 	}
 
@@ -69,22 +61,12 @@ func (s *Storage) SeedTestUsers() error {
 
 	query := `
 		INSERT OR IGNORE INTO users
-		(Name, FullName, LastName, Login, Password, Rating, Role, Class, Notes, Complaints)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		(Name, FullName, LastName, Login, Password, Rating, Role, Class)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	for _, user := range users {
 		fullNameJSON, err := json.Marshal(user.FullName)
-		if err != nil {
-			return err
-		}
-
-		notesJSON, err := json.Marshal(user.Notes)
-		if err != nil {
-			return err
-		}
-
-		complaintsJSON, err := json.Marshal(user.Complaints)
 		if err != nil {
 			return err
 		}
@@ -104,8 +86,6 @@ func (s *Storage) SeedTestUsers() error {
 			user.Rating,
 			user.Role,
 			user.Class,
-			string(notesJSON),
-			string(complaintsJSON),
 		)
 		if err != nil {
 			return err
