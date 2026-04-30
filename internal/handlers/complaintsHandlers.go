@@ -3,7 +3,7 @@ package handlers
 import (
 	"cspirt/internal/logger"
 	"cspirt/internal/models"
-	sr "cspirt/internal/service/notes"
+	sr "cspirt/internal/service/complaints"
 	"cspirt/internal/storage"
 	u "cspirt/internal/utils/auth"
 
@@ -13,23 +13,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetNotesHandler(s *storage.Storage) gin.HandlerFunc {
+func GetComplaintsHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		notes := sr.NewNoteService(s, s.Secret)
-		result, err := notes.GetAllNotes()
+		complaints := sr.NewComplaintsService(s.ComplaintsRepo, s.Secret)
+		result, err := complaints.GetAllComplaints()
 		if err != nil || result == nil {
 			c.JSON(500, gin.H{"error":"Server error"})
 			return 
 		}
 
-		c.JSON(200, gin.H{"All_notes": result})
+		c.JSON(200, gin.H{"All_complaints": result})
 	}
 }
 
-func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
+func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
-		notes := sr.NewNoteService(s, s.Secret)
+		notes := sr.NewComplaintsService(s.ComplaintsRepo, s.Secret)
 		user, err := s.GetUserByLogin(login)
 		if err != nil {
 			writeLog(logger.LogEntry{
@@ -41,7 +41,7 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 			return 
 		}
 
-		var in *models.AddNewNoteResponse
+		var in *models.AddNewComplaintResponse
 		if err := c.ShouldBindJSON(&in); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "info",
@@ -63,7 +63,7 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 			Class: user.Class,
 		} 
 
-		result := notes.AddNewNote(login, in, needUser)
+		result := notes.AddNewComplaint(login, in, needUser)
 		if err != nil || result == nil {
 			c.JSON(500, gin.H{"error":"Server error"})
 			return 
@@ -81,7 +81,7 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
-func DeleteNoteHandler(s *storage.Storage) gin.HandlerFunc {
+func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
 		idStr := c.Param("id")

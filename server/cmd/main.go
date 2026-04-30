@@ -65,7 +65,7 @@ func main() {
 		// user handlers
 		auth.GET("/users", handlers.GetUsersHandler(s))
 		auth.PATCH("/user/add", handlers.AddUserHandler(s))
-		auth.PATCH("/user/delete", handlers.DeleteUserHandler(s))
+		auth.DELETE("/user/delete/:id", handlers.DeleteUserHandler(s))
 		auth.GET("/me", handlers.GetMeHandler(s))
 
 		// Rating handlers
@@ -75,7 +75,12 @@ func main() {
 		// Notes handlers
 		auth.GET("/notes", handlers.GetNotesHandler(s))
 		auth.PATCH("/note/add", handlers.AddNoteHandler(s))
-		auth.PATCH("/note/delete", handlers.DeleteNoteHandler(s))
+		auth.DELETE("/note/delete/:id", handlers.DeleteNoteHandler(s))
+
+		// Complaints handlers
+		auth.GET("/complaints", handlers.GetComplaintsHandler(s))
+		auth.PATCH("/complaint/add", handlers.AddcomplaintHandler(s))
+		auth.DELETE("/complaint/delete/:id", handlers.DeletecomplaintHandler(s))
 	}
 
 	addr := os.Getenv("PORT")

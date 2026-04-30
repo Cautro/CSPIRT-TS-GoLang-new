@@ -17,6 +17,7 @@ type Storage struct {
 
 	RatingRepo repo.RatingRepository
 	NotesRepo repo.NoteRepository
+	ComplaintsRepo repo.ComplaintRepository
 
 	Secret string
 }

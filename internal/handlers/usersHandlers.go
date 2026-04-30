@@ -8,6 +8,7 @@ import (
 	u "cspirt/internal/utils/auth"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
 )
 
 func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
@@ -119,6 +120,12 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
+		idStr := c.Param("id")
+		idInt, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+			return
+		}
 		var user models.User
 
 		if login == "" {
@@ -148,39 +155,18 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		switch foundUser.Role {
-		case "admin":
-		case "owner":
-		case "user":
+		checkRole, err := u.CheckUserRole(s, login, string(models.RoleAdmin), string(models.RoleOwner))
+		if err != nil || !checkRole {
 			writeLog(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_user",
 				Login:   login,
 				Role:    foundUser.Role,
-				Message: "users cannot delete users",
+				Class:   foundUser.Class,
+				Message: "User without need roles trying to delete user",
 			})
-			c.JSON(http.StatusForbidden, gin.H{"error": "Users cannot delete users"})
-			return
-		case "helper":
-			writeLog(logger.LogEntry{
-				Level:   "info",
-				Action:  "delete_user",
-				Login:   login,
-				Role:    foundUser.Role,
-				Message: "helpers cannot delete users",
-			})
-			c.JSON(http.StatusForbidden, gin.H{"error": "Helpers cannot delete users"})
-			return
-		default:
-			writeLog(logger.LogEntry{
-				Level:   "info",
-				Action:  "delete_user",
-				Login:   login,
-				Role:    foundUser.Role,
-				Message: "unknown role",
-			})
-			c.JSON(http.StatusForbidden, gin.H{"error": "Unknown role"})
-			return
+			c.JSON(http.StatusBadRequest, gin.H{"error": "You dont have permisions for thats action"})
+			return 
 		}
 
 		if err := c.ShouldBindBodyWithJSON(&user); err != nil {
@@ -196,7 +182,8 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		userService := sr.NewUsersService(s, s.Secret)
-		if err := userService.DeleteUserHandlerService(user); err != nil {
+
+		if err := userService.DeleteUserHandlerService(idInt, *foundUser); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

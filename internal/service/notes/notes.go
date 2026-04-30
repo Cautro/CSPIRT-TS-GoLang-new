@@ -47,3 +47,16 @@ func (s *NoteService) AddNewNote(login string, in *models.AddNewNoteResponse, us
 
 	return nil
 }
+
+func (s *NoteService) DeleteNote(id int, user models.SafeUser) error {
+	err := s.notes.DeleteNote(id, user)
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level: "info",
+			Action: "delete_note",
+			Message: "Error to delete note",
+		})
+		return errors.New("Server error")
+	}
+	return nil
+}

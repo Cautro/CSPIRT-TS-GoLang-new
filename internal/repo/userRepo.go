@@ -6,7 +6,7 @@ import (
 )
 
 type UserRepository interface {
-	DeleteUser(user models.User) error
+	DeleteUser(id int, user models.SafeUser) error
 	AddUser(user models.User) error
 	SaveUser(user models.SafeUser) error
 	GetAllUsers() ([]models.SafeUser, error)

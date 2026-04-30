@@ -292,7 +292,7 @@ func (s *Storage) UpdateUser(user models.SafeUser) error {
 	return err
 }
 
-func (s *Storage) DeleteUser(user models.User) error {
+func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -305,7 +305,7 @@ func (s *Storage) DeleteUser(user models.User) error {
 	})
 
 	query := `DELETE FROM users WHERE Id = ?`
-	_, err := s.db.Exec(query, user.ID)
+	_, err := s.db.Exec(query, id)
 	if err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "error",
