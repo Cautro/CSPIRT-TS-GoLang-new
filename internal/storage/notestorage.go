@@ -145,6 +145,67 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 	return notes, nil
 }
 
+func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	writeLog(logger.LogEntry{
+		Level:   "info",
+		Action:  "get_note_by_user_id",
+		Message: "getting needed note by user id",
+	})
+
+	rows, err := s.db.Query(`
+		SELECT Id, TargetID, AuthorID, Content, CreatedAt
+		FROM notes
+		WHERE TargetID = ?
+	`, User_id)
+
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_note_by_user_id",
+			Message: "failed to query notes: " + err.Error(),
+		})
+		return nil, err
+	}
+	defer rows.Close()
+
+	notes := make([]models.Note, 0)
+
+	for rows.Next() {
+		var n models.Note
+
+		if err := rows.Scan(
+			&n.ID,
+			&n.TargetID,
+			&n.AuthorID,
+			&n.Content,
+			&n.CreatedAt,
+		); err != nil {
+			writeLog(logger.LogEntry{
+				Level:   "error",
+				Action:  "get_note_by_user_id",
+				Message: "Server error: " + err.Error(),
+			})
+			return []models.Note{}, err
+		}
+
+		notes = append(notes, n)
+	}
+
+	if err := rows.Err(); err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_note_by_user_id",
+			Message: "row iteration failed: " + err.Error(),
+		})
+		return nil, err
+	}
+
+	return notes, nil
+}
+
 func (s *Storage) GetNoteByID(id int) ([]models.Note, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

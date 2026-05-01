@@ -70,9 +70,9 @@ func main() {
 
 		// Class handlers
 		auth.GET("/classes", handlers.GetClassesHandler(s))
-		auth.GET("/classes/:class/users", handlers.GetClassUsersHandler(s))
-		auth.GET("/classes/:class/teacher", handlers.GetClassTeacherHandler(s)) // Получить учитель
-		auth.PATCH("/classes/:class/teacher", handlers.SetClassTeacherHandler(s)) // Установить учителя
+		auth.GET("/classes/:class_id/users", handlers.GetClassUsersHandler(s))
+		auth.GET("/classes/:class_id/teacher", handlers.GetClassTeacherHandler(s))   // Получить учитель
+		auth.PATCH("/classes/:class_id/teacher", handlers.SetClassTeacherHandler(s)) // Установить учителя
 
 		// Rating handlers
 		auth.GET("/rating", handlers.GetRatingsHandler(s))

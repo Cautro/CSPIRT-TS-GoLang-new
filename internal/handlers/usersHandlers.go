@@ -6,10 +6,11 @@ import (
 	sr "cspirt/internal/service/users"
 	"cspirt/internal/storage"
 	u "cspirt/internal/utils/auth"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
@@ -37,7 +38,7 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 				Message: "users, helpers and admins view the list of users in the them class",
 			})
 
-			users, err := userService.GetUsersByClassHandlerService(user.Class)
+			users, err := userService.GetUsersByClassIDHandlerService(user.ClassID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
 				return
@@ -224,17 +225,24 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		resp := models.SafeUser{
-			ID:       user.ID,
-			Name:     user.Name,
-			LastName: user.LastName,
-			FullName: user.FullName,
-			Login:    user.Login,
-			Rating:   user.Rating,
-			Role:     user.Role,
-			Class:    user.Class,
+		note, err := s.NotesRepo.GetNotesByUserId(user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve notes"})
+			return
+		}
+		complaints, err := s.ComplaintsRepo.GetComplaintsByUserId(user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve complaints"})
+			return
+		}
+		resp := u.UserToSafeUser(*user)
+
+		AnswerResponse := models.UserWithFullInfo{
+			User:       resp,
+			Notes:      note,
+			Complaints: complaints,
 		}
 
-		c.JSON(http.StatusOK, resp)
+		c.JSON(http.StatusOK, AnswerResponse)
 	}
 }

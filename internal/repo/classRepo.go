@@ -4,9 +4,9 @@ import "cspirt/internal/models"
 
 type ClassRepository interface {
 	EnsureClass(name string) error
-	SaveClassTeacher(name string, teacherLogin string) error
+	SaveClassTeacherByID(classID int, teacherLogin string) error
 	GetAllClasses() ([]models.Class, error)
-	GetClassByName(name string) (*models.Class, error)
-	GetClassTeacher(name string) (*models.SafeUser, error)
-	GetUsersByClass(name string) ([]models.SafeUser, error)
+	GetClassByID(id int) (*models.Class, error)
+	GetClassTeacherByID(classID int) (*models.SafeUser, error)
+	GetUsersByClassID(classID int) ([]models.SafeUser, error)
 }

@@ -70,6 +70,7 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 			Rating:   user.Rating,
 			Role:     user.Role,
 			Class:    user.Class,
+			ClassID:  user.ClassID,
 		}
 
 		if err := notes.AddNewNote(login, &in, needUser); err != nil {

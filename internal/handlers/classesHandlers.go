@@ -6,6 +6,7 @@ import (
 	sr "cspirt/internal/service/classes"
 	"cspirt/internal/storage"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -40,18 +41,31 @@ func GetClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		className := c.Param("class")
-		if className == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class is required"})
-			return
-		}
-		if !canReadClass(user, className) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this class"})
+		classIdStr := c.Param("class_id")
+		classId, err := strconv.Atoi(classIdStr)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Class ID format"})
 			return
 		}
 
 		classService := sr.NewClassService(s, s.Secret)
-		users, err := classService.GetUsersByClass(className)
+		class, err := classService.GetClassByID(classId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
+			return
+		}
+		if class == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
+			return
+		}
+
+		if !canReadClass(user, classId) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this class"})
+			return
+		}
+
+		users, err := classService.GetUsersByClassID(classId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
 			return
@@ -68,18 +82,30 @@ func GetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		className := c.Param("class")
-		if className == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class is required"})
-			return
-		}
-		if !canReadClass(user, className) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this class"})
+		classIdStr := c.Param("class_id")
+		classId, err := strconv.Atoi(classIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Class ID format"})
 			return
 		}
 
 		classService := sr.NewClassService(s, s.Secret)
-		teacher, err := classService.GetClassTeacher(className)
+		class, err := classService.GetClassByID(classId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
+			return
+		}
+		if class == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
+			return
+		}
+
+		if !canReadClass(user, classId) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this class"})
+			return
+		}
+
+		teacher, err := classService.GetClassTeacher(classId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class teacher"})
 			return
@@ -104,9 +130,10 @@ func SetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		className := c.Param("class")
-		if className == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Class is required"})
+		classIdStr := c.Param("class_id")
+		classId, err := strconv.Atoi(classIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Class ID format"})
 			return
 		}
 
@@ -117,7 +144,7 @@ func SetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		classService := sr.NewClassService(s, s.Secret)
-		if err := classService.SetClassTeacher(className, input.TeacherLogin); err != nil {
+		if err := classService.SetClassTeacher(classId, input.TeacherLogin); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -165,10 +192,10 @@ func canManageClasses(role string) bool {
 		strings.EqualFold(role, string(models.RoleOwner))
 }
 
-func canReadClass(user *models.User, className string) bool {
+func canReadClass(user *models.User, classID int) bool {
 	if canManageClasses(user.Role) {
 		return true
 	}
 
-	return strings.EqualFold(strings.TrimSpace(user.Class), strings.TrimSpace(className))
+	return user.ClassID == classID
 }

@@ -68,14 +68,14 @@ func (s *Storage) AddUser(user models.User) error {
 		return err
 	}
 
-	if err := s.ensureClassLocked(user.Class); err != nil {
+	if err := s.resolveUserClassLocked(&user); err != nil {
 		return err
 	}
 
 	query := `
 		INSERT INTO users
-		(Name, FullName, LastName, Login, Password, Rating, Role, Class)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		(Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = s.db.Exec(
@@ -88,6 +88,7 @@ func (s *Storage) AddUser(user models.User) error {
 		user.Rating,
 		user.Role,
 		user.Class,
+		user.ClassID,
 	)
 	if err != nil {
 		writeLog(logger.LogEntry{
@@ -101,7 +102,7 @@ func (s *Storage) AddUser(user models.User) error {
 		return err
 	}
 
-	if err := s.syncClassLocked(user.Class); err != nil {
+	if err := s.syncClassByIDLocked(user.ClassID); err != nil {
 		return err
 	}
 
@@ -113,9 +114,9 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 	defer s.mu.Unlock()
 
 	user.Login = normalizeLogin(user.Login)
-	user.Class = normalizeClassName(user.Class)
 	user.Name = strings.TrimSpace(user.Name)
 	user.LastName = strings.TrimSpace(user.LastName)
+	user.Class = normalizeClassName(user.Class)
 
 	role, err := normalizeRole(user.Role)
 	if err != nil {
@@ -135,9 +136,6 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 	if user.LastName == "" {
 		return errors.New("last name is required")
 	}
-	if user.Class == "" {
-		return errors.New("class is required")
-	}
 	user.Rating = clampRating(user.Rating)
 
 	oldUser, err := s.getUserByIDLocked(user.ID)
@@ -146,6 +144,9 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 	}
 	if oldUser == nil {
 		return errors.New("user not found")
+	}
+	if err := s.resolveSafeUserClassLocked(&user); err != nil {
+		return err
 	}
 
 	fullNameJSON, err := json.Marshal(user.FullName)
@@ -167,7 +168,7 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 
 	query := `
 		UPDATE users
-		SET Name = ?, FullName = ?, LastName = ?, Login = ?, Rating = ?, Role = ?, Class = ?
+		SET Name = ?, FullName = ?, LastName = ?, Login = ?, Rating = ?, Role = ?, Class = ?, ClassID = ?
 		WHERE Id = ?
 	`
 
@@ -180,6 +181,7 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 		user.Rating,
 		user.Role,
 		user.Class,
+		user.ClassID,
 		user.ID,
 	)
 	if err != nil {
@@ -198,14 +200,11 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 		return errors.New("user not found")
 	}
 
-	if err := s.ensureClassLocked(user.Class); err != nil {
+	if err := s.syncClassByIDLocked(user.ClassID); err != nil {
 		return err
 	}
-	if err := s.syncClassLocked(user.Class); err != nil {
-		return err
-	}
-	if normalizeClassName(oldUser.Class) != user.Class {
-		if err := s.syncClassLocked(oldUser.Class); err != nil {
+	if oldUser.ClassID != 0 && oldUser.ClassID != user.ClassID {
+		if err := s.syncClassByIDLocked(oldUser.ClassID); err != nil {
 			return err
 		}
 	}
@@ -248,7 +247,7 @@ func (s *Storage) UpdateRating(login string, rating int) error {
 		return err
 	}
 
-	return s.syncClassLocked(user.Class)
+	return s.syncClassByIDLocked(user.ClassID)
 }
 
 func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
@@ -289,7 +288,11 @@ func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
 		return errors.New("user not found")
 	}
 
-	if err := s.syncClassLocked(deletedUser.Class); err != nil {
+	if deletedUser.ClassID != 0 {
+		if err := s.syncClassByIDLocked(deletedUser.ClassID); err != nil {
+			return err
+		}
+	} else if err := s.syncClassLocked(deletedUser.Class); err != nil {
 		return err
 	}
 
@@ -315,9 +318,9 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 	})
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class
+		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
 		FROM users
-		ORDER BY Class, LastName, Name, Login
+		ORDER BY ClassID, LastName, Name, Login
 	`)
 	if err != nil {
 		writeLog(logger.LogEntry{
@@ -349,29 +352,6 @@ func (s *Storage) GetUserByLogin(login string) (*models.User, error) {
 	return s.getUserByLoginLocked(login)
 }
 
-func (s *Storage) GetUsersByClass(className string) ([]models.SafeUser, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	className = normalizeClassName(className)
-	if className == "" {
-		return nil, errors.New("class is required")
-	}
-
-	users, err := s.getUsersByClassLocked(className)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_users_by_class",
-			Class:   className,
-			Message: "failed to query users: " + err.Error(),
-		})
-		return nil, err
-	}
-
-	return users, nil
-}
-
 func (s *Storage) GetUserByID(id int) (*models.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -392,7 +372,7 @@ func validateNewUser(user *models.User) error {
 	if user.Role == "" {
 		return errors.New("role is required")
 	}
-	if user.Class == "" {
+	if user.Class == "" && user.ClassID <= 0 {
 		return errors.New("class is required")
 	}
 	if user.Rating < 0 {
@@ -427,19 +407,68 @@ func clampRating(rating int) int {
 	return rating
 }
 
-func (s *Storage) getUsersByClassLocked(className string) ([]models.SafeUser, error) {
-	rows, err := s.db.Query(`
-		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class
-		FROM users
-		WHERE Class = ?
-		ORDER BY LastName, Name, Login
-	`, normalizeClassName(className))
-	if err != nil {
-		return nil, err
+func (s *Storage) resolveUserClassLocked(user *models.User) error {
+	if user.ClassID > 0 {
+		class, err := s.getClassByIDLocked(user.ClassID)
+		if err != nil {
+			return err
+		}
+		if class == nil {
+			return errors.New("class not found")
+		}
+		user.Class = class.Name
+		return nil
 	}
-	defer rows.Close()
 
-	return scanSafeUsers(rows)
+	if user.Class == "" {
+		return errors.New("class is required")
+	}
+	if err := s.ensureClassLocked(user.Class); err != nil {
+		return err
+	}
+
+	classID, err := s.getClassIDByNameLocked(user.Class)
+	if err != nil {
+		return err
+	}
+	if classID == 0 {
+		return errors.New("class not found")
+	}
+
+	user.ClassID = classID
+	return nil
+}
+
+func (s *Storage) resolveSafeUserClassLocked(user *models.SafeUser) error {
+	if user.ClassID > 0 {
+		class, err := s.getClassByIDLocked(user.ClassID)
+		if err != nil {
+			return err
+		}
+		if class == nil {
+			return errors.New("class not found")
+		}
+		user.Class = class.Name
+		return nil
+	}
+
+	if user.Class == "" {
+		return errors.New("class is required")
+	}
+	if err := s.ensureClassLocked(user.Class); err != nil {
+		return err
+	}
+
+	classID, err := s.getClassIDByNameLocked(user.Class)
+	if err != nil {
+		return err
+	}
+	if classID == 0 {
+		return errors.New("class not found")
+	}
+
+	user.ClassID = classID
+	return nil
 }
 
 func (s *Storage) getSafeUserByLoginLocked(login string) (*models.SafeUser, error) {
@@ -460,12 +489,13 @@ func (s *Storage) getSafeUserByLoginLocked(login string) (*models.SafeUser, erro
 		Rating:   user.Rating,
 		Role:     user.Role,
 		Class:    user.Class,
+		ClassID:  user.ClassID,
 	}, nil
 }
 
 func (s *Storage) getUserByLoginLocked(login string) (*models.User, error) {
 	row := s.db.QueryRow(`
-		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class
+		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID
 		FROM users
 		WHERE Login = ?
 	`, normalizeLogin(login))
@@ -475,7 +505,7 @@ func (s *Storage) getUserByLoginLocked(login string) (*models.User, error) {
 
 func (s *Storage) getUserByIDLocked(id int) (*models.User, error) {
 	row := s.db.QueryRow(`
-		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class
+		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID
 		FROM users
 		WHERE Id = ?
 	`, id)
@@ -501,6 +531,7 @@ func scanUser(scanner userScanner) (*models.User, error) {
 		&user.Rating,
 		&user.Role,
 		&user.Class,
+		&user.ClassID,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -537,6 +568,7 @@ func scanSafeUsers(rows *sql.Rows) ([]models.SafeUser, error) {
 			&user.Rating,
 			&user.Role,
 			&user.Class,
+			&user.ClassID,
 		); err != nil {
 			return nil, err
 		}

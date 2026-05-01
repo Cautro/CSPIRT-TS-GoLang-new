@@ -12,6 +12,7 @@ type User struct {
 	Rating   int        `json:"Rating"`
 	Role     string     `json:"Role"`
 	Class    string     `json:"Class"`
+	ClassID  int        `json:"ClassID"`
 }
 
 type SafeUser struct {
@@ -23,6 +24,23 @@ type SafeUser struct {
 	Rating   int        `json:"Rating"`
 	Role     string     `json:"Role"`
 	Class    string     `json:"Class"`
+	ClassID  int        `json:"ClassID"`
+}
+
+type UserWithFullInfo struct {
+	User       *SafeUser
+	Notes      []Note
+	Complaints []Complaint
+	Events     []Event
+}
+
+type Event struct {
+	ID          int
+	Title       string
+	Description string
+	CreatedAt   string
+	startedAt   string
+	Players     []int
 }
 
 type FullName struct {

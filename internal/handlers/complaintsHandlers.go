@@ -70,6 +70,7 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			Rating:   user.Rating,
 			Role:     user.Role,
 			Class:    user.Class,
+			ClassID:  user.ClassID,
 		}
 
 		if err := complaints.AddNewComplaint(login, &in, needUser); err != nil {

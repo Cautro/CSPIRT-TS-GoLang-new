@@ -23,8 +23,8 @@ func (s *UsersService) GetUsersHandlerService() ([]models.SafeUser, error) {
 	return users, nil
 }
 
-func (s *UsersService) GetUsersByClassHandlerService(class string) ([]models.SafeUser, error) {
-	users, err := s.users.GetUsersByClass(class)
+func (s *UsersService) GetUsersByClassIDHandlerService(classID int) ([]models.SafeUser, error) {
+	users, err := s.users.GetUsersByClassID(classID)
 	if err != nil {
 		return nil, err
 	}

@@ -11,7 +11,7 @@ type UserRepository interface {
 	SaveUser(user models.SafeUser) error
 	GetAllUsers() ([]models.SafeUser, error)
 	GetUserByLogin(login string) (*models.User, error)
-	GetUsersByClass(class string) ([]models.SafeUser, error)
+	GetUsersByClassID(classID int) ([]models.SafeUser, error)
 	GetUserByID(id int) (*models.User, error)
 	SaveRefreshToken(userID int, token string, expiresAt time.Time) error
 	GetRefreshToken(token string) (*models.RefreshToken, error)

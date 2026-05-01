@@ -95,6 +95,7 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user
 		Login:    targetUser.Login,
 		Role:     targetUser.Role,
 		Class:    targetUser.Class,
+		ClassID:  targetUser.ClassID,
 		Rating:   targetUser.Rating,
 	}
 

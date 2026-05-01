@@ -216,3 +216,64 @@ func (s *Storage) GetComplaintByID(id int) ([]models.Complaint, error) {
 
 	return complaints, nil
 }
+
+func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	writeLog(logger.LogEntry{
+		Level:   "info",
+		Action:  "get_complaint_by_user_id",
+		Message: "getting needed complaint by user id",
+	})
+
+	rows, err := s.db.Query(`
+		SELECT Id, TargetID, AuthorID, Content, CreatedAt
+		FROM complaints
+		WHERE TargetID = ?
+	`, User_id)
+
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_complaint_by_user_id",
+			Message: "failed to query complaints: " + err.Error(),
+		})
+		return nil, err
+	}
+	defer rows.Close()
+
+	complaints := make([]models.Complaint, 0)
+
+	for rows.Next() {
+		var n models.Complaint
+
+		if err := rows.Scan(
+			&n.ID,
+			&n.TargetID,
+			&n.AuthorID,
+			&n.Content,
+			&n.CreatedAt,
+		); err != nil {
+			writeLog(logger.LogEntry{
+				Level:   "error",
+				Action:  "get_complaint_by_user_id",
+				Message: "Server error: " + err.Error(),
+			})
+			return []models.Complaint{}, err
+		}
+
+		complaints = append(complaints, n)
+	}
+
+	if err := rows.Err(); err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_note_by_user_id",
+			Message: "row iteration failed: " + err.Error(),
+		})
+		return nil, err
+	}
+
+	return complaints, nil
+}

@@ -37,11 +37,15 @@ func (s *Storage) initUserStorage() error {
 		Password TEXT NOT NULL,
 		Rating INTEGER NOT NULL DEFAULT 500,
 		Role TEXT NOT NULL,
-		Class TEXT NOT NULL
+		Class TEXT NOT NULL,
+		ClassID INTEGER
 	);`
 
-	_, err := s.db.Exec(query)
-	return err
+	if _, err := s.db.Exec(query); err != nil {
+		return err
+	}
+
+	return s.ensureColumn("users", "ClassID", "INTEGER")
 }
 
 func (s *Storage) initNoteStorage() error {
@@ -158,4 +162,34 @@ func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
 
 func (s *Storage) Close() error {
 	return s.db.Close()
+}
+
+func (s *Storage) ensureColumn(table string, column string, definition string) error {
+	rows, err := s.db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue sql.NullString
+		var pk int
+
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column + ` ` + definition)
+	return err
 }

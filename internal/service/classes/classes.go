@@ -27,8 +27,12 @@ func (s *ClassService) GetAllClasses() ([]models.Class, error) {
 	return classes, nil
 }
 
-func (s *ClassService) GetUsersByClass(name string) ([]models.SafeUser, error) {
-	users, err := s.classes.GetUsersByClass(name)
+func (s *ClassService) GetClassByID(classID int) (*models.Class, error) {
+	return s.classes.GetClassByID(classID)
+}
+
+func (s *ClassService) GetUsersByClassID(classID int) ([]models.SafeUser, error) {
+	users, err := s.classes.GetUsersByClassID(classID)
 	if err != nil {
 		return nil, err
 	}
@@ -39,10 +43,10 @@ func (s *ClassService) GetUsersByClass(name string) ([]models.SafeUser, error) {
 	return users, nil
 }
 
-func (s *ClassService) GetClassTeacher(name string) (*models.SafeUser, error) {
-	return s.classes.GetClassTeacher(name)
+func (s *ClassService) GetClassTeacher(classID int) (*models.SafeUser, error) {
+	return s.classes.GetClassTeacherByID(classID)
 }
 
-func (s *ClassService) SetClassTeacher(name string, teacherLogin string) error {
-	return s.classes.SaveClassTeacher(name, teacherLogin)
+func (s *ClassService) SetClassTeacher(classID int, teacherLogin string) error {
+	return s.classes.SaveClassTeacherByID(classID, teacherLogin)
 }
