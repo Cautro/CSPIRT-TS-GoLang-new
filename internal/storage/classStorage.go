@@ -83,7 +83,7 @@ func (s *Storage) SaveClassTeacher(name string, teacherLogin string) error {
 
 	_, err = s.db.Exec(`
 		UPDATE classes
-		SET TeacherLogin = ?, UpdatedAt = CURRENT_TIMESTAMP
+		SET TeacherLogin = ?
 		WHERE Name = ?
 	`, teacher.Login, name)
 	if err != nil {
@@ -346,7 +346,7 @@ func (s *Storage) syncClassLocked(name string) error {
 
 	_, err = s.db.Exec(`
 		UPDATE classes
-		SET Members = ?, TotalRating = ?, TeacherLogin = ?, UpdatedAt = CURRENT_TIMESTAMP
+		SET Members = ?, TotalRating = ?, TeacherLogin = ?
 		WHERE Name = ?
 	`, string(membersJSON), totalRating, teacherLogin, name)
 	return err
@@ -448,7 +448,7 @@ func (s *Storage) findTeacherCandidateLocked(name string) (string, error) {
 		SELECT Login
 		FROM users
 		WHERE Class = ?
-		  AND LOWER(Role) IN ('admin', 'owner', 'helper')
+		AND LOWER(Role) IN ('admin', 'owner', 'helper')
 		ORDER BY
 			CASE LOWER(Role)
 				WHEN 'admin' THEN 0
