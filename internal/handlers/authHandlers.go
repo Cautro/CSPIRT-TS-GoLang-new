@@ -5,6 +5,9 @@ import (
 	"cspirt/internal/models"
 	sr "cspirt/internal/service/auth"
 	"cspirt/internal/storage"
+	"net/http"
+	"os"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -33,13 +36,14 @@ func LoginHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
+		c.SetSameSite(http.SameSiteLaxMode)
 		c.SetCookie(
 			"refresh_token",
 			result.RefreshToken,
 			3600*24*7,
 			"/api/refresh",
 			"",
-			false,
+			os.Getenv("COOKIE_SECURE") == "1",
 			true,
 		)
 
@@ -77,5 +81,3 @@ func RefreshHandler(s *storage.Storage) gin.HandlerFunc {
 		})
 	}
 }
-
-

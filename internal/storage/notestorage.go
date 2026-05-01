@@ -3,11 +3,25 @@ package storage
 import (
 	"cspirt/internal/logger"
 	"cspirt/internal/models"
+	"errors"
+	"strings"
+	"time"
 )
 
 func (s *Storage) AddNote(login string, note models.Note, user models.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	note.Content = strings.TrimSpace(note.Content)
+	if note.TargetID <= 0 || note.AuthorID <= 0 {
+		return errors.New("target and author are required")
+	}
+	if note.Content == "" {
+		return errors.New("content is required")
+	}
+	if note.CreatedAt == "" {
+		note.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
 
 	query := `
 		INSERT INTO notes
@@ -41,14 +55,14 @@ func (s *Storage) DeleteNote(id int, user models.SafeUser) error {
 
 	writeLog(logger.LogEntry{
 		Level:   "info",
-		Action:  "delete_user",
+		Action:  "delete_note",
+		Message: "deleting note",
 		Login:   user.Login,
 		Role:    user.Role,
-		Message: "deleting user",
 	})
 
 	query := `DELETE FROM notes WHERE Id = ?`
-	_, err := s.db.Exec(query, id)
+	result, err := s.db.Exec(query, id)
 	if err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "error",
@@ -58,6 +72,9 @@ func (s *Storage) DeleteNote(id int, user models.SafeUser) error {
 			Message: "failed to delete note: " + err.Error(),
 		})
 		return err
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return errors.New("note not found")
 	}
 
 	writeLog(logger.LogEntry{
@@ -142,7 +159,7 @@ func (s *Storage) GetNoteByID(id int) ([]models.Note, error) {
 		SELECT Id, TargetID, AuthorID, Content, CreatedAt
 		FROM notes
 		WHERE Id = ?
-	`)
+	`, id)
 	if err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "error",

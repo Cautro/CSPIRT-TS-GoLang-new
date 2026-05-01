@@ -68,6 +68,12 @@ func main() {
 		auth.DELETE("/user/delete/:id", handlers.DeleteUserHandler(s))
 		auth.GET("/me", handlers.GetMeHandler(s))
 
+		// Class handlers
+		auth.GET("/classes", handlers.GetClassesHandler(s))
+		auth.GET("/classes/:class/users", handlers.GetClassUsersHandler(s))
+		auth.GET("/classes/:class/teacher", handlers.GetClassTeacherHandler(s)) // Получить учитель
+		auth.PATCH("/classes/:class/teacher", handlers.SetClassTeacherHandler(s)) // Установить учителя
+
 		// Rating handlers
 		auth.GET("/rating", handlers.GetRatingsHandler(s))
 		auth.PATCH("/rating/update", handlers.UpdateRatingsHandler(rs.NewRatingsService(s, s.Secret), s))

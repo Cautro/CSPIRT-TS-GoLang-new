@@ -1,4 +1,4 @@
-package complaints
+package complaintservice
 
 import (
 	"cspirt/internal/logger"
@@ -20,12 +20,15 @@ func NewComplaintsService(complaints repo.ComplaintRepository, jwtSecret string)
 func (s *ComplaintService) GetAllComplaints() ([]models.Complaint, error) {
 	result, err := s.complaints.GetAllComplaints()
 
-	if err != nil || result == nil {
+	if err != nil {
 		writeLog(logger.LogEntry{
-			Level:   "Error",
+			Level:   "error",
 			Action:  "getting_all_complaints",
 			Message: "Error by getting all complaints",
 		})
+		return nil, err
+	}
+	if result == nil {
 		return []models.Complaint{}, nil
 	}
 
@@ -33,7 +36,14 @@ func (s *ComplaintService) GetAllComplaints() ([]models.Complaint, error) {
 }
 
 func (s *ComplaintService) AddNewComplaint(login string, in *models.AddNewComplaintResponse, user *models.SafeUser) error {
-	result := s.complaints.AddComplaint(login, models.Complaint{
+	if in == nil {
+		return errors.New("invalid input")
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	err := s.complaints.AddComplaint(login, models.Complaint{
 		ID:        in.ID,
 		TargetID:  in.TargetID,
 		AuthorID:  in.AuthorID,
@@ -41,8 +51,8 @@ func (s *ComplaintService) AddNewComplaint(login string, in *models.AddNewCompla
 		CreatedAt: in.CreatedAt,
 	}, *user)
 
-	if result == nil {
-		return errors.New("failed to create new complaint")
+	if err != nil {
+		return err
 	}
 
 	return nil

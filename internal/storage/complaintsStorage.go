@@ -3,11 +3,25 @@ package storage
 import (
 	"cspirt/internal/logger"
 	"cspirt/internal/models"
+	"errors"
+	"strings"
+	"time"
 )
 
 func (s *Storage) AddComplaint(login string, complaint models.Complaint, user models.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	complaint.Content = strings.TrimSpace(complaint.Content)
+	if complaint.TargetID <= 0 || complaint.AuthorID <= 0 {
+		return errors.New("target and author are required")
+	}
+	if complaint.Content == "" {
+		return errors.New("content is required")
+	}
+	if complaint.CreatedAt == "" {
+		complaint.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
 
 	query := `
 		INSERT INTO complaints
@@ -58,7 +72,7 @@ func (s *Storage) DeleteComplaint(id int, user models.SafeUser) error {
 
 	query := `DELETE FROM complaints WHERE Id = ?`
 
-	_, err := s.db.Exec(query, id)
+	result, err := s.db.Exec(query, id)
 	if err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "error",
@@ -68,6 +82,9 @@ func (s *Storage) DeleteComplaint(id int, user models.SafeUser) error {
 			Message: "failed to delete complaint: " + err.Error(),
 		})
 		return err
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return errors.New("complaint not found")
 	}
 
 	writeLog(logger.LogEntry{

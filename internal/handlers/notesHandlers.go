@@ -18,8 +18,8 @@ func GetNotesHandler(s *storage.Storage) gin.HandlerFunc {
 		notes := sr.NewNoteService(s, s.Secret)
 		result, err := notes.GetAllNotes()
 		if err != nil || result == nil {
-			c.JSON(500, gin.H{"error":"Server error"})
-			return 
+			c.JSON(500, gin.H{"error": "Server error"})
+			return
 		}
 
 		c.JSON(200, gin.H{"All_notes": result})
@@ -29,6 +29,11 @@ func GetNotesHandler(s *storage.Storage) gin.HandlerFunc {
 func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
+		if login == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
 		notes := sr.NewNoteService(s, s.Secret)
 		user, err := s.GetUserByLogin(login)
 		if err != nil {
@@ -37,11 +42,15 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 				Action:  "notes",
 				Message: "server error: " + err.Error(),
 			})
-			c.JSON(500, gin.H{"error":"Server error"})
-			return 
+			c.JSON(500, gin.H{"error": "Server error"})
+			return
+		}
+		if user == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
 		}
 
-		var in *models.AddNewNoteResponse
+		var in models.AddNewNoteResponse
 		if err := c.ShouldBindJSON(&in); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "info",
@@ -53,31 +62,30 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		needUser := &models.SafeUser{
-			ID: user.ID,
-			Name: user.Name,
+			ID:       user.ID,
+			Name:     user.Name,
 			LastName: user.LastName,
 			FullName: user.FullName,
-			Login: user.Login,
-			Rating: user.Rating,
-			Role: user.Role,
-			Class: user.Class,
-		} 
+			Login:    user.Login,
+			Rating:   user.Rating,
+			Role:     user.Role,
+			Class:    user.Class,
+		}
 
-		result := notes.AddNewNote(login, in, needUser)
-		if err != nil || result == nil {
-			c.JSON(500, gin.H{"error":"Server error"})
-			return 
+		if err := notes.AddNewNote(login, &in, needUser); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
 		}
 
 		writeLog(logger.LogEntry{
-			Level: "info",
-			Login: login,
-			Class: user.Class,
-			Role: user.Role,
-			Action: "added_note",
+			Level:   "info",
+			Login:   login,
+			Class:   user.Class,
+			Role:    user.Role,
+			Action:  "added_note",
 			Message: "Added new note",
 		})
-		c.JSON(200, gin.H{"Add_notes": result})
+		c.JSON(200, gin.H{"message": "Note added"})
 	}
 }
 
@@ -118,17 +126,17 @@ func DeleteNoteHandler(s *storage.Storage) gin.HandlerFunc {
 				Class:   foundUser.Class,
 				Message: "User without need roles trying to delete user",
 			})
-			c.JSON(http.StatusBadRequest, gin.H{"error": "You dont have permisions for thats action"})
-			return 
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
+			return
 		}
 
 		needUser := u.UserToSafeUser(*foundUser)
-		result := s.NotesRepo.DeleteNote(idInt, *needUser)
-		if result != nil {
-			return 
+		notes := sr.NewNoteService(s, s.Secret)
+		if err := notes.DeleteNote(idInt, *needUser); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 
-		c.JSON(200, gin.H{"message":"Note deleted"})
+		c.JSON(200, gin.H{"message": "Note deleted"})
 	}
 }
-

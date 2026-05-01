@@ -7,111 +7,40 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 )
 
 func (s *Storage) AddUser(user models.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if user.Login == "" {
+	trimUserInput(&user)
+
+	if err := validateNewUser(&user); err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
-			Message: "login is required",
+			Login:   user.Login,
+			Role:    user.Role,
+			Class:   user.Class,
+			Message: err.Error(),
 		})
-		return errors.New("login is required")
+		return err
 	}
-	if user.Password == "" {
+
+	role, err := normalizeRole(user.Role)
+	if err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
 			Login:   user.Login,
-			Message: "password is required",
+			Role:    user.Role,
+			Class:   user.Class,
+			Message: err.Error(),
 		})
-		return errors.New("password is required")
+		return err
 	}
-	if user.Role == "" {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Message: "role is required",
-		})
-		return errors.New("role is required")
-	} 
-	if user.Role != "admin" && user.Role != "owner" && user.Role != "user" && user.Role != "helper" {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "invalid role",
-		})
-		return errors.New("invalid role")
-	} 
-	if user.Class == "" {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "class is required",
-		})
-		return errors.New("class is required")
-	} 
-	if user.Rating >= 5000 {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "rating must be less than 5000",
-		})
-		return errors.New("rating must be less than 5000")
-	} 
-	if user.Rating < 0 {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "rating must be non-negative",
-		})
-		return errors.New("rating must be non-negative")
-	} 
-	if user.Rating == 0 {
-		user.Rating = 500
-	} 
-	if user.FullName == nil {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "full name is required",
-		})
-		return errors.New("full name is required")
-	} 
-	if user.Name == "" {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "name is required",
-		})
-		return errors.New("name is required")
-	} 
-	if user.LastName == "" {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "last name is required",
-		})
-		return errors.New("last name is required")
-	}
+	user.Role = role
 
 	fullNameJSON, err := json.Marshal(user.FullName)
 	if err != nil {
@@ -120,6 +49,7 @@ func (s *Storage) AddUser(user models.User) error {
 			Action:  "add_user",
 			Login:   user.Login,
 			Role:    user.Role,
+			Class:   user.Class,
 			Message: "failed to marshal full name: " + err.Error(),
 		})
 		return err
@@ -132,8 +62,13 @@ func (s *Storage) AddUser(user models.User) error {
 			Action:  "add_user",
 			Login:   user.Login,
 			Role:    user.Role,
+			Class:   user.Class,
 			Message: "failed to hash password: " + err.Error(),
 		})
+		return err
+	}
+
+	if err := s.ensureClassLocked(user.Class); err != nil {
 		return err
 	}
 
@@ -160,35 +95,86 @@ func (s *Storage) AddUser(user models.User) error {
 			Action:  "add_user",
 			Login:   user.Login,
 			Role:    user.Role,
+			Class:   user.Class,
 			Message: "failed to insert user: " + err.Error(),
 		})
+		return err
 	}
 
-	return err
+	if err := s.syncClassLocked(user.Class); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Storage) SaveUser(user models.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	user.Login = normalizeLogin(user.Login)
+	user.Class = normalizeClassName(user.Class)
+	user.Name = strings.TrimSpace(user.Name)
+	user.LastName = strings.TrimSpace(user.LastName)
+
+	role, err := normalizeRole(user.Role)
+	if err != nil {
+		return err
+	}
+	user.Role = role
+
+	if user.ID <= 0 {
+		return errors.New("user id is required")
+	}
+	if user.Login == "" {
+		return errors.New("login is required")
+	}
+	if user.Name == "" {
+		return errors.New("name is required")
+	}
+	if user.LastName == "" {
+		return errors.New("last name is required")
+	}
+	if user.Class == "" {
+		return errors.New("class is required")
+	}
+	user.Rating = clampRating(user.Rating)
+
+	oldUser, err := s.getUserByIDLocked(user.ID)
+	if err != nil {
+		return err
+	}
+	if oldUser == nil {
+		return errors.New("user not found")
+	}
+
+	fullNameJSON, err := json.Marshal(user.FullName)
+	if err != nil {
+		return err
+	}
+	if string(fullNameJSON) == "null" {
+		fullNameJSON = []byte("[]")
+	}
+
 	writeLog(logger.LogEntry{
 		Level:   "info",
 		Action:  "save_user",
 		Login:   user.Login,
 		Role:    user.Role,
+		Class:   user.Class,
 		Message: "saving user",
 	})
 
-	query := `UPDATE users SET Name = ?,
-	LastName = ?,
-	Login = ?,
-	Rating = ?,
-	Role = ?,
-	Class = ?,
-	WHERE Id = ?`
+	query := `
+		UPDATE users
+		SET Name = ?, FullName = ?, LastName = ?, Login = ?, Rating = ?, Role = ?, Class = ?
+		WHERE Id = ?
+	`
 
-	_, err := s.db.Exec(query,
+	result, err := s.db.Exec(
+		query,
 		user.Name,
+		string(fullNameJSON),
 		user.LastName,
 		user.Login,
 		user.Rating,
@@ -202,9 +188,26 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 			Action:  "save_user",
 			Login:   user.Login,
 			Role:    user.Role,
+			Class:   user.Class,
 			Message: "failed to save user: " + err.Error(),
 		})
 		return err
+	}
+
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return errors.New("user not found")
+	}
+
+	if err := s.ensureClassLocked(user.Class); err != nil {
+		return err
+	}
+	if err := s.syncClassLocked(user.Class); err != nil {
+		return err
+	}
+	if normalizeClassName(oldUser.Class) != user.Class {
+		if err := s.syncClassLocked(oldUser.Class); err != nil {
+			return err
+		}
 	}
 
 	writeLog(logger.LogEntry{
@@ -212,84 +215,40 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 		Action:  "save_user",
 		Login:   user.Login,
 		Role:    user.Role,
+		Class:   user.Class,
 		Message: "user saved",
 	})
-	return err
+	return nil
 }
 
 func (s *Storage) UpdateUser(user models.SafeUser) error {
+	return s.SaveUser(user)
+}
+
+func (s *Storage) UpdateRating(login string, rating int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
-		Level:   "info",
-		Action:  "update_user",
-		Login:   user.Login,
-		Role:    user.Role,
-		Message: "updating user",
-	})
-
-	existingUser, err := s.GetUserByLogin(user.Login)
-	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "update_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "failed to get existing user: " + err.Error(),
-		})
-		return err
+	login = normalizeLogin(login)
+	if login == "" {
+		return errors.New("login is required")
 	}
 
-	if existingUser == nil {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "update_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "user not found for update",
-		})
+	user, err := s.getUserByLoginLocked(login)
+	if err != nil {
+		return err
+	}
+	if user == nil {
 		return errors.New("user not found")
 	}
 
-	query := `UPDATE users SET Name = ?,
-	LastName = ?,
-	Login = ?,
-	Rating = ?,
-	Role = ?,
-	Class = ?,
-	Notes = ?,
-	Complaints = ?
-	WHERE Id = ?`
-
-	_, err = s.db.Exec(query,
-		user.Name,
-		user.LastName,
-		user.Login,
-		user.Rating,
-		user.Role,
-		user.Class,
-		user.ID,
-	)
+	rating = clampRating(rating)
+	_, err = s.db.Exec(`UPDATE users SET Rating = ? WHERE Login = ?`, rating, login)
 	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "update_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Message: "failed to update user: " + err.Error(),
-		})
 		return err
 	}
 
-	writeLog(logger.LogEntry{
-		Level:   "info",
-		Action:  "update_user",
-		Login:   user.Login,
-		Role:    user.Role,
-		Message: "user updated",
-	})
-	return err
+	return s.syncClassLocked(user.Class)
 }
 
 func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
@@ -301,19 +260,36 @@ func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
 		Action:  "delete_user",
 		Login:   user.Login,
 		Role:    user.Role,
+		Class:   user.Class,
 		Message: "deleting user",
 	})
 
+	deletedUser, err := s.getUserByIDLocked(id)
+	if err != nil {
+		return err
+	}
+	if deletedUser == nil {
+		return errors.New("user not found")
+	}
+
 	query := `DELETE FROM users WHERE Id = ?`
-	_, err := s.db.Exec(query, id)
+	result, err := s.db.Exec(query, id)
 	if err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_user",
 			Login:   user.Login,
 			Role:    user.Role,
+			Class:   user.Class,
 			Message: "failed to delete user: " + err.Error(),
 		})
+		return err
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return errors.New("user not found")
+	}
+
+	if err := s.syncClassLocked(deletedUser.Class); err != nil {
 		return err
 	}
 
@@ -322,9 +298,10 @@ func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
 		Action:  "delete_user",
 		Login:   user.Login,
 		Role:    user.Role,
+		Class:   user.Class,
 		Message: "user deleted",
 	})
-	return err
+	return nil
 }
 
 func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
@@ -338,8 +315,9 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 	})
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, LastName, Login, Rating, Role, Class
+		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class
 		FROM users
+		ORDER BY Class, LastName, Name, Login
 	`)
 	if err != nil {
 		writeLog(logger.LogEntry{
@@ -351,35 +329,12 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 	}
 	defer rows.Close()
 
-	users := make([]models.SafeUser, 0)
-	for rows.Next() {
-		var u models.SafeUser
-
-		if err := rows.Scan(
-			&u.ID,
-			&u.Name,
-			&u.LastName,
-			&u.Login,
-			&u.Rating,
-			&u.Role,
-			&u.Class,
-		); err != nil {
-			writeLog(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_all_users",
-				Message: "failed to scan user: " + err.Error(),
-			})
-			return nil, err
-		}
-
-		users = append(users, u)
-	}
-
-	if err := rows.Err(); err != nil {
+	users, err := scanSafeUsers(rows)
+	if err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_users",
-			Message: "row iteration failed: " + err.Error(),
+			Message: "failed to scan users: " + err.Error(),
 		})
 		return nil, err
 	}
@@ -391,111 +346,29 @@ func (s *Storage) GetUserByLogin(login string) (*models.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	row := s.db.QueryRow(`
-		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class
-		FROM users
-		WHERE Login = ?
-	`, login)
-
-	var u models.User
-	var fullNameJSON string
-
-	err := row.Scan(
-		&u.ID,
-		&u.Name,
-		&fullNameJSON,
-		&u.LastName,
-		&u.Login,
-		&u.Password,
-		&u.Rating,
-		&u.Role,
-		&u.Class,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_user_by_login",
-			Login:   login,
-			Message: "failed to scan user: " + err.Error(),
-		})
-		return nil, err
-	}
-
-	if fullNameJSON != "" {
-		if err := json.Unmarshal([]byte(fullNameJSON), &u.FullName); err != nil {
-			writeLog(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_user_by_login",
-				Login:   login,
-				Role:    u.Role,
-				Message: "failed to unmarshal full name: " + err.Error(),
-			})
-			return nil, err
-		}
-	}
-
-	return &u, nil
+	return s.getUserByLoginLocked(login)
 }
 
-func (s *Storage) GetUsersByClass(class string) ([]models.SafeUser, error) {
+func (s *Storage) GetUsersByClass(className string) ([]models.SafeUser, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows, err := s.db.Query(`
-		SELECT Id, Name, LastName, Login, Rating, Role, Class, Notes, Complaints
-		FROM users
-		WHERE Class = ?
-	`, class)
+	className = normalizeClassName(className)
+	if className == "" {
+		return nil, errors.New("class is required")
+	}
+
+	users, err := s.getUsersByClassLocked(className)
 	if err != nil {
 		writeLog(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_users_by_class",
-			Class:   class,
+			Class:   className,
 			Message: "failed to query users: " + err.Error(),
 		})
 		return nil, err
 	}
-	defer rows.Close()
 
-	users := make([]models.SafeUser, 0)
-	for rows.Next() {
-		var u models.SafeUser
-		var notesJSON string
-		var complaintsJSON string
-
-		if err := rows.Scan(
-			&u.ID,
-			&u.Name,
-			&u.LastName,
-			&u.Login,
-			&u.Rating,
-			&u.Role,
-			&u.Class,
-			&notesJSON,
-			&complaintsJSON,
-		); err != nil {
-			writeLog(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_users_by_class",
-				Class:   class,
-				Message: "failed to scan user: " + err.Error(),
-			})
-			return nil, err
-		}
-
-	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_users_by_class",
-			Class:   class,
-			Message: "row iteration failed: " + err.Error(),
-		})
-		return nil, err
-	}}
-	
 	return users, nil
 }
 
@@ -503,25 +376,131 @@ func (s *Storage) GetUserByID(id int) (*models.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.getUserByIDLocked(id)
+}
+
+func validateNewUser(user *models.User) error {
+	if user.Login == "" {
+		return errors.New("login is required")
+	}
+	if strings.ContainsAny(user.Login, " \t\r\n") {
+		return errors.New("login must not contain spaces")
+	}
+	if len(user.Password) < 6 {
+		return errors.New("password must be at least 6 characters")
+	}
+	if user.Role == "" {
+		return errors.New("role is required")
+	}
+	if user.Class == "" {
+		return errors.New("class is required")
+	}
+	if user.Rating < 0 {
+		return errors.New("rating must be non-negative")
+	}
+	if user.Rating > 5000 {
+		return errors.New("rating must be less than or equal to 5000")
+	}
+	if user.Rating == 0 {
+		user.Rating = 500
+	}
+	if len(user.FullName) == 0 {
+		return errors.New("full name is required")
+	}
+	if user.Name == "" {
+		return errors.New("name is required")
+	}
+	if user.LastName == "" {
+		return errors.New("last name is required")
+	}
+
+	return nil
+}
+
+func clampRating(rating int) int {
+	if rating < 0 {
+		return 0
+	}
+	if rating > 5000 {
+		return 5000
+	}
+	return rating
+}
+
+func (s *Storage) getUsersByClassLocked(className string) ([]models.SafeUser, error) {
+	rows, err := s.db.Query(`
+		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class
+		FROM users
+		WHERE Class = ?
+		ORDER BY LastName, Name, Login
+	`, normalizeClassName(className))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanSafeUsers(rows)
+}
+
+func (s *Storage) getSafeUserByLoginLocked(login string) (*models.SafeUser, error) {
+	user, err := s.getUserByLoginLocked(login)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, nil
+	}
+
+	return &models.SafeUser{
+		ID:       user.ID,
+		Name:     user.Name,
+		LastName: user.LastName,
+		FullName: user.FullName,
+		Login:    user.Login,
+		Rating:   user.Rating,
+		Role:     user.Role,
+		Class:    user.Class,
+	}, nil
+}
+
+func (s *Storage) getUserByLoginLocked(login string) (*models.User, error) {
+	row := s.db.QueryRow(`
+		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class
+		FROM users
+		WHERE Login = ?
+	`, normalizeLogin(login))
+
+	return scanUser(row)
+}
+
+func (s *Storage) getUserByIDLocked(id int) (*models.User, error) {
 	row := s.db.QueryRow(`
 		SELECT Id, Name, FullName, LastName, Login, Password, Rating, Role, Class
 		FROM users
 		WHERE Id = ?
 	`, id)
 
-	var u models.User
-	var fullNameJSON string
+	return scanUser(row)
+}
 
-	err := row.Scan(
-		&u.ID,
-		&u.Name,
+type userScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+func scanUser(scanner userScanner) (*models.User, error) {
+	var user models.User
+	var fullNameJSON sql.NullString
+
+	err := scanner.Scan(
+		&user.ID,
+		&user.Name,
 		&fullNameJSON,
-		&u.LastName,
-		&u.Login,
-		&u.Password,
-		&u.Rating,
-		&u.Role,
-		&u.Class,
+		&user.LastName,
+		&user.Login,
+		&user.Password,
+		&user.Rating,
+		&user.Role,
+		&user.Class,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -530,11 +509,53 @@ func (s *Storage) GetUserByID(id int) (*models.User, error) {
 		return nil, err
 	}
 
-	if fullNameJSON != "" {
-		if err := json.Unmarshal([]byte(fullNameJSON), &u.FullName); err != nil {
+	if fullNameJSON.Valid && fullNameJSON.String != "" {
+		if err := json.Unmarshal([]byte(fullNameJSON.String), &user.FullName); err != nil {
 			return nil, err
 		}
 	}
+	if user.FullName == nil {
+		user.FullName = []models.FullName{}
+	}
 
-	return &u, nil
+	return &user, nil
+}
+
+func scanSafeUsers(rows *sql.Rows) ([]models.SafeUser, error) {
+	users := make([]models.SafeUser, 0)
+
+	for rows.Next() {
+		var user models.SafeUser
+		var fullNameJSON sql.NullString
+
+		if err := rows.Scan(
+			&user.ID,
+			&user.Name,
+			&fullNameJSON,
+			&user.LastName,
+			&user.Login,
+			&user.Rating,
+			&user.Role,
+			&user.Class,
+		); err != nil {
+			return nil, err
+		}
+
+		if fullNameJSON.Valid && fullNameJSON.String != "" {
+			if err := json.Unmarshal([]byte(fullNameJSON.String), &user.FullName); err != nil {
+				return nil, err
+			}
+		}
+		if user.FullName == nil {
+			user.FullName = []models.FullName{}
+		}
+
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }

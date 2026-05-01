@@ -29,6 +29,13 @@ func NewRatingsService(users repo.UserRepository, jwtSecret string) *RatingsServ
 }
 
 func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user *models.SafeUser) error {
+	if in == nil {
+		return errors.New("invalid input")
+	}
+	if in.Rating < -5000 || in.Rating > 5000 {
+		return errors.New("rating change must be between -5000 and 5000")
+	}
+
 	targetUser, err := s.users.GetUserByLogin(in.TargetLogin)
 	if err != nil {
 		writeLog(logger.LogEntry{
@@ -81,14 +88,14 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user
 	}
 
 	needTargetUser := &models.SafeUser{
-		ID: targetUser.ID,
-		Name: targetUser.Name,
+		ID:       targetUser.ID,
+		Name:     targetUser.Name,
 		LastName: targetUser.LastName,
 		FullName: targetUser.FullName,
-		Login: targetUser.Login,
-		Role: targetUser.Role,
-		Class: targetUser.Class,
-		Rating: targetUser.Rating,
+		Login:    targetUser.Login,
+		Role:     targetUser.Role,
+		Class:    targetUser.Class,
+		Rating:   targetUser.Rating,
 	}
 
 	if err := s.users.SaveUser(*needTargetUser); err != nil {

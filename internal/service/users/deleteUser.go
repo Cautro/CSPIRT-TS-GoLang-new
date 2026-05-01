@@ -9,17 +9,17 @@ import (
 
 func (s *UsersService) DeleteUserHandlerService(id int, u models.User) error {
 	checkRole, err := utils.CheckUserRole(s.users, u.Login, string(models.RoleAdmin), string(models.RoleOwner))
-		if err != nil || !checkRole {
-			writeLog(logger.LogEntry{
-				Level:   "info",
-				Action:  "delete_user",
-				Login:   u.Login,
-				Role:    u.Role,
-				Class:   u.Class,
-				Message: "User without need roles trying to delete user",
-			})
-			return errors.New("You dont have permisions for thats action")
-		}
+	if err != nil || !checkRole {
+		writeLog(logger.LogEntry{
+			Level:   "info",
+			Action:  "delete_user",
+			Login:   u.Login,
+			Role:    u.Role,
+			Class:   u.Class,
+			Message: "User without need roles trying to delete user",
+		})
+		return errors.New("you dont have permissions for this action")
+	}
 
 	safeUser := utils.UserToSafeUser(u)
 
@@ -30,12 +30,11 @@ func (s *UsersService) DeleteUserHandlerService(id int, u models.User) error {
 	}
 
 	writeLog(logger.LogEntry{
-		Level: "info",
-		Action: "deleting_note",
-		Message: "Deleted note by " + u.Name + " " + u.LastName + "with role " + u.Role,
-		Role: u.Role,
-		Class: u.Class,
-		
+		Level:   "info",
+		Action:  "delete_user",
+		Message: "Deleted user by " + u.Name + " " + u.LastName + " with role " + u.Role,
+		Role:    u.Role,
+		Class:   u.Class,
 	})
 	return nil
 }

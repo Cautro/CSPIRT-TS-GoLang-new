@@ -8,6 +8,7 @@ import (
 	// "crypto/rand"
 	// "strings"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -29,6 +30,11 @@ func NewAuthService(users repo.UserRepository, jwtSecret string) *AuthService {
 }
 
 func (s *AuthService) Login(in models.LoginInput) (LoginResult, error) {
+	in.Login = strings.TrimSpace(in.Login)
+	if in.Login == "" || in.Password == "" {
+		return LoginResult{}, nil
+	}
+
 	user, err := s.users.GetUserByLogin(in.Login)
 	if err != nil {
 		return LoginResult{}, err
@@ -75,6 +81,7 @@ func (s *AuthService) Refresh(refreshToken string) (LoginResult, error) {
 	}
 
 	if time.Now().After(session.ExpiresAt) {
+		_ = s.users.DeleteRefreshToken(refreshToken)
 		return LoginResult{}, errors.New("refresh token expired")
 	}
 

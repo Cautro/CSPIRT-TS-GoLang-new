@@ -1,4 +1,4 @@
-package complaints
+package complaintservice
 
 import (
 	"cspirt/internal/logger"

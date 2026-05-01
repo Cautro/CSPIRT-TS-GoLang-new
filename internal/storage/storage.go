@@ -15,9 +15,10 @@ type Storage struct {
 	db *sql.DB
 	mu sync.Mutex
 
-	RatingRepo repo.RatingRepository
-	NotesRepo repo.NoteRepository
+	RatingRepo     repo.RatingRepository
+	NotesRepo      repo.NoteRepository
 	ComplaintsRepo repo.ComplaintRepository
+	ClassRepo      repo.ClassRepository
 
 	Secret string
 }
@@ -29,14 +30,14 @@ func (s *Storage) initUserStorage() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
-		Name TEXT,
-		FullName TEXT,
-		LastName TEXT,
-		Login TEXT UNIQUE,
-		Password TEXT,
-		Rating INTEGER,
-		Role TEXT,
-		Class TEXT
+		Name TEXT NOT NULL,
+		FullName TEXT NOT NULL DEFAULT '[]',
+		LastName TEXT NOT NULL,
+		Login TEXT NOT NULL UNIQUE,
+		Password TEXT NOT NULL,
+		Rating INTEGER NOT NULL DEFAULT 500,
+		Role TEXT NOT NULL,
+		Class TEXT NOT NULL
 	);`
 
 	_, err := s.db.Exec(query)
@@ -50,10 +51,12 @@ func (s *Storage) initNoteStorage() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS notes (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
-		TargetID INTEGER,
-		AuthorID INTEGER,
-		Content TEXT,
-		CreatedAt TEXT
+		TargetID INTEGER NOT NULL,
+		AuthorID INTEGER NOT NULL,
+		Content TEXT NOT NULL,
+		CreatedAt TEXT NOT NULL,
+		FOREIGN KEY (TargetID) REFERENCES users(Id) ON DELETE CASCADE,
+		FOREIGN KEY (AuthorID) REFERENCES users(Id) ON DELETE CASCADE
 	);`
 
 	_, err := s.db.Exec(query)
@@ -85,10 +88,12 @@ func (s *Storage) initComplaintStorage() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS complaints (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
-		TargetID INTEGER,
-		AuthorID INTEGER,
-		Content TEXT,
-		CreatedAt TEXT
+		TargetID INTEGER NOT NULL,
+		AuthorID INTEGER NOT NULL,
+		Content TEXT NOT NULL,
+		CreatedAt TEXT NOT NULL,
+		FOREIGN KEY (TargetID) REFERENCES users(Id) ON DELETE CASCADE,
+		FOREIGN KEY (AuthorID) REFERENCES users(Id) ON DELETE CASCADE
 	);`
 
 	_, err := s.db.Exec(query)
@@ -105,6 +110,11 @@ func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
 		return nil, err
 	}
 
+	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		db.Close()
+		return nil, err
+	}
+
 	db.SetMaxOpenConns(1)
 
 	st := &Storage{
@@ -113,10 +123,35 @@ func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
 		Secret: jwt_secret,
 	}
 
-	if err := st.initUserStorage(); err != nil { return nil, err }
-    if err := st.initNoteStorage(); err != nil { return nil, err }
-    if err := st.initComplaintStorage(); err != nil { return nil, err }
-	if err := st.initHTTPOnlyStorage(); err != nil { return nil, err }
+	st.RatingRepo = st
+	st.NotesRepo = st
+	st.ComplaintsRepo = st
+	st.ClassRepo = st
+
+	if err := st.initUserStorage(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := st.initClassStorage(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := st.initNoteStorage(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := st.initComplaintStorage(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := st.initHTTPOnlyStorage(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := st.syncAllClasses(); err != nil {
+		db.Close()
+		return nil, err
+	}
 
 	return st, nil
 }

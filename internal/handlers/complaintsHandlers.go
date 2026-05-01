@@ -3,7 +3,7 @@ package handlers
 import (
 	"cspirt/internal/logger"
 	"cspirt/internal/models"
-	sr "cspirt/internal/service/complaints"
+	complaintsservice "cspirt/internal/service/complaintservice"
 	"cspirt/internal/storage"
 	u "cspirt/internal/utils/auth"
 
@@ -15,11 +15,11 @@ import (
 
 func GetComplaintsHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		complaints := sr.NewComplaintsService(s.ComplaintsRepo, s.Secret)
+		complaints := complaintsservice.NewComplaintsService(s, s.Secret)
 		result, err := complaints.GetAllComplaints()
 		if err != nil || result == nil {
-			c.JSON(500, gin.H{"error":"Server error"})
-			return 
+			c.JSON(500, gin.H{"error": "Server error"})
+			return
 		}
 
 		c.JSON(200, gin.H{"All_complaints": result})
@@ -29,7 +29,12 @@ func GetComplaintsHandler(s *storage.Storage) gin.HandlerFunc {
 func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
-		notes := sr.NewComplaintsService(s.ComplaintsRepo, s.Secret)
+		if login == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		complaints := complaintsservice.NewComplaintsService(s, s.Secret)
 		user, err := s.GetUserByLogin(login)
 		if err != nil {
 			writeLog(logger.LogEntry{
@@ -37,11 +42,15 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 				Action:  "notes",
 				Message: "server error: " + err.Error(),
 			})
-			c.JSON(500, gin.H{"error":"Server error"})
-			return 
+			c.JSON(500, gin.H{"error": "Server error"})
+			return
+		}
+		if user == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
 		}
 
-		var in *models.AddNewComplaintResponse
+		var in models.AddNewComplaintResponse
 		if err := c.ShouldBindJSON(&in); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "info",
@@ -53,31 +62,30 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		needUser := &models.SafeUser{
-			ID: user.ID,
-			Name: user.Name,
+			ID:       user.ID,
+			Name:     user.Name,
 			LastName: user.LastName,
 			FullName: user.FullName,
-			Login: user.Login,
-			Rating: user.Rating,
-			Role: user.Role,
-			Class: user.Class,
-		} 
+			Login:    user.Login,
+			Rating:   user.Rating,
+			Role:     user.Role,
+			Class:    user.Class,
+		}
 
-		result := notes.AddNewComplaint(login, in, needUser)
-		if err != nil || result == nil {
-			c.JSON(500, gin.H{"error":"Server error"})
-			return 
+		if err := complaints.AddNewComplaint(login, &in, needUser); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
 		}
 
 		writeLog(logger.LogEntry{
-			Level: "info",
-			Login: login,
-			Class: user.Class,
-			Role: user.Role,
-			Action: "added_note",
-			Message: "Added new note",
+			Level:   "info",
+			Login:   login,
+			Class:   user.Class,
+			Role:    user.Role,
+			Action:  "added_complaint",
+			Message: "Added new complaint",
 		})
-		c.JSON(200, gin.H{"Add_notes": result})
+		c.JSON(200, gin.H{"message": "Complaint added"})
 	}
 }
 
@@ -118,17 +126,17 @@ func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 				Class:   foundUser.Class,
 				Message: "User without need roles trying to delete user",
 			})
-			c.JSON(http.StatusBadRequest, gin.H{"error": "You dont have permisions for thats action"})
-			return 
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
+			return
 		}
 
 		needUser := u.UserToSafeUser(*foundUser)
-		result := s.NotesRepo.DeleteNote(idInt, *needUser)
-		if result != nil {
-			return 
+		complaints := complaintsservice.NewComplaintsService(s, s.Secret)
+		if err := complaints.DeleteComplaint(idInt, *needUser); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 
-		c.JSON(200, gin.H{"message":"Note deleted"})
+		c.JSON(200, gin.H{"message": "Complaint deleted"})
 	}
 }
-

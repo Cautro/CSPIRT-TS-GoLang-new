@@ -29,7 +29,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		parts := strings.Split(auth, " ")
+		parts := strings.Fields(auth)
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header"})
 			writeLog(logger.LogEntry{
@@ -70,8 +70,18 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
+		if claims.Login == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			writeLog(logger.LogEntry{
+				Level:   "info",
+				Action:  "auth_middleware",
+				Message: "token login is empty",
+			})
+			c.Abort()
+			return
+		}
+
 		c.Set("Login", claims.Login)
 		c.Next()
 	}
 }
-

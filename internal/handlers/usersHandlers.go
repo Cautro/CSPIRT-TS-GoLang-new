@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
@@ -20,8 +21,14 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
 			return
 		}
+		if user == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
 
-		if user.Role == string(models.RoleAdmin) || user.Role == string(models.RoleUser) || user.Role == string(models.RoleHelper) {
+		if strings.EqualFold(user.Role, string(models.RoleAdmin)) ||
+			strings.EqualFold(user.Role, string(models.RoleUser)) ||
+			strings.EqualFold(user.Role, string(models.RoleHelper)) {
 			writeLog(logger.LogEntry{
 				Level:   "info",
 				Action:  "get_users",
@@ -126,7 +133,6 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
 			return
 		}
-		var user models.User
 
 		if login == "" {
 			writeLog(logger.LogEntry{
@@ -165,19 +171,7 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 				Class:   foundUser.Class,
 				Message: "User without need roles trying to delete user",
 			})
-			c.JSON(http.StatusBadRequest, gin.H{"error": "You dont have permisions for thats action"})
-			return 
-		}
-
-		if err := c.ShouldBindBodyWithJSON(&user); err != nil {
-			writeLog(logger.LogEntry{
-				Level:   "info",
-				Action:  "delete_user",
-				Login:   login,
-				Role:    foundUser.Role,
-				Message: "invalid input: " + err.Error(),
-			})
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
 			return
 		}
 
@@ -188,16 +182,12 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		message := "user deleted successfully"
-		if user.Login != "" {
-			message += ": " + user.Login
-		}
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "delete_user",
 			Login:   login,
 			Role:    foundUser.Role,
-			Message: message,
+			Message: "user deleted successfully",
 		})
 
 		c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
@@ -235,14 +225,14 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		resp := models.SafeUser{
-			ID:         user.ID,
-			Name:       user.Name,
-			LastName:   user.LastName,
-			FullName:   user.FullName,
-			Login:      user.Login,
-			Rating:     user.Rating,
-			Role:       user.Role,
-			Class:      user.Class,
+			ID:       user.ID,
+			Name:     user.Name,
+			LastName: user.LastName,
+			FullName: user.FullName,
+			Login:    user.Login,
+			Rating:   user.Rating,
+			Role:     user.Role,
+			Class:    user.Class,
 		}
 
 		c.JSON(http.StatusOK, resp)
