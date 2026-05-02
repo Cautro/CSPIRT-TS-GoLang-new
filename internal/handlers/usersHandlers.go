@@ -63,7 +63,42 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		SafeNeedUser := u.UserToSafeUser(*needUser)
-		c.JSON(http.StatusOK, SafeNeedUser)
+
+		notes, err := s.NotesRepo.GetNotesByUserId(SafeNeedUser.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve notes"})
+			return
+		}
+
+		complaints, err := s.ComplaintsRepo.GetComplaintsByUserId(SafeNeedUser.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve complaints"})
+			return
+		}
+
+		var classTeacher *models.SafeUser
+
+		if SafeNeedUser.ClassID > 0 {
+			class, err := s.ClassRepo.GetClassByID(SafeNeedUser.ClassID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
+				return
+			}
+
+			if class != nil {
+				classTeacher = class.Teacher
+			}
+		}
+
+		answerResponse := models.UserWithFullInfo{
+			User:         SafeNeedUser,
+			Notes:        notes,
+			Complaints:   complaints,
+			ClassTeacher: classTeacher,
+			Events: []models.Event{}, 
+		}
+
+		c.JSON(http.StatusOK, answerResponse)
 	}
 }
 
