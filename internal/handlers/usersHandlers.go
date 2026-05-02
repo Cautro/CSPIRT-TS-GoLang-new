@@ -8,37 +8,34 @@ import (
 	u "cspirt/internal/utils/auth"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userService := sr.NewUsersService(s, s.Secret)
-
-		user, err := s.GetUserByLogin(c.GetString("Login"))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
-			return
-		}
-		if user == nil {
+		login := c.GetString("Login")
+		if login == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
-		if strings.EqualFold(user.Role, string(models.RoleAdmin)) ||
-			strings.EqualFold(user.Role, string(models.RoleUser)) ||
-			strings.EqualFold(user.Role, string(models.RoleHelper)) {
-			writeLog(logger.LogEntry{
-				Level:   "info",
-				Action:  "get_users",
-				Login:   user.Login,
-				Role:    user.Role,
-				Message: "users, helpers and admins view the list of users in the them class",
-			})
+		currentUser, err := s.GetUserByLogin(login)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve current user"})
+			return
+		}
 
-			users, err := userService.GetUsersByClassIDHandlerService(user.ClassID)
+		if currentUser == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		userIDStr := c.Query("id")
+		if userIDStr == "" {
+			userService := sr.NewUsersService(s, s.Secret)
+
+			users, err := userService.GetUsersHandlerService()
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
 				return
@@ -48,13 +45,25 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		users, err := userService.GetUsersHandlerService()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+		userID, err := strconv.Atoi(userIDStr)
+		if err != nil || userID <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
 			return
 		}
 
-		c.JSON(http.StatusOK, users)
+		needUser, err := s.GetUserByID(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+			return
+		}
+
+		if needUser == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+
+		SafeNeedUser := u.UserToSafeUser(*needUser)
+		c.JSON(http.StatusOK, SafeNeedUser)
 	}
 }
 
@@ -225,24 +234,42 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		note, err := s.NotesRepo.GetNotesByUserId(user.ID)
+		notes, err := s.NotesRepo.GetNotesByUserId(user.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve notes"})
 			return
 		}
+
 		complaints, err := s.ComplaintsRepo.GetComplaintsByUserId(user.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve complaints"})
 			return
 		}
+
 		resp := u.UserToSafeUser(*user)
 
-		AnswerResponse := models.UserWithFullInfo{
-			User:       resp,
-			Notes:      note,
-			Complaints: complaints,
+		var classTeacher *models.SafeUser
+
+		if user.ClassID > 0 {
+			class, err := s.ClassRepo.GetClassByID(user.ClassID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
+				return
+			}
+
+			if class != nil {
+				classTeacher = class.Teacher
+			}
 		}
 
-		c.JSON(http.StatusOK, AnswerResponse)
+		answerResponse := models.UserWithFullInfo{
+			User:         resp,
+			Notes:        notes,
+			Complaints:   complaints,
+			ClassTeacher: classTeacher,
+			Events: []models.Event{}, 
+		}
+
+		c.JSON(http.StatusOK, answerResponse)
 	}
 }

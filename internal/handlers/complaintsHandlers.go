@@ -3,6 +3,7 @@ package handlers
 import (
 	"cspirt/internal/logger"
 	"cspirt/internal/models"
+	srClass "cspirt/internal/service/classes"
 	complaintsservice "cspirt/internal/service/complaintservice"
 	"cspirt/internal/storage"
 	u "cspirt/internal/utils/auth"
@@ -15,14 +16,82 @@ import (
 
 func GetComplaintsHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		complaints := complaintsservice.NewComplaintsService(s, s.Secret)
-		result, err := complaints.GetAllComplaints()
-		if err != nil || result == nil {
-			c.JSON(500, gin.H{"error": "Server error"})
+		user, ok := authenticatedUser(c, s, "get_notes")
+		if !ok {
 			return
 		}
 
-		c.JSON(200, gin.H{"All_complaints": result})
+		check, err := u.CheckUserRole(s, user.Login, string(models.RoleAdmin), string(models.RoleOwner), string(models.RoleHelper),
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+			return
+		}
+		if !check {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
+			return
+		}
+
+		complaintService := complaintsservice.NewComplaintsService(s, s.Secret)
+
+		classIDStr := c.Query("class")
+		if classIDStr != "" {
+			classID, err := strconv.Atoi(classIDStr)
+			if err != nil || classID <= 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
+				return
+			}
+
+			classService := srClass.NewClassService(s, s.Secret)
+
+			class, err := classService.GetClassByID(classID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
+				return
+			}
+			if class == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
+				return
+			}
+
+			if !canReadClass(user, classID) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this class"})
+				return
+			}
+
+			result, err := complaintService.GetComplaintsByClassID(classID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"Complaints": result})
+			return
+		}
+
+		if !canManageClasses(user.Role) {
+			if user.ClassID <= 0 {
+				c.JSON(http.StatusForbidden, gin.H{"error": "User has no class"})
+				return
+			}
+
+			result, err := complaintService.GetComplaintsByClassID(user.ClassID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"Complaints": result})
+			return
+		}
+
+		result, err := complaintService.GetAllComplaints()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"All_Complaints": result})
 	}
 }
 
@@ -34,7 +103,7 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		complaints := complaintsservice.NewComplaintsService(s, s.Secret)
+		complaintService := complaintsservice.NewComplaintsService(s, s.Secret)
 		user, err := s.GetUserByLogin(login)
 		if err != nil {
 			writeLog(logger.LogEntry{
@@ -73,7 +142,7 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			ClassID:  user.ClassID,
 		}
 
-		if err := complaints.AddNewComplaint(login, &in, needUser); err != nil {
+		if err := complaintService.AddNewComplaint(login, &in, needUser); err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
@@ -141,3 +210,4 @@ func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 		c.JSON(200, gin.H{"message": "Complaint deleted"})
 	}
 }
+

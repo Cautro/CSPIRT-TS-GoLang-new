@@ -206,6 +206,70 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 	return notes, nil
 }
 
+func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if classID <= 0 {
+		return nil, errors.New("invalid class id")
+	}
+
+	if err := s.syncAllClassesLocked(); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.Query(`
+		SELECT n.Id, n.TargetID, n.AuthorID, n.Content, n.CreatedAt
+		FROM notes n
+		JOIN users u ON u.Id = n.TargetID
+		WHERE u.ClassID = ?
+		ORDER BY n.Id DESC
+	`, classID)
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_notes_by_class",
+			Message: "failed to query notes by class: " + err.Error(),
+		})
+		return nil, err
+	}
+	defer rows.Close()
+
+	notes := make([]models.Note, 0)
+
+	for rows.Next() {
+		var n models.Note
+
+		if err := rows.Scan(
+			&n.ID,
+			&n.TargetID,
+			&n.AuthorID,
+			&n.Content,
+			&n.CreatedAt,
+		); err != nil {
+			writeLog(logger.LogEntry{
+				Level:   "error",
+				Action:  "get_notes_by_class",
+				Message: "failed to scan note: " + err.Error(),
+			})
+			return nil, err
+		}
+
+		notes = append(notes, n)
+	}
+
+	if err := rows.Err(); err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_notes_by_class",
+			Message: "row iteration failed: " + err.Error(),
+		})
+		return nil, err
+	}
+
+	return notes, nil
+}
+
 func (s *Storage) GetNoteByID(id int) ([]models.Note, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

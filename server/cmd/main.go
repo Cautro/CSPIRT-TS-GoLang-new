@@ -56,37 +56,37 @@ func main() {
 
 	// Gin logic here
 	r := gin.Default()
-	r.GET("/health", handlers.HealthHandler)
-	r.POST("/login", handlers.LoginHandler(s))
-	r.POST("/api/refresh", handlers.RefreshHandler(s))
+	r.GET("/health", handlers.HealthHandler) // Endpoint для проверки работоспособности сервера
+	r.POST("/login", handlers.LoginHandler(s)) // Endpoint для входа и получения JWT
+	r.POST("/api/refresh", handlers.RefreshHandler(s)) // Endpoint для обновления токена
 
 	auth := r.Group("/api", utils.AuthMiddleware(jwtSecret))
 	{
 		// user handlers
-		auth.GET("/users", handlers.GetUsersHandler(s))
-		auth.PATCH("/user/add", handlers.AddUserHandler(s))
-		auth.DELETE("/user/delete/:id", handlers.DeleteUserHandler(s))
-		auth.GET("/me", handlers.GetMeHandler(s))
+		auth.GET("/users", handlers.GetUsersHandler(s)) // Получить всех пользователей или конкретного пользователя по ID (через Query параметр)
+		auth.PATCH("/user/add", handlers.AddUserHandler(s)) // Добавление нового пользователя
+		auth.DELETE("/user/delete/:id", handlers.DeleteUserHandler(s)) // Удаление пользователя по ID
+		auth.GET("/me", handlers.GetMeHandler(s)) // Получить информацию о текущем пользователе
 
 		// Class handlers
-		auth.GET("/classes", handlers.GetClassesHandler(s))
-		auth.GET("/classes/:class_id/users", handlers.GetClassUsersHandler(s))
-		auth.GET("/classes/:class_id/teacher", handlers.GetClassTeacherHandler(s))   // Получить учитель
+		auth.GET("/classes", handlers.GetClassesHandler(s)) // Получить все классы
+		auth.GET("/classes/:class_id/users", handlers.GetClassUsersHandler(s)) // Получить всех пользователей класса
+		auth.GET("/classes/:class_id/teacher", handlers.GetClassTeacherHandler(s))   // Получить учителя
 		auth.PATCH("/classes/:class_id/teacher", handlers.SetClassTeacherHandler(s)) // Установить учителя
 
 		// Rating handlers
-		auth.GET("/rating", handlers.GetRatingsHandler(s))
-		auth.PATCH("/rating/update", handlers.UpdateRatingsHandler(rs.NewRatingsService(s, s.Secret), s))
+		auth.GET("/rating", handlers.GetRatingsHandler(s)) // Получить рейтинг
+		auth.PATCH("/rating/update", handlers.UpdateRatingsHandler(rs.NewRatingsService(s, s.Secret), s)) // Обновить рейтинг
 
 		// Notes handlers
-		auth.GET("/notes", handlers.GetNotesHandler(s))
-		auth.PATCH("/note/add", handlers.AddNoteHandler(s))
-		auth.DELETE("/note/delete/:id", handlers.DeleteNoteHandler(s))
+		auth.GET("/notes", handlers.GetNotesHandler(s)) // Получить заметки, с возможностью фильтрации по классу Query параметром
+		auth.PATCH("/note/add", handlers.AddNoteHandler(s)) // Добавить заметку
+		auth.DELETE("/note/delete/:id", handlers.DeleteNoteHandler(s)) // Удалить заметку
 
 		// Complaints handlers
-		auth.GET("/complaints", handlers.GetComplaintsHandler(s))
-		auth.PATCH("/complaint/add", handlers.AddcomplaintHandler(s))
-		auth.DELETE("/complaint/delete/:id", handlers.DeletecomplaintHandler(s))
+		auth.GET("/complaints", handlers.GetComplaintsHandler(s)) // Получить жалобы, с возможностью фильтрации по классу Query параметром
+		auth.PATCH("/complaint/add", handlers.AddcomplaintHandler(s)) // Добавить жалобу
+		auth.DELETE("/complaint/delete/:id", handlers.DeletecomplaintHandler(s)) // Удалить жалобу
 	}
 
 	addr := os.Getenv("PORT")

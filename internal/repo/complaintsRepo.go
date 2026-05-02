@@ -8,4 +8,5 @@ type ComplaintRepository interface {
 	DeleteComplaint(id int, user models.SafeUser) error
 	GetComplaintByID(id int) ([]models.Complaint, error)
 	GetComplaintsByUserId(User_id int) ([]models.Complaint, error)
+	GetComplaintsByClassID(classID int) ([]models.Complaint, error)
 }

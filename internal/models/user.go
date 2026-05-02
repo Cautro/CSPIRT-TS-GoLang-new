@@ -31,6 +31,7 @@ type UserWithFullInfo struct {
 	User       *SafeUser
 	Notes      []Note
 	Complaints []Complaint
+	ClassTeacher *SafeUser
 	Events     []Event
 }
 

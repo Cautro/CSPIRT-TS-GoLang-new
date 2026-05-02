@@ -35,6 +35,28 @@ func (s *NoteService) GetAllNotes() ([]models.Note, error) {
 	return result, nil
 }
 
+func (s *NoteService) GetNotesByClassID(classID int) ([]models.Note, error) {
+	if classID <= 0 {
+		return nil, errors.New("invalid class id")
+	}
+
+	result, err := s.notes.GetNotesByClassID(classID)
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "getting_notes_by_class",
+			Message: "Error by getting notes by class",
+		})
+		return nil, err
+	}
+
+	if result == nil {
+		return []models.Note{}, nil
+	}
+
+	return result, nil
+}
+
 func (s *NoteService) AddNewNote(login string, in *models.AddNewNoteResponse, user *models.SafeUser) error {
 	if in == nil {
 		return errors.New("invalid input")

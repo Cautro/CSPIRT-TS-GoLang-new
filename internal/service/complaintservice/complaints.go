@@ -17,6 +17,29 @@ func NewComplaintsService(complaints repo.ComplaintRepository, jwtSecret string)
 	}
 }
 
+func (s *ComplaintService) GetComplaintsByClassID(classID int) ([]models.Complaint, error) {
+	if classID <= 0 {
+		return nil, errors.New("invalid class id")
+	}
+
+	result, err := s.complaints.GetComplaintsByClassID(classID)
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "getting_complaints_by_class",
+			Message: "Error by getting complaints by class",
+		})
+		return nil, err
+	}
+
+	if result == nil {
+		return []models.Complaint{}, nil
+	}
+
+	return result, nil
+}
+
+
 func (s *ComplaintService) GetAllComplaints() ([]models.Complaint, error) {
 	result, err := s.complaints.GetAllComplaints()
 

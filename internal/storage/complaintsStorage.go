@@ -277,3 +277,67 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error)
 
 	return complaints, nil
 }
+
+func (s *Storage) GetComplaintsByClassID(classID int) ([]models.Complaint, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if classID <= 0 {
+		return nil, errors.New("invalid class id")
+	}
+
+	if err := s.syncAllClassesLocked(); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.Query(`
+		SELECT c.Id, c.TargetID, c.AuthorID, c.Content, c.CreatedAt
+		FROM complaints c
+		JOIN users u ON u.Id = c.TargetID
+		WHERE u.ClassID = ?
+		ORDER BY c.Id DESC
+	`, classID)
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_complaints_by_class",
+			Message: "failed to query complaints by class: " + err.Error(),
+		})
+		return nil, err
+	}
+	defer rows.Close()
+
+	complaints := make([]models.Complaint, 0)
+
+	for rows.Next() {
+		var c models.Complaint
+
+		if err := rows.Scan(
+			&c.ID,
+			&c.TargetID,
+			&c.AuthorID,
+			&c.Content,
+			&c.CreatedAt,
+		); err != nil {
+			writeLog(logger.LogEntry{
+				Level:   "error",
+				Action:  "get_complaints_by_class",
+				Message: "failed to scan complaint: " + err.Error(),
+			})
+			return nil, err
+		}
+
+		complaints = append(complaints, c)
+	}
+
+	if err := rows.Err(); err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_complaints_by_class",
+			Message: "row iteration failed: " + err.Error(),
+		})
+		return nil, err
+	}
+
+	return complaints, nil
+}
