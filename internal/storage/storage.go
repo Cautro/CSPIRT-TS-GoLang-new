@@ -5,6 +5,7 @@ import (
 	noteRepo "cspirt/internal/note/repo"
 	complaintRepo "cspirt/internal/complaints/repo"
 	classRepo "cspirt/internal/class/repo"
+	eventsRepo "cspirt/internal/events/repo"
 
 	_ "modernc.org/sqlite"
 
@@ -22,6 +23,7 @@ type Storage struct {
 	NotesRepo      noteRepo.NoteRepository
 	ComplaintsRepo complaintRepo.ComplaintRepository
 	ClassRepo      classRepo.ClassRepository
+	EventsRepo	   eventsRepo.EventsRepository
 
 	Secret string
 }
@@ -49,6 +51,25 @@ func (s *Storage) initUserStorage() error {
 	}
 
 	return s.ensureColumn("users", "ClassID", "INTEGER")
+}
+
+func (s *Storage) initEventsStorage() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `
+	CREATE TABLE IF NOT EXISTS events (
+		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Title TEXT NOT NULL,
+		Status TEXT NOT NULL,
+		Description TEXT NOT NULL,
+		CreatedAt TEXT NOT NULL,
+		StartedAt TEXT NOT NULL,
+		Players TEXT NOT NULL
+	);`
+
+	_, err := s.db.Exec(query)
+	return err	
 }
 
 func (s *Storage) initNoteStorage() error {
@@ -136,6 +157,7 @@ func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
 	st.NotesRepo = st
 	st.ComplaintsRepo = st
 	st.ClassRepo = st
+	st.EventsRepo = st
 
 	if err := st.initUserStorage(); err != nil {
 		db.Close()
@@ -158,6 +180,10 @@ func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
 		return nil, err
 	}
 	if err := st.syncAllClasses(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := st.initEventsStorage(); err != nil {
 		db.Close()
 		return nil, err
 	}

@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+	"cspirt/internal/events/models"
+)
+
 
 type User struct {
 	ID       int        `json:"Id"`
@@ -32,16 +36,7 @@ type UserWithFullInfo struct {
 	Notes      []Note        `json:"Notes"`
 	Complaints []Complaint   `json:"Complaints"`
 	ClassTeacher *SafeUser   `json:"ClassTeacher"`
-	Events     []Event       `json:"Events"`
-}
-
-type Event struct {
-	ID          int       `json:"ID"`
-	Title       string    `json:"Title"`
-	Description string    `json:"Description"`
-	CreatedAt   time.Time `json:"CreatedAt"`
-	StartedAt   string    `json:"StartedAt"`
-	Players     []int     `json:"Players"`
+	Events     []models.Event       `json:"Events"`
 }
 
 type FullName struct {

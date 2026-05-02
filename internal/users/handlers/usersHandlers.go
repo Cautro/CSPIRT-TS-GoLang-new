@@ -3,6 +3,7 @@ package handlers
 import (
 	"cspirt/internal/logger"
 	"cspirt/internal/users/models"
+	eventModels "cspirt/internal/events/models"
 	ratingModels "cspirt/internal/rating/models"
 	sr "cspirt/internal/users/service"
 	"cspirt/internal/storage"
@@ -96,7 +97,7 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 			Notes:        notes,
 			Complaints:   complaints,
 			ClassTeacher: classTeacher,
-			Events: []models.Event{}, 
+			Events: []eventModels.Event{}, 
 		}
 
 		c.JSON(http.StatusOK, answerResponse)
@@ -303,7 +304,7 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			Notes:        notes,
 			Complaints:   complaints,
 			ClassTeacher: classTeacher,
-			Events: []models.Event{}, 
+			Events: []eventModels.Event{}, 
 		}
 
 		c.JSON(http.StatusOK, answerResponse)

@@ -6,6 +6,7 @@ import (
 	cmHandlers "cspirt/internal/complaints/handlers"
 	hHandlers "cspirt/internal/health/handlers"
 	"cspirt/internal/logger"
+	eHandlers "cspirt/internal/events/handlers"
 	nHandlers "cspirt/internal/note/handlers"
 	rHandlers "cspirt/internal/rating/handler"
 	rs "cspirt/internal/rating/service"
@@ -93,6 +94,13 @@ func main() {
 		auth.GET("/complaints", cmHandlers.GetComplaintsHandler(s))                // Получить жалобы, с возможностью фильтрации по классу Query параметром
 		auth.PATCH("/complaint/add", cmHandlers.AddcomplaintHandler(s))            // Добавить жалобу
 		auth.DELETE("/complaint/delete/:id", cmHandlers.DeletecomplaintHandler(s)) // Удалить жалобу
+
+		// Events handlers
+		auth.GET("/events", eHandlers.GetEventsHandler(s))				// Получить события, с возможностью фильтрации по классу Query параметром
+		auth.PATCH("/event/add", eHandlers.AddEventHandler(s))                              // Добавить событие
+		auth.DELETE("/event/delete/:id", eHandlers.DeleteEventHandler(s))                   // Удалить событие
+		auth.PATCH("/event/:eventId/players/add", eHandlers.AddPlayersToEvent(s))           // Добавить игроков к событию
+		auth.DELETE("/event/:eventId/players/delete", eHandlers.DeletePlayersFromEvent(s))  // Удалить игроков из события
 	}
 
 	addr := os.Getenv("PORT")
