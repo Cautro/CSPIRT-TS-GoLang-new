@@ -18,11 +18,11 @@ const notesResponseShema = z.object({
 });
 
 const noteAddResponseSchema = z.object({
-    messsage: z.string(),
+    message: z.string(),
 });
 
 const noteDeleteResponseSchema = z.object({
-    messsage: z.string(),
+    message: z.string(),
 });
 
 const client = new ApiClient();

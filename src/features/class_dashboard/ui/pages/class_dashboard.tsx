@@ -61,7 +61,6 @@ export function ClassDashboard() {
                                 onClick={() => {
                                     void getNotes(classId);
                                     setSelectedList('notes');
-                                    console.log(notes);
                                 }}
                                 disabled={(selectedList === "notes")}
                             >

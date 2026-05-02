@@ -2,11 +2,12 @@ import {z} from "zod";
 import {ApiClient} from "../../../../core/api/api_client.ts";
 import {userSchema} from "../types/user_types.ts";
 import {noteSchema} from "../../notes/types/notes_types.ts";
+import {complaintSchema} from "../../complaints/types/complaints_types.ts";
 
 const getUserResponseSchema = z.object({
     User: userSchema,
     Notes: z.array(noteSchema).optional(),
-    Complaints: z.array(noteSchema).optional(),
+    Complaints: z.array(complaintSchema).optional(),
     Events: z.array(noteSchema).optional(),
     ClassTeacher: userSchema.optional(),
 })
