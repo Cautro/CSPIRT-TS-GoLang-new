@@ -1,7 +1,10 @@
 package storage
 
 import (
-	"cspirt/internal/repo"
+	ratingRepo "cspirt/internal/rating/repo"
+	noteRepo "cspirt/internal/note/repo"
+	complaintRepo "cspirt/internal/complaints/repo"
+	classRepo "cspirt/internal/class/repo"
 
 	_ "modernc.org/sqlite"
 
@@ -15,10 +18,10 @@ type Storage struct {
 	db *sql.DB
 	mu sync.Mutex
 
-	RatingRepo     repo.RatingRepository
-	NotesRepo      repo.NoteRepository
-	ComplaintsRepo repo.ComplaintRepository
-	ClassRepo      repo.ClassRepository
+	RatingRepo     ratingRepo.RatingRepository
+	NotesRepo      noteRepo.NoteRepository
+	ComplaintsRepo complaintRepo.ComplaintRepository
+	ClassRepo      classRepo.ClassRepository
 
 	Secret string
 }

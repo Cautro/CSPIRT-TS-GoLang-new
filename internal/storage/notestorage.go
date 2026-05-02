@@ -2,7 +2,7 @@ package storage
 
 import (
 	"cspirt/internal/logger"
-	"cspirt/internal/models"
+	"cspirt/internal/users/models"
 	"errors"
 	"strings"
 	"time"

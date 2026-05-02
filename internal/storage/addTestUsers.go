@@ -1,8 +1,8 @@
 package storage
 
 import (
-	"cspirt/internal/models"
-	utils "cspirt/internal/utils/auth"
+	"cspirt/internal/users/models"
+	utils "cspirt/internal/utils"
 	"encoding/json"
 )
 

@@ -1,7 +1,8 @@
 package storage
 
 import (
-	"cspirt/internal/models"
+	"cspirt/internal/users/models"
+	ratingModels "cspirt/internal/rating/models"
 	"errors"
 	"strings"
 )
@@ -16,14 +17,14 @@ func normalizeClassName(name string) string {
 
 func normalizeRole(role string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(role)) {
-	case strings.ToLower(string(models.RoleUser)):
-		return string(models.RoleUser), nil
-	case strings.ToLower(string(models.RoleHelper)):
-		return string(models.RoleHelper), nil
-	case strings.ToLower(string(models.RoleAdmin)):
-		return string(models.RoleAdmin), nil
-	case strings.ToLower(string(models.RoleOwner)):
-		return string(models.RoleOwner), nil
+	case strings.ToLower(string(ratingModels.RoleAdmin)):
+		return string(ratingModels.RoleAdmin), nil
+	case strings.ToLower(string(ratingModels.RoleUser)):
+		return string(ratingModels.RoleUser), nil
+	case strings.ToLower(string(ratingModels.RoleHelper)):
+		return string(ratingModels.RoleHelper), nil
+	case strings.ToLower(string(ratingModels.RoleOwner)):
+		return string(ratingModels.RoleOwner), nil
 	default:
 		return "", errors.New("invalid role")
 	}
@@ -31,9 +32,9 @@ func normalizeRole(role string) (string, error) {
 
 func isTeacherCandidate(role string) bool {
 	role = strings.ToLower(strings.TrimSpace(role))
-	return role == strings.ToLower(string(models.RoleAdmin)) ||
-		role == strings.ToLower(string(models.RoleOwner)) ||
-		role == strings.ToLower(string(models.RoleHelper))
+	return role == strings.ToLower(string(ratingModels.RoleAdmin)) ||
+		role == strings.ToLower(string(ratingModels.RoleOwner)) ||
+		role == strings.ToLower(string(ratingModels.RoleHelper))
 }
 
 func trimUserInput(user *models.User) {

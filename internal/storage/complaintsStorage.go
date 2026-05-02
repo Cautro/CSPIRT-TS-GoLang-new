@@ -2,13 +2,13 @@ package storage
 
 import (
 	"cspirt/internal/logger"
-	"cspirt/internal/models"
+	userModels "cspirt/internal/users/models"
 	"errors"
 	"strings"
 	"time"
 )
 
-func (s *Storage) AddComplaint(login string, complaint models.Complaint, user models.SafeUser) error {
+func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, user userModels.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -60,7 +60,7 @@ func (s *Storage) AddComplaint(login string, complaint models.Complaint, user mo
 	return nil
 }
 
-func (s *Storage) DeleteComplaint(id int, user models.SafeUser) error {
+func (s *Storage) DeleteComplaint(id int, user userModels.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -100,7 +100,7 @@ func (s *Storage) DeleteComplaint(id int, user models.SafeUser) error {
 	return nil
 }
 
-func (s *Storage) GetAllComplaints() ([]models.Complaint, error) {
+func (s *Storage) GetAllComplaints() ([]userModels.Complaint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -124,10 +124,10 @@ func (s *Storage) GetAllComplaints() ([]models.Complaint, error) {
 	}
 	defer rows.Close()
 
-	complaints := make([]models.Complaint, 0)
+	complaints := make([]userModels.Complaint, 0)
 
 	for rows.Next() {
-		var complaint models.Complaint
+		var complaint userModels.Complaint
 
 		if err := rows.Scan(
 			&complaint.ID,
@@ -161,7 +161,7 @@ func (s *Storage) GetAllComplaints() ([]models.Complaint, error) {
 	return complaints, nil
 }
 
-func (s *Storage) GetComplaintByID(id int) ([]models.Complaint, error) {
+func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -186,10 +186,10 @@ func (s *Storage) GetComplaintByID(id int) ([]models.Complaint, error) {
 	}
 	defer rows.Close()
 
-	complaints := make([]models.Complaint, 0)
+	complaints := make([]userModels.Complaint, 0)
 
 	for rows.Next() {
-		var complaint models.Complaint
+		var complaint userModels.Complaint
 
 		if err := rows.Scan(
 			&complaint.ID,
@@ -223,7 +223,7 @@ func (s *Storage) GetComplaintByID(id int) ([]models.Complaint, error) {
 	return complaints, nil
 }
 
-func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error) {
+func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -249,10 +249,10 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error)
 	}
 	defer rows.Close()
 
-	complaints := make([]models.Complaint, 0)
+	complaints := make([]userModels.Complaint, 0)
 
 	for rows.Next() {
-		var c models.Complaint
+		var c userModels.Complaint
 
 		if err := rows.Scan(
 			&c.ID,
@@ -268,7 +268,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error)
 				Action:  "get_complaint_by_user_id",
 				Message: "Server error: " + err.Error(),
 			})
-			return []models.Complaint{}, err
+			return []userModels.Complaint{}, err
 		}
 
 		complaints = append(complaints, c)
@@ -286,7 +286,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error)
 	return complaints, nil
 }
 
-func (s *Storage) GetComplaintsByClassID(classID int) ([]models.Complaint, error) {
+func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -315,10 +315,10 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]models.Complaint, error
 	}
 	defer rows.Close()
 
-	complaints := make([]models.Complaint, 0)
+	complaints := make([]userModels.Complaint, 0)
 
 	for rows.Next() {
-		var c models.Complaint
+		var c userModels.Complaint
 
 		if err := rows.Scan(
 			&c.ID,

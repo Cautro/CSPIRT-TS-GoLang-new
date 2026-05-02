@@ -2,8 +2,8 @@ package storage
 
 import (
 	"cspirt/internal/logger"
-	"cspirt/internal/models"
-	utils "cspirt/internal/utils/auth"
+	"cspirt/internal/users/models"
+	utils "cspirt/internal/utils"
 	"database/sql"
 	"encoding/json"
 	"errors"

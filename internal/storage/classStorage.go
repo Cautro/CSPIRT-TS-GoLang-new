@@ -2,7 +2,8 @@ package storage
 
 import (
 	"cspirt/internal/logger"
-	"cspirt/internal/models"
+	userModels "cspirt/internal/users/models"
+	classModels "cspirt/internal/class/models"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -100,7 +101,7 @@ func (s *Storage) saveClassTeacherLocked(name string, teacherLogin string) error
 	return s.syncClassLocked(name)
 }
 
-func (s *Storage) GetAllClasses() ([]models.Class, error) {
+func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -128,7 +129,7 @@ func (s *Storage) GetAllClasses() ([]models.Class, error) {
 	}
 	defer rows.Close()
 
-	classes := make([]models.Class, 0)
+	classes := make([]classModels.Class, 0)
 	for rows.Next() {
 		class, err := s.scanClassRowsLocked(rows)
 		if err != nil {
@@ -182,7 +183,7 @@ func (s *Storage) SaveClassTeacherByID(classID int, teacherLogin string) error {
 	return s.saveClassTeacherLocked(class.Name, teacherLogin)
 }
 
-func (s *Storage) GetClassByID(id int) (*models.Class, error) {
+func (s *Storage) GetClassByID(id int) (*classModels.Class, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -205,7 +206,7 @@ func (s *Storage) GetClassByID(id int) (*models.Class, error) {
 	return s.getClassByIDLocked(id)
 }
 
-func (s *Storage) GetClassTeacherByID(classID int) (*models.SafeUser, error) {
+func (s *Storage) GetClassTeacherByID(classID int) (*userModels.SafeUser, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -239,7 +240,7 @@ func (s *Storage) GetClassTeacherByID(classID int) (*models.SafeUser, error) {
 	return s.getSafeUserByLoginLocked(class.TeacherLogin)
 }
 
-func (s *Storage) GetUsersByClassID(classID int) ([]models.SafeUser, error) {
+func (s *Storage) GetUsersByClassID(classID int) ([]userModels.SafeUser, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -477,7 +478,7 @@ func (s *Storage) classExistsLocked(name string) (bool, error) {
 	return true, nil
 }
 
-func (s *Storage) getClassByNameLocked(name string) (*models.Class, error) {
+func (s *Storage) getClassByNameLocked(name string) (*classModels.Class, error) {
 	row := s.db.QueryRow(`
 		SELECT Id, Name, TeacherLogin, Members, TotalRating
 		FROM classes
@@ -495,7 +496,7 @@ func (s *Storage) getClassByNameLocked(name string) (*models.Class, error) {
 	return &class, nil
 }
 
-func (s *Storage) getClassByIDLocked(id int) (*models.Class, error) {
+func (s *Storage) getClassByIDLocked(id int) (*classModels.Class, error) {
 	row := s.db.QueryRow(`
 		SELECT Id, Name, TeacherLogin, Members, TotalRating
 		FROM classes
@@ -526,7 +527,7 @@ func (s *Storage) getClassIDByNameLocked(name string) (int, error) {
 	return classID, nil
 }
 
-func (s *Storage) getUsersByClassIDLocked(classID int) ([]models.SafeUser, error) {
+func (s *Storage) getUsersByClassIDLocked(classID int) ([]userModels.SafeUser, error) {
 	rows, err := s.db.Query(`
 		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
 		FROM users
@@ -545,8 +546,8 @@ type classScanner interface {
 	Scan(dest ...interface{}) error
 }
 
-func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool) (models.Class, error) {
-	var class models.Class
+func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool) (classModels.Class, error) {
+	var class classModels.Class
 	var teacherLogin sql.NullString
 	var membersJSON string
 
@@ -557,16 +558,16 @@ func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool)
 		&membersJSON,
 		&class.TotalRating,
 	); err != nil {
-		return models.Class{}, err
+		return classModels.Class{}, err
 	}
 
 	if membersJSON != "" {
 		if err := json.Unmarshal([]byte(membersJSON), &class.Members); err != nil {
-			return models.Class{}, err
+			return classModels.Class{}, err
 		}
 	}
 	if class.Members == nil {
-		class.Members = []models.SafeUser{}
+		class.Members = []userModels.SafeUser{}
 	}
 
 	if teacherLogin.Valid && teacherLogin.String != "" {
@@ -574,7 +575,7 @@ func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool)
 		if loadTeacher {
 			teacher, err := s.getSafeUserByLoginLocked(teacherLogin.String)
 			if err != nil {
-				return models.Class{}, err
+				return classModels.Class{}, err
 			}
 			class.Teacher = teacher
 		}
@@ -583,7 +584,7 @@ func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool)
 	return class, nil
 }
 
-func (s *Storage) scanClassRowsLocked(rows *sql.Rows) (models.Class, error) {
+func (s *Storage) scanClassRowsLocked(rows *sql.Rows) (classModels.Class, error) {
 	return s.scanClassScannerLocked(rows, false)
 }
 

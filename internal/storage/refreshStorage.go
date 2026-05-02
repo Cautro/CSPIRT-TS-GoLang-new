@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"cspirt/internal/models"
+	"cspirt/internal/users/models"
 	"time"
 	"database/sql"
 )

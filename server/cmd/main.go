@@ -1,11 +1,17 @@
 package main
 
 import (
-	"cspirt/internal/handlers"
+	aHandlers "cspirt/internal/auth/handlers"
+	clHandlers "cspirt/internal/class/handlers"
+	cmHandlers "cspirt/internal/complaints/handlers"
+	hHandlers "cspirt/internal/health/handlers"
 	"cspirt/internal/logger"
-	rs "cspirt/internal/service/rating"
+	nHandlers "cspirt/internal/note/handlers"
+	rHandlers "cspirt/internal/rating/handler"
+	rs "cspirt/internal/rating/service"
 	"cspirt/internal/storage"
-	utils "cspirt/internal/utils/auth"
+	uHandlers "cspirt/internal/users/handlers"
+	utils "cspirt/internal/utils"
 	"log/slog"
 	"os"
 
@@ -56,37 +62,37 @@ func main() {
 
 	// Gin logic here
 	r := gin.Default()
-	r.GET("/health", handlers.HealthHandler) // Endpoint для проверки работоспособности сервера
-	r.POST("/login", handlers.LoginHandler(s)) // Endpoint для входа и получения JWT
-	r.POST("/api/refresh", handlers.RefreshHandler(s)) // Endpoint для обновления токена
+	r.GET("/health", hHandlers.HealthHandler)           // Endpoint для проверки работоспособности сервера
+	r.POST("/login", aHandlers.LoginHandler(s))         // Endpoint для входа и получения JWT
+	r.POST("/api/refresh", aHandlers.RefreshHandler(s)) // Endpoint для обновления токена
 
 	auth := r.Group("/api", utils.AuthMiddleware(jwtSecret))
 	{
 		// user handlers
-		auth.GET("/users", handlers.GetUsersHandler(s)) // Получить всех пользователей или конкретного пользователя по ID (через Query параметр)
-		auth.PATCH("/user/add", handlers.AddUserHandler(s)) // Добавление нового пользователя
-		auth.DELETE("/user/delete/:id", handlers.DeleteUserHandler(s)) // Удаление пользователя по ID
-		auth.GET("/me", handlers.GetMeHandler(s)) // Получить информацию о текущем пользователе
+		auth.GET("/users", uHandlers.GetUsersHandler(s))                // Получить всех пользователей или конкретного пользователя по ID (через Query параметр)
+		auth.PATCH("/user/add", uHandlers.AddUserHandler(s))            // Добавление нового пользователя
+		auth.DELETE("/user/delete/:id", uHandlers.DeleteUserHandler(s)) // Удаление пользователя по ID
+		auth.GET("/me", uHandlers.GetMeHandler(s))                      // Получить информацию о текущем пользователе
 
 		// Class handlers
-		auth.GET("/classes", handlers.GetClassesHandler(s)) // Получить все классы
-		auth.GET("/classes/:class_id/users", handlers.GetClassUsersHandler(s)) // Получить всех пользователей класса
-		auth.GET("/classes/:class_id/teacher", handlers.GetClassTeacherHandler(s))   // Получить учителя
-		auth.PATCH("/classes/:class_id/teacher", handlers.SetClassTeacherHandler(s)) // Установить учителя
+		auth.GET("/classes", clHandlers.GetClassesHandler(s))                          // Получить все классы
+		auth.GET("/classes/:class_id/users", clHandlers.GetClassUsersHandler(s))       // Получить всех пользователей класса
+		auth.GET("/classes/:class_id/teacher", clHandlers.GetClassTeacherHandler(s))   // Получить учителя
+		auth.PATCH("/classes/:class_id/teacher", clHandlers.SetClassTeacherHandler(s)) // Установить учителя
 
 		// Rating handlers
-		auth.GET("/rating", handlers.GetRatingsHandler(s)) // Получить рейтинг
-		auth.PATCH("/rating/update", handlers.UpdateRatingsHandler(rs.NewRatingsService(s, s.Secret), s)) // Обновить рейтинг
+		auth.GET("/rating", rHandlers.GetRatingsHandler(s))                                                              // Получить рейтинг
+		auth.PATCH("/rating/update", rHandlers.UpdateRatingsHandler(rs.NewRatingsService(s.RatingRepo, s, s.Secret), s)) // Обновить рейтинг
 
 		// Notes handlers
-		auth.GET("/notes", handlers.GetNotesHandler(s)) // Получить заметки, с возможностью фильтрации по классу Query параметром
-		auth.PATCH("/note/add", handlers.AddNoteHandler(s)) // Добавить заметку
-		auth.DELETE("/note/delete/:id", handlers.DeleteNoteHandler(s)) // Удалить заметку
+		auth.GET("/notes", nHandlers.GetNotesHandler(s))                // Получить заметки, с возможностью фильтрации по классу Query параметром
+		auth.PATCH("/note/add", nHandlers.AddNoteHandler(s))            // Добавить заметку
+		auth.DELETE("/note/delete/:id", nHandlers.DeleteNoteHandler(s)) // Удалить заметку
 
 		// Complaints handlers
-		auth.GET("/complaints", handlers.GetComplaintsHandler(s)) // Получить жалобы, с возможностью фильтрации по классу Query параметром
-		auth.PATCH("/complaint/add", handlers.AddcomplaintHandler(s)) // Добавить жалобу
-		auth.DELETE("/complaint/delete/:id", handlers.DeletecomplaintHandler(s)) // Удалить жалобу
+		auth.GET("/complaints", cmHandlers.GetComplaintsHandler(s))                // Получить жалобы, с возможностью фильтрации по классу Query параметром
+		auth.PATCH("/complaint/add", cmHandlers.AddcomplaintHandler(s))            // Добавить жалобу
+		auth.DELETE("/complaint/delete/:id", cmHandlers.DeletecomplaintHandler(s)) // Удалить жалобу
 	}
 
 	addr := os.Getenv("PORT")
