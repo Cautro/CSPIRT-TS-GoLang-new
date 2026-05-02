@@ -12,9 +12,9 @@ import {ratingChangeDTO} from "../../../../shared/entities/rating/api/rating_api
 export function UserPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>(); 
-    const role = useAuthStore.getState().user?.User.Role;
-    const name = useAuthStore.getState().user?.User.Name
-    const lastName = useAuthStore.getState().user?.User.LastName
+    const role = useAuthStore((state) => state.user?.User.Role);
+    const name = useAuthStore((state) => state.user?.User.Name);
+    const lastName = useAuthStore((state) => state.user?.User.LastName);
     
     const status = useUserStore((state) => state.status);
     const error = useUserStore((state) => state.error);
@@ -330,8 +330,8 @@ export function UserPage() {
 
                         {complaints.length > 0 ? (
                             <div className="feed">
-                                {complaints.map((item, index) => (
-                                    <ComplaintCard key={index} item={item} role={role} onDelete={() => {
+                                {complaints.map((item) => (
+                                    <ComplaintCard key={item.ID} item={item} onDelete={() => {
                                         deleteComplaint(item.ID.toString());
                                         if (!id) {
                                             return
@@ -389,8 +389,8 @@ export function UserPage() {
 
                             {notes.length > 0 ? (
                                 <div className="feed">
-                                    {notes.map((note, index) => (
-                                        <NoteCard key={index} item={note} role={role} onDelete={() => {
+                                    {notes.map((note) => (
+                                        <NoteCard key={note.ID} item={note} onDelete={() => {
                                             deleteNote(note.ID.toString());
                                             if (!id) {
                                                 return

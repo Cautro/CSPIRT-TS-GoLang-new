@@ -4,13 +4,8 @@ import {clearAccessToken, getAccessToken, setAccessToken} from "../auth/access_t
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 interface RequestOptions {
-    token?: string | null;
     data?: unknown;
     skipAuthRetry?: boolean;
-}
-
-interface RequestOptions {
-    data?: unknown;
     auth?: boolean;
     credentials?: RequestCredentials;
 }

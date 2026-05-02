@@ -71,7 +71,7 @@ export function DashboardPage() {
                 {!isLoading && !error && classes.length > 0 && (
                     <div className="class-list">
                         {classes.map((item) => (
-                            <ClassCard key={item.Id} item={item} role={role}/>
+                            <ClassCard key={item.Id} item={item}/>
                         ))}
                     </div>
                 )}

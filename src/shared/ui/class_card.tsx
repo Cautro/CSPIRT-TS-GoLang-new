@@ -1,13 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import type { ClassType } from "../entities/class/types/class_types.ts";
-import type {UserRole} from "../entities/user/types/user_types.ts";
 
 interface Props {
     item: ClassType;
-    role: UserRole;
 }
 
-export function ClassCard({ item, role }: Props) {
+export function ClassCard({ item }: Props) {
     const navigate = useNavigate();
 
     const teacherFullName = `${item.Teacher.Name} ${item.Teacher.LastName}`;
@@ -22,7 +20,6 @@ export function ClassCard({ item, role }: Props) {
                     state: {
                         name: item.Name,
                         id: item.Id,
-                        role: role
                     },
                 });
             }}

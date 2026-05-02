@@ -4,6 +4,7 @@ import {UserCard} from "../../../../shared/ui/user_card.tsx";
 import {NoteCard} from "../../../../shared/ui/note_card.tsx";
 import {useClassDashboardStore} from "../../store/class_dashboard_store.ts";
 import {ComplaintCard} from "../../../../shared/ui/complaint_card.tsx";
+import {useAuthStore} from "../../../auth/store/auth_store.ts";
 
 type SelectedList = | "users" | "notes" | "complaints";
 
@@ -13,7 +14,7 @@ export function ClassDashboard() {
     const location = useLocation();
     const className = location.state?.name;
     const classId = location.state?.id;
-    const role = location.state?.role;
+    const role = useAuthStore((state) => state.user?.User.Role);
     
     const getUsers = useClassDashboardStore((state) => state.getUsersByClass);
     const users = useClassDashboardStore((state) => state.users);
@@ -32,7 +33,7 @@ export function ClassDashboard() {
         
     useEffect(() => {
         void getUsers(classId);
-    }, [getUsers, className])
+    }, [getUsers, classId])
 
     return (
         <main className={"main"}>
@@ -107,7 +108,7 @@ export function ClassDashboard() {
                 {selectedList === "users" ? users.length > 0 ? (
                     <div className={"class-list"}>
                         {users.map((user) => (
-                            <UserCard user={user}/>
+                            <UserCard user={user} key={user.Id}/>
                         ))}
                     </div>
                 ) : (
@@ -124,7 +125,7 @@ export function ClassDashboard() {
                 {selectedList === "notes" && notes.length > 0 ? (
                     <div className={"class-list"}>
                         {notes.map((note) => (
-                            <NoteCard item={note} role={role} onDelete={() => {
+                            <NoteCard item={note} key={note.ID} onDelete={() => {
                                 deleteNote(note.ID.toString());
                                 if (!classId) {
                                     return
@@ -145,7 +146,7 @@ export function ClassDashboard() {
                 {selectedList === "complaints" && complaints.length > 0 ? (
                     <div className={"class-list"}>
                         {complaints.map((item) => (
-                            <ComplaintCard item={item} role={role} onDelete={() => {
+                            <ComplaintCard item={item} key={item.ID} onDelete={() => {
                                 deleteComplaint(item.ID.toString());
                                 if (!classId) {
                                     return
