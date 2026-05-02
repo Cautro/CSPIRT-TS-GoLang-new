@@ -59,13 +59,11 @@ func (s *Storage) initNoteStorage() error {
 	CREATE TABLE IF NOT EXISTS notes (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		TargetID INTEGER NOT NULL,
-		TargetName TEXT NOT NULL,
 		AuthorID INTEGER NOT NULL,
+		TargetName TEXT NOT NULL,
 		AuthorName TEXT NOT NULL,
 		Content TEXT NOT NULL,
-		CreatedAt TEXT NOT NULL,
-		FOREIGN KEY (TargetID) REFERENCES users(Id) ON DELETE CASCADE,
-		FOREIGN KEY (AuthorID) REFERENCES users(Id) ON DELETE CASCADE
+		CreatedAt TEXT NOT NULL
 	);`
 
 	_, err := s.db.Exec(query)

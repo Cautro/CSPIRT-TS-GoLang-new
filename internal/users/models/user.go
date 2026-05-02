@@ -28,20 +28,20 @@ type SafeUser struct {
 }
 
 type UserWithFullInfo struct {
-	User       *SafeUser
-	Notes      []Note
-	Complaints []Complaint
-	ClassTeacher *SafeUser
-	Events     []Event
+	User       *SafeUser     `json:"User"`
+	Notes      []Note        `json:"Notes"`
+	Complaints []Complaint   `json:"Complaints"`
+	ClassTeacher *SafeUser   `json:"ClassTeacher"`
+	Events     []Event       `json:"Events"`
 }
 
 type Event struct {
-	ID          int
-	Title       string
-	Description string
-	CreatedAt   string
-	startedAt   string
-	Players     []int
+	ID          int       `json:"ID"`
+	Title       string    `json:"Title"`
+	Description string    `json:"Description"`
+	CreatedAt   time.Time `json:"CreatedAt"`
+	StartedAt   string    `json:"StartedAt"`
+	Players     []int     `json:"Players"`
 }
 
 type FullName struct {
@@ -50,23 +50,23 @@ type FullName struct {
 }
 
 type Note struct {
-	ID        int    `json:"ID"`
-	TargetID  int    `json:"TargetID"`
-	TargetName string `json:"TargetName"`
-	AuthorID  int    `json:"AuthorID"`
-	AuthorName string `json:"AuthorName"`
-	Content   string `json:"Content"`
-	CreatedAt string `json:"CreatedAt"`
+	ID        int      `json:"ID"`
+	TargetID  int      `json:"TargetID"`
+	TargetName string  `json:"TargetName"`
+	AuthorID  int      `json:"AuthorID"`
+	AuthorName string  `json:"AuthorName"`
+	Content   string   `json:"Content"`
+	CreatedAt time.Time`json:"CreatedAt"`
 }
 
 type Complaint struct {
-	ID        int    `json:"ID"`
-	TargetID  int    `json:"TargetID"`
+	ID        int     `json:"ID"`
+	TargetID  int     `json:"TargetID"`
 	TargetName string `json:"TargetName"`
-	AuthorID  int    `json:"AuthorID"`
+	AuthorID  int     `json:"AuthorID"`
 	AuthorName string `json:"AuthorName"`
-	Content   string `json:"Content"`
-	CreatedAt string `json:"CreatedAt"`
+	Content   string  `json:"Content"`
+	CreatedAt time.Time `json:"CreatedAt"`
 }
 
 type RefreshToken struct {

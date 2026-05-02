@@ -5,7 +5,6 @@ import (
 	"cspirt/internal/users/models"
 	"errors"
 	"strings"
-	"time"
 )
 
 func (s *Storage) AddNote(login string, note models.Note, user models.SafeUser) error {
@@ -18,9 +17,6 @@ func (s *Storage) AddNote(login string, note models.Note, user models.SafeUser) 
 	}
 	if note.Content == "" {
 		return errors.New("content is required")
-	}
-	if note.CreatedAt == "" {
-		note.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 	}
 
 	query := `

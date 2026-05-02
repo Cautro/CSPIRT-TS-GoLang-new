@@ -308,12 +308,12 @@ func (s *Storage) syncAllClassesLocked() error {
 			WHERE classes.Name = users.Class
 		)
 		WHERE (ClassID IS NULL OR ClassID = 0)
-		  AND TRIM(Class) <> ''
-		  AND EXISTS (
+		AND TRIM(Class) <> ''
+		AND EXISTS (
 			SELECT 1
 			FROM classes
 			WHERE classes.Name = users.Class
-		  )
+		)
 	`); err != nil {
 		return err
 	}
@@ -326,12 +326,12 @@ func (s *Storage) syncAllClassesLocked() error {
 			WHERE classes.Id = users.ClassID
 		)
 		WHERE ClassID IS NOT NULL
-		  AND ClassID > 0
-		  AND EXISTS (
+		AND ClassID > 0
+		AND EXISTS (
 			SELECT 1
 			FROM classes
 			WHERE classes.Id = users.ClassID
-		  )
+		)
 	`); err != nil {
 		return err
 	}

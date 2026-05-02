@@ -2,10 +2,11 @@ package notes
 
 import (
 	"cspirt/internal/logger"
-	"cspirt/internal/users/models"
 	noteModels "cspirt/internal/note/models"
 	"cspirt/internal/note/repo"
+	"cspirt/internal/users/models"
 	"errors"
+	"time"
 )
 
 type NoteService struct {
@@ -65,13 +66,22 @@ func (s *NoteService) AddNewNote(login string, in *noteModels.AddNewNoteResponse
 	if user == nil {
 		return errors.New("user not found")
 	}
+	if in.TargetID <= 0 {
+		return errors.New("target is required")
+	}
+	if in.Content == "" {
+		return errors.New("content is required")
+	}
+
+	authorName := user.Name + " " + user.LastName
 
 	err := s.notes.AddNote(login, models.Note{
-		ID:        in.ID,
 		TargetID:  in.TargetID,
-		AuthorID:  in.AuthorID,
+		AuthorID:  user.ID,
+		AuthorName: authorName,
+		TargetName: in.TargetName,
 		Content:   in.Content,
-		CreatedAt: in.CreatedAt,
+		CreatedAt: time.Now(),
 	}, *user)
 
 	if err != nil {

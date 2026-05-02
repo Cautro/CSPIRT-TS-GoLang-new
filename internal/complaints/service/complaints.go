@@ -6,6 +6,7 @@ import (
 	"cspirt/internal/logger"
 	userModels "cspirt/internal/users/models"
 	"errors"
+	"time"
 )
 
 type ComplaintService struct {
@@ -71,7 +72,7 @@ func (s *ComplaintService) AddNewComplaint(login string, in *complaintModels.Add
 		TargetID:  in.TargetID,
 		AuthorID:  in.AuthorID,
 		Content:   in.Content,
-		CreatedAt: in.CreatedAt,
+		CreatedAt: time.Now(),
 	}, *user)
 
 	if err != nil {

@@ -5,7 +5,6 @@ import (
 	userModels "cspirt/internal/users/models"
 	"errors"
 	"strings"
-	"time"
 )
 
 func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, user userModels.SafeUser) error {
@@ -19,9 +18,14 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 	if complaint.Content == "" {
 		return errors.New("content is required")
 	}
-	if complaint.CreatedAt == "" {
-		complaint.CreatedAt = time.Now().UTC().Format(time.RFC3339)
-	}
+
+	writeLog(logger.LogEntry{
+		Level:   "info",
+		Action:  "add_complaint",
+		Login:   user.Login,
+		Role:    user.Role,
+		Message: "adding new complaint",
+	})
 
 	query := `
 		INSERT INTO complaints
