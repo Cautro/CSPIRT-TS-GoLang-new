@@ -56,7 +56,9 @@ func (s *Storage) initNoteStorage() error {
 	CREATE TABLE IF NOT EXISTS notes (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		TargetID INTEGER NOT NULL,
+		TargetName TEXT NOT NULL,
 		AuthorID INTEGER NOT NULL,
+		AuthorName TEXT NOT NULL,
 		Content TEXT NOT NULL,
 		CreatedAt TEXT NOT NULL,
 		FOREIGN KEY (TargetID) REFERENCES users(Id) ON DELETE CASCADE,
@@ -93,7 +95,9 @@ func (s *Storage) initComplaintStorage() error {
 	CREATE TABLE IF NOT EXISTS complaints (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		TargetID INTEGER NOT NULL,
+		TargetName TEXT NOT NULL,
 		AuthorID INTEGER NOT NULL,
+		AuthorName TEXT NOT NULL,
 		Content TEXT NOT NULL,
 		CreatedAt TEXT NOT NULL,
 		FOREIGN KEY (TargetID) REFERENCES users(Id) ON DELETE CASCADE,

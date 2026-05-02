@@ -25,14 +25,16 @@ func (s *Storage) AddNote(login string, note models.Note, user models.SafeUser) 
 
 	query := `
 		INSERT INTO notes
-		(TargetID, AuthorID, Content, CreatedAt)
-		VALUES (?, ?, ?, ?)
+		(TargetID, AuthorID, TargetName, AuthorName, Content, CreatedAt)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := s.db.Exec(
 		query,
 		note.TargetID,
 		note.AuthorID,
+		note.TargetName,
+		note.AuthorName,
 		note.Content,
 		note.CreatedAt,
 	)
@@ -98,7 +100,7 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 	})
 
 	rows, err := s.db.Query(`
-		SELECT Id, TargetID, AuthorID, Content, CreatedAt
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM notes
 	`)
 	if err != nil {
@@ -118,7 +120,9 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 		if err := rows.Scan(
 			&n.ID,
 			&n.TargetID,
+			&n.TargetName,
 			&n.AuthorID,
+			&n.AuthorName,
 			&n.Content,
 			&n.CreatedAt,
 		); err != nil {
@@ -156,7 +160,7 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 	})
 
 	rows, err := s.db.Query(`
-		SELECT Id, TargetID, AuthorID, Content, CreatedAt
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM notes
 		WHERE TargetID = ?
 	`, User_id)
@@ -179,7 +183,9 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 		if err := rows.Scan(
 			&n.ID,
 			&n.TargetID,
+			&n.TargetName,
 			&n.AuthorID,
+			&n.AuthorName,
 			&n.Content,
 			&n.CreatedAt,
 		); err != nil {
@@ -219,7 +225,7 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 	}
 
 	rows, err := s.db.Query(`
-		SELECT n.Id, n.TargetID, n.AuthorID, n.Content, n.CreatedAt
+		SELECT n.Id, n.TargetID, n.TargetName, n.AuthorID, n.AuthorName, n.Content, n.CreatedAt
 		FROM notes n
 		JOIN users u ON u.Id = n.TargetID
 		WHERE u.ClassID = ?
@@ -243,7 +249,9 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 		if err := rows.Scan(
 			&n.ID,
 			&n.TargetID,
+			&n.TargetName,
 			&n.AuthorID,
+			&n.AuthorName,
 			&n.Content,
 			&n.CreatedAt,
 		); err != nil {
@@ -274,23 +282,12 @@ func (s *Storage) GetNoteByID(id int) ([]models.Note, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
-		Level:   "info",
-		Action:  "get_note_by_id",
-		Message: "getting needed note by id",
-	})
-
 	rows, err := s.db.Query(`
-		SELECT Id, TargetID, AuthorID, Content, CreatedAt
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM notes
 		WHERE Id = ?
 	`, id)
 	if err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_note_by_id",
-			Message: "failed to query notes: " + err.Error(),
-		})
 		return nil, err
 	}
 	defer rows.Close()
@@ -298,31 +295,21 @@ func (s *Storage) GetNoteByID(id int) ([]models.Note, error) {
 	notes := make([]models.Note, 0)
 	for rows.Next() {
 		var n models.Note
-
 		if err := rows.Scan(
 			&n.ID,
 			&n.TargetID,
+			&n.TargetName,
 			&n.AuthorID,
+			&n.AuthorName,
 			&n.Content,
 			&n.CreatedAt,
 		); err != nil {
-			writeLog(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_note_by_id",
-				Message: "failed to scan note: " + err.Error(),
-			})
 			return nil, err
 		}
-
 		notes = append(notes, n)
 	}
 
 	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_note_by_id",
-			Message: "row iteration failed: " + err.Error(),
-		})
 		return nil, err
 	}
 

@@ -52,7 +52,9 @@ type FullName struct {
 type Note struct {
 	ID        int    `json:"ID"`
 	TargetID  int    `json:"TargetID"`
+	TargetName string `json:"TargetName"`
 	AuthorID  int    `json:"AuthorID"`
+	AuthorName string `json:"AuthorName"`
 	Content   string `json:"Content"`
 	CreatedAt string `json:"CreatedAt"`
 }
@@ -60,7 +62,9 @@ type Note struct {
 type Complaint struct {
 	ID        int    `json:"ID"`
 	TargetID  int    `json:"TargetID"`
+	TargetName string `json:"TargetName"`
 	AuthorID  int    `json:"AuthorID"`
+	AuthorName string `json:"AuthorName"`
 	Content   string `json:"Content"`
 	CreatedAt string `json:"CreatedAt"`
 }

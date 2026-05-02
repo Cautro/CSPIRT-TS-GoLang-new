@@ -14,15 +14,6 @@ import (
 
 func GetClassesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := authenticatedUser(c, s, "get_classes")
-		if !ok {
-			return
-		}
-		if !canManageClasses(user.Role) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
-			return
-		}
-
 		classService := sr.NewClassService(s, s.Secret)
 		classes, err := classService.GetAllClasses()
 		if err != nil {

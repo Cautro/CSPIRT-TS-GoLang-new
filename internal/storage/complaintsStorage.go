@@ -25,14 +25,16 @@ func (s *Storage) AddComplaint(login string, complaint models.Complaint, user mo
 
 	query := `
 		INSERT INTO complaints
-		(TargetID, AuthorID, Content, CreatedAt)
-		VALUES (?, ?, ?, ?)
+		(TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := s.db.Exec(
 		query,
 		complaint.TargetID,
+		complaint.TargetName,
 		complaint.AuthorID,
+		complaint.AuthorName,
 		complaint.Content,
 		complaint.CreatedAt,
 	)
@@ -109,7 +111,7 @@ func (s *Storage) GetAllComplaints() ([]models.Complaint, error) {
 	})
 
 	rows, err := s.db.Query(`
-		SELECT Id, TargetID, AuthorID, Content, CreatedAt
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM complaints
 	`)
 	if err != nil {
@@ -130,7 +132,9 @@ func (s *Storage) GetAllComplaints() ([]models.Complaint, error) {
 		if err := rows.Scan(
 			&complaint.ID,
 			&complaint.TargetID,
+			&complaint.TargetName,
 			&complaint.AuthorID,
+			&complaint.AuthorName,
 			&complaint.Content,
 			&complaint.CreatedAt,
 		); err != nil {
@@ -168,7 +172,7 @@ func (s *Storage) GetComplaintByID(id int) ([]models.Complaint, error) {
 	})
 
 	rows, err := s.db.Query(`
-		SELECT Id, TargetID, AuthorID, Content, CreatedAt
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM complaints
 		WHERE Id = ?
 	`, id)
@@ -190,7 +194,9 @@ func (s *Storage) GetComplaintByID(id int) ([]models.Complaint, error) {
 		if err := rows.Scan(
 			&complaint.ID,
 			&complaint.TargetID,
+			&complaint.TargetName,
 			&complaint.AuthorID,
+			&complaint.AuthorName,
 			&complaint.Content,
 			&complaint.CreatedAt,
 		); err != nil {
@@ -228,7 +234,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error)
 	})
 
 	rows, err := s.db.Query(`
-		SELECT Id, TargetID, AuthorID, Content, CreatedAt
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM complaints
 		WHERE TargetID = ?
 	`, User_id)
@@ -246,14 +252,16 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error)
 	complaints := make([]models.Complaint, 0)
 
 	for rows.Next() {
-		var n models.Complaint
+		var c models.Complaint
 
 		if err := rows.Scan(
-			&n.ID,
-			&n.TargetID,
-			&n.AuthorID,
-			&n.Content,
-			&n.CreatedAt,
+			&c.ID,
+			&c.TargetID,
+			&c.TargetName,
+			&c.AuthorID,
+			&c.AuthorName,
+			&c.Content,
+			&c.CreatedAt,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -263,7 +271,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]models.Complaint, error)
 			return []models.Complaint{}, err
 		}
 
-		complaints = append(complaints, n)
+		complaints = append(complaints, c)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -291,7 +299,7 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]models.Complaint, error
 	}
 
 	rows, err := s.db.Query(`
-		SELECT c.Id, c.TargetID, c.AuthorID, c.Content, c.CreatedAt
+		SELECT c.Id, c.TargetID, c.TargetName, c.AuthorID, c.AuthorName, c.Content, c.CreatedAt
 		FROM complaints c
 		JOIN users u ON u.Id = c.TargetID
 		WHERE u.ClassID = ?
@@ -315,7 +323,9 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]models.Complaint, error
 		if err := rows.Scan(
 			&c.ID,
 			&c.TargetID,
+			&c.TargetName,
 			&c.AuthorID,
+			&c.AuthorName,
 			&c.Content,
 			&c.CreatedAt,
 		); err != nil {
