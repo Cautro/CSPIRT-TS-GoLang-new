@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { ApiClient } from "../../../core/api/api_client.ts";
-import { usersSchema, type UserType } from "../../../shared/entities/user/user_types.ts";
+import { usersSchema, type UserType } from "../../../shared/entities/user/types/user_types.ts";
 import {
     LOGIN_REGEX,
     SECURITY_LIMITS,
     normalizeText,
 } from "../../../core/security/security_limits.ts";
-import {noteSchema, type NoteType} from "../../../shared/entities/notes/notes_types.ts";
+import {noteSchema, type NoteType} from "../../../shared/entities/notes/types/notes_types.ts";
 
 const errorResponseSchema = z.object({
     error: z.string().optional(),
@@ -73,6 +73,8 @@ export const dashboardApi = {
       
       return parsed.data.All_notes;
     },
+    
+    // async getClasses():
     
     async getUsers(): Promise<UserType[]> {
         const response = await client.get<unknown>("/api/users", true);

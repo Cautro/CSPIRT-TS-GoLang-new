@@ -23,9 +23,7 @@ export const userSchema = z.object({
     Rating: z.number().int(),
     Role: userRoleSchema,
     Class: z.string().max(32),
-
-    Notes: nullableArray(z.unknown()),
-    Complaints: nullableArray(z.unknown()),
+    ClassID: z.number().int().nonnegative(),
 });
 
 export const usersSchema = z.array(userSchema);
@@ -34,8 +32,8 @@ export type UserType = z.infer<typeof userSchema>;
 export type UserRole = z.infer<typeof userRoleSchema>;
 
 export const UserRoles: Record<UserRole, string> = {
-    Admin: "Администратор",
-    User: "Пользователь",
-    Owner: "Owner",
+    Admin: "Учитель",
+    User: "Ученик",
+    Owner: "...",
     Helper: "Староста",
 };

@@ -1,6 +1,5 @@
 import { create } from "zustand";
-import { authApi, type AuthDto } from "../api/auth_api";
-import type { UserType } from "../../../shared/entities/user/user_types.ts";
+import {authApi, type AuthDto, type meType} from "../api/auth_api";
 import {clearAccessToken, setAccessToken} from "../../../core/auth/access_token_memory.ts";
 
 type AuthStatus =
@@ -10,7 +9,7 @@ type AuthStatus =
     | "unauthenticated";
 
 interface AuthState {
-    user: UserType | null;
+    user: meType | null;
     error: string | null;
     status: AuthStatus;
 

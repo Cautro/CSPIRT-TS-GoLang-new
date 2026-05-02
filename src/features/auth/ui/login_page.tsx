@@ -1,18 +1,10 @@
 import { type FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+
 import {
-    Alert,
-    Box,
-    Button,
-    Card,
-    CardContent,
-    CircularProgress,
-    Container,
-    Paper,
-    TextField,
-    Typography,
-} from "@mui/material";
-import { LOGIN_REGEX, SECURITY_LIMITS } from "../../../core/security/security_limits.ts";
+    LOGIN_REGEX,
+    SECURITY_LIMITS,
+} from "../../../core/security/security_limits";
 
 import { useAuthStore } from "../store/auth_store";
 
@@ -32,6 +24,8 @@ export function LoginPage() {
         return <Navigate to="/" replace />;
     }
 
+    const trimmedUsername = username.trim();
+
     const usernameError =
         username.length > 0 && !LOGIN_REGEX.test(username)
             ? "Логин может содержать только латиницу, цифры, точку, дефис и подчёркивание"
@@ -44,8 +38,8 @@ export function LoginPage() {
 
     const isSubmitDisabled =
         isLoading ||
-        username.trim().length < SECURITY_LIMITS.loginMin ||
-        username.trim().length > SECURITY_LIMITS.loginMax ||
+        trimmedUsername.length < SECURITY_LIMITS.loginMin ||
+        trimmedUsername.length > SECURITY_LIMITS.loginMax ||
         password.length < SECURITY_LIMITS.passwordMin ||
         password.length > SECURITY_LIMITS.passwordMax ||
         Boolean(usernameError) ||
@@ -55,7 +49,7 @@ export function LoginPage() {
         event.preventDefault();
 
         const success = await login({
-            login: username.trim(),
+            login: trimmedUsername,
             password,
         });
 
@@ -65,185 +59,79 @@ export function LoginPage() {
     }
 
     return (
-        <Container maxWidth="sm">
-            <Box
-                sx={{
-                    minHeight: "100vh",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    py: 4,
-                }}
-            >
-                <Paper
-                    elevation={0}
-                    sx={{
-                        width: "100%",
-                        borderRadius: 4,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        overflow: "hidden",
-                    }}
-                >
-                    <Card
-                        variant="outlined"
-                        sx={{
-                            border: "none",
-                            borderRadius: 0,
-                        }}
+        <main className="auth-page">
+            <section className="auth-card">
+                <div className="auth-card__header">
+
+                    <div>
+                        <h1 className="auth-card__title">Вход в систему</h1>
+                    </div>
+                </div>
+
+                {error && <div className="alert alert--danger auth-card__alert">{error}</div>}
+
+                <form className="auth-form" onSubmit={handleSubmit}>
+                    <div className="field">
+                        <label className="field__label" htmlFor="login">
+                            Логин
+                        </label>
+
+                        <input
+                            id="login"
+                            className={usernameError ? "input input--error" : "input"}
+                            value={username}
+                            onChange={(event) => setUsername(event.target.value)}
+                            placeholder="Введите ваш логин"
+                            type="text"
+                            autoComplete="username"
+                            disabled={isLoading}
+                            maxLength={SECURITY_LIMITS.loginMax}
+                        />
+
+                        <div className={usernameError ? "field__error" : "field__hint"}>
+                            {usernameError}
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label className="field__label" htmlFor="password">
+                            Пароль
+                        </label>
+
+                        <input
+                            id="password"
+                            className={passwordError ? "input input--error" : "input"}
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            placeholder="Введите пароль"
+                            type="password"
+                            autoComplete="current-password"
+                            disabled={isLoading}
+                            minLength={SECURITY_LIMITS.passwordMin}
+                            maxLength={SECURITY_LIMITS.passwordMax}
+                        />
+
+                        <div className={passwordError ? "field__error" : "field__hint"}>
+                            {passwordError}
+                        </div>
+                    </div>
+
+                    <button
+                        className="btn btn--primary btn--lg auth-submit"
+                        type="submit"
+                        disabled={isSubmitDisabled}
                     >
-                        <CardContent
-                            sx={{
-                                p: {
-                                    xs: 3,
-                                    sm: 4,
-                                },
-                            }}
-                        >
-                            <Box
-                                sx={{
-                                    mb: 3,
-                                }}
-                            >
-                                <Typography
-                                    variant="h4"
-                                    sx={{
-                                        fontWeight: 800,
-                                        mb: 1,
-                                    }}
-                                >
-                                    Вход
-                                </Typography>
-
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        color: "text.secondary",
-                                    }}
-                                >
-                                    Введите логин и пароль для доступа к профилю.
-                                </Typography>
-                            </Box>
-
-                            {error && (
-                                <Alert
-                                    severity="error"
-                                    sx={{
-                                        mb: 2,
-                                    }}
-                                >
-                                    {error}
-                                </Alert>
-                            )}
-
-                            <Box
-                                component="form"
-                                onSubmit={handleSubmit}
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 2,
-                                }}
-                            >
-                                <TextField
-                                    label="Логин"
-                                    value={username}
-                                    onChange={(event) => setUsername(event.target.value)}
-                                    placeholder="Например: Owner"
-                                    type="text"
-                                    autoComplete="username"
-                                    fullWidth
-                                    disabled={isLoading}
-                                    error={Boolean(usernameError)}
-                                    helperText={usernameError ?? " "}
-                                    slotProps={{
-                                        htmlInput: {
-                                            maxLength: SECURITY_LIMITS.loginMax,
-                                        },
-                                    }}
-                                />
-
-                                <TextField
-                                    label="Пароль"
-                                    value={password}
-                                    onChange={(event) => setPassword(event.target.value)}
-                                    placeholder="Введите пароль"
-                                    type="password"
-                                    autoComplete="current-password"
-                                    fullWidth
-                                    disabled={isLoading}
-                                    error={Boolean(passwordError)}
-                                    helperText={passwordError ?? " "}
-                                    slotProps={{
-                                        htmlInput: {
-                                            minLength: SECURITY_LIMITS.passwordMin,
-                                            maxLength: SECURITY_LIMITS.passwordMax,
-                                        },
-                                    }}
-                                />
-                                
-                                <Button
-                                    type="submit"
-                                    variant="contained"
-                                    size="large"
-                                    disabled={isSubmitDisabled}
-                                    sx={{
-                                        mt: 1,
-                                        py: 1.2,
-                                        borderRadius: 2,
-                                        fontWeight: 700,
-                                        textTransform: "none",
-                                    }}
-                                >
-                                    {isLoading ? (
-                                        <Box
-                                            sx={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                gap: 1,
-                                            }}
-                                        >
-                                            <CircularProgress size={20} color="inherit" />
-                                            <span>Вход...</span>
-                                        </Box>
-                                    ) : (
-                                        "Войти"
-                                    )}
-                                </Button>
-                            </Box>
-
-                            <Box
-                                sx={{
-                                    mt: 3,
-                                    p: 2,
-                                    borderRadius: 2,
-                                    bgcolor: "background.default",
-                                }}
-                            >
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        color: "text.secondary",
-                                    }}
-                                >
-                                    Тестовый аккаунт:
-                                </Typography>
-
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        mt: 0.5,
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    Login: Owner
-                                </Typography>
-                            </Box>
-                        </CardContent>
-                    </Card>
-                </Paper>
-            </Box>
-        </Container>
+                        {isLoading ? (
+                            <span className="auth-submit__loading">
+                <span className="spinner" />
+                Вход...
+              </span>
+                        ) : (
+                            "Войти"
+                        )}
+                    </button>
+                </form>
+            </section>
+        </main>
     );
 }

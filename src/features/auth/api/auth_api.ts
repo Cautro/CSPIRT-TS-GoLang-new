@@ -1,7 +1,8 @@
-import { z } from "zod";
+import {z} from "zod";
 import { ApiClient } from "../../../core/api/api_client";
-import { userSchema, type UserType } from "../../../shared/entities/user/user_types.ts";
+import { userSchema } from "../../../shared/entities/user/types/user_types.ts";
 import { LOGIN_REGEX, SECURITY_LIMITS } from "../../../core/security/security_limits.ts";
+import {noteSchema} from "../../../shared/entities/notes/types/notes_types.ts";
 
 export interface AuthDto {
     login: string;
@@ -27,6 +28,16 @@ const loginResponseSchema = z.object({
 const refreshResponseSchema = z.object({
     token: z.string().min(20).max(4096),
 });
+
+const meResponseSchema = z.object({
+    User: userSchema,
+    Notes: z.array(noteSchema).optional(),
+    Complaints: z.array(noteSchema).optional(),
+    Events: z.array(noteSchema).optional(),
+    ClassTeacher: userSchema.optional(),
+})
+
+export type meType = z.infer<typeof meResponseSchema>
 
 const errorResponseSchema = z.object({
     error: z.string().optional(),
@@ -87,14 +98,14 @@ export const authApi = {
         return parsed.data.token;
     },
 
-    async checkAuth(): Promise<UserType> {
+    async checkAuth(): Promise<meType> {
         const response = await client.get<unknown>("/api/me", true);
 
         if (!response.checkStatus()) {
             throw new Error("Сессия недействительна");
         }
 
-        const parsedUser = userSchema.safeParse(response.data);
+        const parsedUser = meResponseSchema.safeParse(response.data);
 
         if (!parsedUser.success) {
             throw new Error("Некорректный формат профиля");

@@ -140,4 +140,12 @@ export class ApiClient {
     ): Promise<ApiResponse<T>> {
         return this.request<T>("PATCH", endpoint, { data, auth });
     }
+    
+    delete<T>(
+        endpoint: string,
+        data?: unknown,
+        auth = false,
+    ): Promise<ApiResponse<T>> {
+        return this.request<T>("DELETE", endpoint, { data, auth });
+    }
 }

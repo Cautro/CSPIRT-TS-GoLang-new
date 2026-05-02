@@ -1,27 +1,14 @@
-import {
-    Alert,
-    Avatar,
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    Container,
-    Divider,
-    LinearProgress,
-    Paper,
-    Typography,
-} from "@mui/material";
+import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useAuthStore } from "../../auth/store/auth_store";
-import type { ReactNode } from "react";
-import {UserRoles} from "../../../shared/entities/user/user_types.ts";
-import {useNavigate} from "react-router-dom";
-import { truncateText } from "../../../core/security/security_limits.ts";
+import { UserRoles } from "../../../shared/entities/user/types/user_types";
+import { truncateText } from "../../../core/security/security_limits";
+import {NoteCard} from "../../../shared/ui/note_card.tsx";
 
 export function ProfilePage() {
     const navigate = useNavigate();
-    
+
     const profile = useAuthStore((state) => state.user);
     const getProfile = useAuthStore((state) => state.checkAuth);
     const logout = useAuthStore((state) => state.logout);
@@ -47,247 +34,216 @@ export function ProfilePage() {
         return "Скрыто: неизвестный формат данных";
     }
 
+    async function handleLogout() {
+        await logout();
+        navigate("/login", { replace: true });
+    }
+
     if (!profile) {
         return (
-            <Container maxWidth="lg">
-                <Box sx={{ py: 4 }}>
-                    {isLoading && <LinearProgress />}
-                    {error ? (
-                        <Alert severity="error">{error}</Alert>
-                    ) : (
-                        <Alert severity="info">Профиль не загружен</Alert>
+            <main className="main">
+                <section className="page">
+                    {isLoading && (
+                        <div className="profile-loading">
+                            <div className="skeleton" style={{ height: 120 }} />
+                            <div className="skeleton" style={{ height: 240 }} />
+                        </div>
                     )}
-                </Box>
-            </Container>
+
+                    {!isLoading && error && (
+                        <div className="alert alert--danger">{error}</div>
+                    )}
+
+                    {!isLoading && !error && (
+                        <div className="empty-state">
+                            <h2 className="empty-state__title">Профиль не загружен</h2>
+                            <p className="empty-state__text">
+                                Данные пользователя отсутствуют или сессия недействительна.
+                            </p>
+                        </div>
+                    )}
+                </section>
+            </main>
         );
     }
 
     const notes = profile.Notes ?? [];
     const complaints = profile.Complaints ?? [];
 
-    const fullName = `${profile.Name ?? ""} ${profile.LastName ?? ""}`.trim();
-    const initials = `${profile.Name?.[0] ?? ""}${profile.LastName?.[0] ?? ""}`;
-    const ratingPercent =  (profile.Rating / 5000) * 100
+    const fullName = `${profile.User.Name ?? ""} ${profile.User.LastName ?? ""}`.trim();
+    const initials =
+        `${profile.User.Name?.[0] ?? ""}${profile.User.LastName?.[0] ?? ""}` || "?";
+
+    const rating = profile.User.Rating ?? 0;
+    const ratingPercent = Math.min(Math.max((rating / 5000) * 100, 0), 100);
 
     return (
-        <Container maxWidth="lg">
-            <Box sx={{ py: 4 }}>
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            p: { xs: 2, sm: 3 },
-                            borderRadius: 4,
-                            border: "1px solid",
-                            borderColor: "divider",
-                        }}
-                    >
-                        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: { xs: "column", sm: "row" },
-                                    justifyContent: "space-between",
-                                    alignItems: { xs: "flex-start", sm: "center" },
-                                    gap: 2,
-                                }}
-                            >
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                                    <Avatar
-                                        sx={{
-                                            width: 80,
-                                            height: 80,
-                                            bgcolor: "primary.main",
-                                            fontSize: 28,
-                                            fontWeight: 700,
-                                        }}
-                                    >
-                                        {initials}
-                                    </Avatar>
+        <main className="main">
+            <section className="page profile-page">
+                <div className="profile-hero">
+                    <div className="profile-hero__main">
+                        <div className="profile-avatar">{initials}</div>
 
-                                    <Box>
-                                        <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                                            {fullName}
-                                        </Typography>
+                        <div className="profile-hero__info">
+                            <h1 className="profile-hero__name">{fullName || "Без имени"}</h1>
 
-                                        <Box
-                                            sx={{
-                                                mt: 1,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                flexWrap: "wrap",
-                                                gap: 1,
-                                            }}
-                                        >
-                                            <Chip label={profile.Role} color="primary" size="small" />
-                                            <Chip label={`Класс ${profile.Class}`} variant="outlined" size="small" />
+                            <div className="profile-hero__meta">
+                <span className="badge badge--info">
+                  {UserRoles[profile.User.Role] ?? profile.User.Role}
+                </span>
 
-                                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                                @{profile.Login}
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-                                </Box>
+                                <span className="badge badge--neutral">
+                  Класс {profile.User.Class}
+                </span>
 
-                                <Box sx={{ display: "flex", gap: 1 }}>
-                                    <Button variant="outlined" onClick={() => navigate("/", {replace: true})}>
-                                        Главная
-                                    </Button>
-                                    
-                                    <Button variant="outlined" onClick={() => void getProfile()}>
-                                        Обновить
-                                    </Button>
+                                <span className="profile-login">@{profile.User.Login}</span>
+                            </div>
+                        </div>
+                    </div>
 
-                                    <Button variant="contained" color="error" onClick={() => void logout()}>
-                                        Выйти
-                                    </Button>
-                                </Box>
-                            </Box>
+                    <div className="profile-actions">
+                        <button
+                            className="btn btn--secondary"
+                            type="button"
+                            onClick={() => navigate("/", { replace: true })}
+                        >
+                            Главная
+                        </button>
 
-                            {isLoading && <LinearProgress />}
+                        <button
+                            className="btn btn--secondary"
+                            type="button"
+                            onClick={() => void getProfile()}
+                            disabled={isLoading}
+                        >
+                            Обновить
+                        </button>
 
-                            {error && <Alert severity="error">{error}</Alert>}
-                        </Box>
-                    </Paper>
+                        <button
+                            className="btn btn--danger"
+                            type="button"
+                            onClick={() => void handleLogout()}
+                            disabled={isLoading}
+                        >
+                            Выйти
+                        </button>
+                    </div>
+                </div>
 
-                    <Box
-                        sx={{
-                            display: "grid",
-                            gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
-                            gap: 3,
-                        }}
-                    >
-                        <Card variant="outlined" sx={{ borderRadius: 4 }}>
-                            <CardContent>
-                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                                    Основная информация
-                                </Typography>
+                {isLoading && <div className="profile-progress" />}
 
-                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                    <InfoRow label="ID пользователя" value={profile.Id} />
-                                    <InfoRow label="Имя" value={profile.Name} />
-                                    <InfoRow label="Фамилия" value={profile.LastName} />
-                                    <InfoRow label="Полное имя" value={fullName} />
-                                    <InfoRow label="Логин" value={profile.Login} />
-                                    <InfoRow label="Класс" value={profile.Class} />
-                                    <InfoRow label="Роль" value={UserRoles[profile.Role]} />
-                                </Box>
-                            </CardContent>
-                        </Card>
+                {error && <div className="alert alert--danger mb-4">{error}</div>}
 
-                        <Card variant="outlined" sx={{ borderRadius: 4 }}>
-                            <CardContent>
-                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                                    Рейтинг
-                                </Typography>
+                <div className="profile-grid">
+                    <section className="card card--padded">
+                        <div className="section-head">
+                            <h2 className="section-title">Основная информация</h2>
+                            <p className="section-description">
+                                Базовые данные текущего пользователя системы.
+                            </p>
+                        </div>
 
-                                <Typography variant="h3" sx={{ fontWeight: 800 }}>
-                                    {profile.Rating}
-                                </Typography>
+                        <div className="info-list">
+                            <InfoRow label="ID пользователя" value={profile.User.Id} />
+                            <InfoRow label="Имя" value={profile.User.Name} />
+                            <InfoRow label="Фамилия" value={profile.User.LastName} />
+                            <InfoRow label="Полное имя" value={fullName || "Не указано"} />
+                            <InfoRow label="Логин" value={profile.User.Login} />
+                            <InfoRow label="Класс" value={profile.User.Class} />
+                            <InfoRow
+                                label="Роль"
+                                value={UserRoles[profile.User.Role] ?? profile.User.Role}
+                            />
+                        </div>
+                    </section>
 
-                                <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
-                                    Текущий рейтинг пользователя
-                                </Typography>
+                    <section className="card card--padded profile-rating-card">
+                        <div className="section-head">
+                            <h2 className="section-title">Рейтинг</h2>
+                            <p className="section-description">
+                                Текущий социальный рейтинг пользователя.
+                            </p>
+                        </div>
 
-                                <LinearProgress
-                                    variant="determinate"
-                                    value={ratingPercent}
-                                    sx={{
-                                        height: 10,
-                                        borderRadius: 999,
-                                    }}
+                        <div className="profile-rating-value">{rating}</div>
+
+                        <div className="rating">
+                            <div className="rating__top">
+                                <span className="rating__value">{rating} / 5000</span>
+                                <span className="rating__value">{Math.round(ratingPercent)}%</span>
+                            </div>
+
+                            <div className="rating__bar">
+                                <div
+                                    className="rating__fill rating__fill--high"
+                                    style={{ width: `${ratingPercent}%` }}
                                 />
-                            </CardContent>
-                        </Card>
-                    </Box>
+                            </div>
+                        </div>
+                    </section>
+                </div>
 
-                    <Box
-                        sx={{
-                            display: "grid",
-                            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                            gap: 3,
-                        }}
-                    >
-                        <Card variant="outlined" sx={{ borderRadius: 4 }}>
-                            <CardContent>
-                                <Box
-                                    sx={{
-                                        mb: 2,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        gap: 1,
-                                    }}
-                                >
-                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                        Заметки
-                                    </Typography>
+                <div className="profile-grid profile-grid--equal">
+                    <section className="card card--padded">
+                        <div className="section-head section-head--row">
+                            <div>
+                                <h2 className="section-title">Заметки</h2>
+                                <p className="section-description">
+                                    Поведенческие заметки, оставленные ответственными пользователями.
+                                </p>
+                            </div>
 
-                                    <Chip label={notes.length} size="small" variant="outlined" />
-                                </Box>
+                            <span className="badge badge--neutral">{notes.length}</span>
+                        </div>
 
-                                <Divider sx={{ mb: 2 }} />
+                        {notes.length > 0 ? (
+                            <div className="feed">
+                                {notes.map((note) => (
+                                    <NoteCard item={note} role={"User"}/>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="empty-inline">Заметок нет</div>
+                        )}
+                    </section>
 
-                                {notes.length > 0 ? (
-                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                                        {notes.map((note, index) => (
-                                            <Alert key={index} severity="info">
-                                                {safeUnknownToText(note)}
-                                            </Alert>
-                                        ))}
-                                    </Box>
-                                ) : (
-                                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                        Заметок нет
-                                    </Typography>
-                                )}
-                            </CardContent>
-                        </Card>
+                    <section className="card card--padded">
+                        <div className="section-head section-head--row">
+                            <div>
+                                <h2 className="section-title">Жалобы</h2>
+                                <p className="section-description">
+                                    Жалобы, связанные с текущим пользователем.
+                                </p>
+                            </div>
 
-                        <Card variant="outlined" sx={{ borderRadius: 4 }}>
-                            <CardContent>
-                                <Box
-                                    sx={{
-                                        mb: 2,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        gap: 1,
-                                    }}
-                                >
-                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                        Жалобы
-                                    </Typography>
+                            <span
+                                className={
+                                    complaints.length > 0
+                                        ? "badge badge--danger"
+                                        : "badge badge--neutral"
+                                }
+                            >
+                {complaints.length}
+              </span>
+                        </div>
 
-                                    <Chip
-                                        label={complaints.length}
-                                        size="small"
-                                        variant="outlined"
-                                        color={complaints.length > 0 ? "error" : "default"}
-                                    />
-                                </Box>
-
-                                <Divider sx={{ mb: 2 }} />
-
-                                {complaints.length > 0 ? (
-                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                                        {complaints.map((complaint, index) => (
-                                            <Alert key={index} severity="warning">
-                                                {JSON.stringify(complaint)}
-                                            </Alert>
-                                        ))}
-                                    </Box>
-                                ) : (
-                                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                        Жалоб нет
-                                    </Typography>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </Box>
-                </Box>
-            </Box>
-        </Container>
+                        {complaints.length > 0 ? (
+                            <div className="feed">
+                                {complaints.map((complaint, index) => (
+                                    <div className="feed-item feed-item--warning" key={index}>
+                                        <p className="feed-item__text">
+                                            {safeUnknownToText(complaint)}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="empty-inline">Жалоб нет</div>
+                        )}
+                    </section>
+                </div>
+            </section>
+        </main>
     );
 }
 
@@ -298,25 +254,9 @@ interface InfoRowProps {
 
 function InfoRow({ label, value }: InfoRowProps) {
     return (
-        <Box
-            sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: "background.default",
-                display: "flex",
-                flexDirection: { xs: "column", sm: "row" },
-                alignItems: { xs: "flex-start", sm: "center" },
-                justifyContent: "space-between",
-                gap: 1,
-            }}
-        >
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                {label}
-            </Typography>
-
-            <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                {value}
-            </Typography>
-        </Box>
+        <div className="info-row">
+            <span className="info-row__label">{label}</span>
+            <span className="info-row__value">{value || "Не указано"}</span>
+        </div>
     );
 }
