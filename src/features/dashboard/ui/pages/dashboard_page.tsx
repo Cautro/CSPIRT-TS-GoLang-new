@@ -81,7 +81,7 @@ export function DashboardPage() {
                             className="btn btn--primary"
                             type="button"
                             onClick={() => {
-                                void getEvents
+                                void getEvents();
                                 setIsAddEventModalOpen(true);
                             }}
                         >

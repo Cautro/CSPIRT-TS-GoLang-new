@@ -27,7 +27,7 @@ export const useUserStore = create<State>()((set) => ({
     message: null,
     
     getUser: async (id: string) => {
-        set({status: "idle"});
+        set({status: "loading"});
         
         try {
             const response = await UserApi.getUser(id);

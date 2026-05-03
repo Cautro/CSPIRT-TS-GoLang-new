@@ -113,11 +113,11 @@ export const useEventStore = create<State>()((set) => ({
     },
     
     completeEvent: async (item: EventType) => {
-        set({status: "loading", error: null, event: null,});
+        set({status: "loading", error: null,});
 
         try {
             await EventsApi.completeEvent(item);
-            set({status: "idle", event: null, message: "Мероприятие успешно завершено"});
+            set({status: "idle", event: null, message: "Мероприятие успешно завершено", error: null});
         } catch (e) {
             set({
                 error: e instanceof Error ? e.message : "Неизвестная ошибка",
@@ -128,11 +128,11 @@ export const useEventStore = create<State>()((set) => ({
     },
     
     deleteEvent: async (id: number) => {
-        set({status: "loading", error: null, event: null,});
+        set({status: "loading", error: null,});
 
         try {
             await EventsApi.deleteEvent(id);
-            set({status: "idle", event: null, message: "Мероприятие успешно удалено"});
+            set({status: "idle", event: null, message: "Мероприятие успешно удалено", error: null});
         } catch (e) {
             set({
                 error: e instanceof Error ? e.message : "Неизвестная ошибка",
