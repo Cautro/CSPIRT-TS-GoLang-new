@@ -3,9 +3,7 @@ package classes
 import (
 	classModels "cspirt/internal/class/models"
 	"cspirt/internal/class/repo"
-	"cspirt/internal/storage"
 	userModels "cspirt/internal/users/models"
-	"errors"
 )
 
 type ClassService struct {
@@ -23,20 +21,7 @@ func (s *ClassService) GetAllClassTeachers() ([]userModels.SafeUser, error) {
 }
 
 func (s *ClassService) AddClass(input classModels.ClassInput, login string) error {
-	teacher, err := s.classes.GetUserByLogin(input.TeacherLogin)
-	if err != nil {
-		return err
-	}
-	if teacher == nil {
-		return errors.New("teacher not found")
-	}
-
-	err = s.classes.AddClass(input, login)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.classes.AddClass(input, login)
 }
 
 func (s *ClassService) DeleteClass(classID int, login string) error {
