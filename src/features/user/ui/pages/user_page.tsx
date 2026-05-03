@@ -1,113 +1,143 @@
-import {type ReactNode, useEffect, useState} from "react";
-import {useNavigate, useParams} from "react-router-dom";
-import {UserRoles} from "../../../../shared/entities/user/types/user_types.ts";
-import {NoteCard} from "../../../../shared/ui/note_card.tsx";
-import {useAuthStore} from "../../../auth/store/auth_store.ts";
-import {useUserStore} from "../../store/user_store.ts";
-import {noteAddDto,} from "../../../../shared/entities/notes/api/notes_api.ts";
-import {complaintAddDto} from "../../../../shared/entities/complaints/api/complaints_api.ts";
-import {ComplaintCard} from "../../../../shared/ui/complaint_card.tsx";
-import {ratingChangeDTO} from "../../../../shared/entities/rating/api/rating_api.ts";
+import { type ReactNode, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
+import { UserRoles } from "../../../../shared/entities/user/types/user_types";
+import { NoteCard } from "../../../../shared/ui/note_card";
+import { ComplaintCard } from "../../../../shared/ui/complaint_card";
+
+import { useAuthStore } from "../../../auth/store/auth_store";
+import { useUserStore } from "../../store/user_store";
+
+import { noteAddDto } from "../../../../shared/entities/notes/api/notes_api";
+import { complaintAddDto } from "../../../../shared/entities/complaints/api/complaints_api";
+import { ratingChangeDTO } from "../../../../shared/entities/rating/api/rating_api";
 
 export function UserPage() {
     const navigate = useNavigate();
-    const { id } = useParams<{ id: string }>(); 
-    const role = useAuthStore((state) => state.user?.User.Role);
-    const name = useAuthStore((state) => state.user?.User.Name);
-    const lastName = useAuthStore((state) => state.user?.User.LastName);
-    
+    const { id } = useParams<{ id: string }>();
+
+    const currentUser = useAuthStore((state) => state.user?.User);
+
     const status = useUserStore((state) => state.status);
     const error = useUserStore((state) => state.error);
     const user = useUserStore((state) => state.user);
+
     const getUser = useUserStore((state) => state.getUser);
     const addNote = useUserStore((state) => state.addNote);
     const deleteNote = useUserStore((state) => state.deleteNote);
     const addComplaint = useUserStore((state) => state.addComplaint);
     const deleteComplaint = useUserStore((state) => state.deleteComplaint);
     const changeRating = useUserStore((state) => state.changeRating);
-    
-    const [noteText, setNoteText] = useState<string>("");
-    const [complaintText, setComplaintText] = useState<string>("");
-    const [changeRatingText, setChangeRatingText] = useState<string>("");
-    const [changeRatingValue, setChangeRatingValue] = useState<number>();
-    
+
+    const [noteText, setNoteText] = useState("");
+    const [complaintText, setComplaintText] = useState("");
+    const [ratingReason, setRatingReason] = useState("");
+    const [ratingValue, setRatingValue] = useState("");
+    const [formError, setFormError] = useState<string | null>(null);
+
+    const isLoading = status === "loading";
+
     useEffect(() => {
         if (!id) {
             return;
         }
+
         void getUser(id);
     }, [id, getUser]);
-    
-    const isLoading = status === "loading";
 
-    function handleNoteAdd() {
-        if (!user) {
+    async function refreshUser() {
+        if (!id) {
+            return;
+        }
+
+        await getUser(id);
+    }
+
+    async function handleNoteAdd() {
+        setFormError(null);
+
+        if (!user || !currentUser) {
+            setFormError("Не удалось определить пользователя");
             return;
         }
 
         const dto = {
             TargetID: user.User.Id,
             Content: noteText.trim(),
-            AuthorID: (useAuthStore.getState().user?.User.Id),
-            CreatedAt: (new Date().toISOString()),
-            AuthorName: `${name} ${lastName}`,
+            AuthorID: currentUser.Id,
+            CreatedAt: new Date().toISOString(),
+            AuthorName: `${currentUser.Name} ${currentUser.LastName}`,
             TargetName: `${user.User.Name} ${user.User.LastName}`,
         };
 
         const parsed = noteAddDto.safeParse(dto);
 
         if (!parsed.success) {
+            setFormError("Проверьте текст заметки");
             return;
         }
 
-        void addNote(parsed.data);
+        await addNote(parsed.data);
         setNoteText("");
+        await refreshUser();
     }
 
-    function handleComplaintAdd() {
-        if (!user) {
+    async function handleComplaintAdd() {
+        setFormError(null);
+
+        if (!user || !currentUser) {
+            setFormError("Не удалось определить пользователя");
             return;
         }
 
         const dto = {
             TargetID: user.User.Id,
             Content: complaintText.trim(),
-            AuthorID: (useAuthStore.getState().user?.User.Id),
-            CreatedAt: (new Date().toISOString()),
-            AuthorName: `${name} ${lastName}`,
+            AuthorID: currentUser.Id,
+            CreatedAt: new Date().toISOString(),
+            AuthorName: `${currentUser.Name} ${currentUser.LastName}`,
             TargetName: `${user.User.Name} ${user.User.LastName}`,
         };
 
         const parsed = complaintAddDto.safeParse(dto);
 
         if (!parsed.success) {
+            setFormError("Проверьте текст жалобы");
             return;
         }
 
-        void addComplaint(parsed.data);
+        await addComplaint(parsed.data);
         setComplaintText("");
+        await refreshUser();
     }
 
-    function handleChangeRating() {
+    async function handleChangeRating() {
+        setFormError(null);
+
         if (!user) {
+            setFormError("Пользователь не загружен");
             return;
         }
 
+        const ratingNumber = Number(ratingValue);
+
         const dto = {
-            rating: changeRatingValue,
+            rating: ratingNumber,
             target_login: user.User.Login,
-            reason: changeRatingText,
+            reason: ratingReason.trim(),
         };
-        
 
         const parsed = ratingChangeDTO.safeParse(dto);
 
         if (!parsed.success) {
+            setFormError("Проверьте значение рейтинга и причину изменения");
             return;
         }
-        void changeRating(parsed.data);
-        setChangeRatingValue(0);
-        setChangeRatingText("");
+
+        await changeRating(parsed.data);
+        setRatingValue("");
+        setRatingReason("");
+        await refreshUser();
     }
 
     if (!user) {
@@ -138,6 +168,15 @@ export function UserPage() {
         );
     }
 
+    const targetRole = user.User.Role;
+    const currentRole = currentUser?.Role;
+    const isYou = user.User.Id === currentUser?.Id;
+
+    const isStudentLikeUser = targetRole === "User" || targetRole === "Helper";
+    const canManageNotes =
+        currentRole === "Helper" || currentRole === "Owner" || currentRole === "Admin";
+    const canManageRating = currentRole === "Owner" || currentRole === "Admin";
+
     const notes = user.Notes ?? [];
     const complaints = user.Complaints ?? [];
 
@@ -148,24 +187,29 @@ export function UserPage() {
     const rating = user.User.Rating ?? 0;
     const ratingPercent = Math.min(Math.max((rating / 5000) * 100, 0), 100);
 
+    const ratingLevel =
+        rating < 1500 ? "low" : rating < 3500 ? "medium" : "high";
+
     return (
         <main className="main">
-            <section className="page profile-page">
-                <div className="profile-hero">
-                    <div className="profile-hero__main">
+            <section className="page user-page">
+                <div className="user-hero">
+                    <div className="user-hero__main">
                         <div className="profile-avatar">{initials}</div>
 
-                        <div className="profile-hero__info">
+                        <div className="user-hero__content">
                             <h1 className="profile-hero__name">{fullName || "Без имени"}</h1>
 
                             <div className="profile-hero__meta">
                 <span className="badge badge--info">
-                  {UserRoles[user.User.Role] ?? user.User.Role}
+                  {UserRoles[targetRole] ?? targetRole}
                 </span>
 
-                                <span className="badge badge--neutral">
-                  Класс {user.User.Class}
-                </span>
+                                {isStudentLikeUser && (
+                                    <span className="badge badge--neutral">
+                    Класс {user.User.Class}
+                  </span>
+                                )}
 
                                 <span className="profile-login">@{user.User.Login}</span>
                             </div>
@@ -180,20 +224,20 @@ export function UserPage() {
                         >
                             Назад
                         </button>
-                        
                     </div>
                 </div>
 
                 {isLoading && <div className="profile-progress" />}
 
-                {error && <div className="alert alert--danger mb-4">{error}</div>}
+                {error && <div className="alert alert--danger">{error}</div>}
+                {formError && <div className="alert alert--danger">{formError}</div>}
 
-                <div className="profile-grid">
+                <div className={isStudentLikeUser ? "user-main-grid" : "user-main-grid user-main-grid--single"}>
                     <section className="card card--padded">
                         <div className="section-head">
                             <h2 className="section-title">Основная информация</h2>
                             <p className="section-description">
-                                Базовые данные текущего пользователя системы.
+                                Базовые данные пользователя системы.
                             </p>
                         </div>
 
@@ -203,209 +247,228 @@ export function UserPage() {
                             <InfoRow label="Фамилия" value={user.User.LastName} />
                             <InfoRow label="Полное имя" value={fullName || "Не указано"} />
                             <InfoRow label="Логин" value={user.User.Login} />
-                            <InfoRow label="Класс" value={user.User.Class} />
+
+                            {isStudentLikeUser && (
+                                <InfoRow label="Класс" value={user.User.Class} />
+                            )}
+
                             <InfoRow
                                 label="Роль"
-                                value={UserRoles[user.User.Role] ?? user.User.Role}
+                                value={UserRoles[targetRole] ?? targetRole}
                             />
                         </div>
                     </section>
 
-                    <section className="card card--padded profile-rating-card">
-                        <div className="section-head">
-                            <h2 className="section-title">Рейтинг</h2>
-                            <p className="section-description">
-                                Текущий социальный рейтинг пользователя.
-                            </p>
-                        </div>
-
-                        <div className="profile-rating-value">{rating}</div>
-
-                        <div className="rating">
-                            <div className="rating__top">
-                                <span className="rating__value">{rating} / 5000</span>
-                                <span className="rating__value">{Math.round(ratingPercent)}%</span>
-                            </div>
-
-                            <div className="rating__bar">
-                                <div
-                                    className="rating__fill rating__fill--high"
-                                    style={{ width: `${ratingPercent}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {(role === "Owner" || role === "Admin") && (
-                            <div className="user-action-form">
-                                <div className="field">
-                                    <label className="field__label" htmlFor="noteText">
-                                        Изменить рейтинг
-                                    </label>
-
-                                    <input
-                                        className="input"
-                                        id="noteText"
-                                        placeholder="Измените рейтинг"
-                                        type={"number"}
-                                        onChange={(e) => setChangeRatingValue(parseInt(e.target.value))}
-                                        value={changeRatingValue}
-                                    />
-
-                                    <textarea
-                                        id="noteText"
-                                        className="textarea"
-                                        placeholder="Напишите причину изменения рейтинга"
-                                        maxLength={500}
-                                        onChange={(e) => setChangeRatingText(e.target.value)}
-                                        value={changeRatingText}
-                                    />
-                                </div>
-
-                                <div className="user-action-form__footer">
-                                    <button className="btn btn--primary" type="button" onClick={() => {
-                                        handleChangeRating();
-                                        if (!id) {
-                                            return
-                                        }
-                                        getUser(id);
-                                    }}>
-                                        Изменить рейтинг
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                        
-                    </section>
-                </div>
-
-                <div className="profile-grid profile-grid--equal">
-                    <section className="card card--padded user-section-card">
-                        <div className="section-head section-head--row">
-                            <div>
-                                <h2 className="section-title">Жалобы</h2>
+                    {isStudentLikeUser && (
+                        <section className="card card--padded user-rating-card">
+                            <div className="section-head">
+                                <h2 className="section-title">Рейтинг</h2>
                                 <p className="section-description">
-                                    Жалобы, связанные с текущим пользователем.
+                                    Текущий социальный рейтинг пользователя.
                                 </p>
                             </div>
 
-                            <span
-                                className={
-                                    complaints.length > 0
-                                        ? "badge badge--danger"
-                                        : "badge badge--neutral"
-                                }
-                            >
-                {complaints.length}
-            </span>
-                        </div>
-
-                        <div className="user-action-form">
-                            <div className="field">
-                                <label className="field__label" htmlFor="complaintText">
-                                    Новая жалоба
-                                </label>
-
-                                <textarea
-                                    id="complaintText"
-                                    className="textarea"
-                                    placeholder="Введите текст жалобы на пользователя..."
-                                    maxLength={500}
-                                    onChange={(e) => setComplaintText(e.target.value)}
-                                    value={complaintText}
-                                />
-                            </div>
-
-                            <div className="user-action-form__footer">
-                                <button className="btn btn--danger" type="button" onClick={() => {
-                                    handleComplaintAdd();
-                                    if (!id) {
-                                        return
-                                    }
-                                    getUser(id);
-                                }}>
-                                    Отправить жалобу
-                                </button>
-                            </div>
-                        </div>
-
-                        {complaints.length > 0 ? (
-                            <div className="feed">
-                                {complaints.map((item) => (
-                                    <ComplaintCard key={item.ID} item={item} onDelete={() => {
-                                        deleteComplaint(item.ID.toString());
-                                        if (!id) {
-                                            return
-                                        }
-                                        getUser(id);
-                                    }} />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="empty-inline">Жалоб нет</div>
-                        )}
-                    </section>
-
-                    {(role === "Helper" || role === "Owner" || role === "Admin") && (
-                        <section className="card card--padded user-section-card">
-                            <div className="section-head section-head--row">
+                            <div className="user-rating-summary">
                                 <div>
-                                    <h2 className="section-title">Заметки</h2>
-                                    <p className="section-description">
-                                        Поведенческие заметки, оставленные старостами.
-                                    </p>
+                                    <div className={`profile-rating-value profile-rating-value--${ratingLevel}`}>
+                                        {rating}
+                                    </div>
+                                    <div className="text-muted">из 5000</div>
                                 </div>
 
-                                <span className="badge badge--neutral">{notes.length}</span>
+                                <span className={`badge badge--${ratingLevel}`}>
+                  {Math.round(ratingPercent)}%
+                </span>
                             </div>
 
-                            <div className="user-action-form">
-                                <div className="field">
-                                    <label className="field__label" htmlFor="noteText">
-                                        Новая заметка
-                                    </label>
-
-                                    <textarea
-                                        id="noteText"
-                                        className="textarea"
-                                        placeholder="Введите заметку о поведении пользователя..."
-                                        maxLength={500}
-                                        onChange={(e) => setNoteText(e.currentTarget.value)}
-                                        value={noteText}
+                            <div className="rating">
+                                <div className="rating__bar">
+                                    <div
+                                        className={`rating__fill rating__fill--${ratingLevel}`}
+                                        style={{ width: `${ratingPercent}%` }}
                                     />
                                 </div>
-
-                                <div className="user-action-form__footer">
-                                    <button className="btn btn--primary" type="button" onClick={() => {
-                                        handleNoteAdd();
-                                        if (!id) {
-                                            return
-                                        }
-                                        getUser(id);
-                                    }}>
-                                        Добавить заметку
-                                    </button>
-                                </div>
                             </div>
 
-                            {notes.length > 0 ? (
-                                <div className="feed">
-                                    {notes.map((note) => (
-                                        <NoteCard key={note.ID} item={note} onDelete={() => {
-                                            deleteNote(note.ID.toString());
-                                            if (!id) {
-                                                return
-                                            }
-                                            getUser(id);
-                                        }} />
-                                    ))}
+                            {canManageRating && (
+                                <div className="user-action-form user-action-form--compact">
+                                    <div className="field">
+                                        <label className="field__label" htmlFor="ratingValue">
+                                            Новое значение рейтинга
+                                        </label>
+
+                                        <input
+                                            className="input"
+                                            id="ratingValue"
+                                            placeholder="Например: 4200"
+                                            type="number"
+                                            min={0}
+                                            max={5000}
+                                            value={ratingValue}
+                                            onChange={(event) => setRatingValue(event.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="field">
+                                        <label className="field__label" htmlFor="ratingReason">
+                                            Причина изменения
+                                        </label>
+
+                                        <textarea
+                                            id="ratingReason"
+                                            className="textarea"
+                                            placeholder="Укажите причину изменения рейтинга"
+                                            maxLength={500}
+                                            value={ratingReason}
+                                            onChange={(event) => setRatingReason(event.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="user-action-form__footer">
+                                        <button
+                                            className="btn btn--primary"
+                                            type="button"
+                                            disabled={!ratingValue || !ratingReason.trim() || isLoading}
+                                            onClick={() => void handleChangeRating()}
+                                        >
+                                            Изменить рейтинг
+                                        </button>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="empty-inline">Заметок нет</div>
                             )}
                         </section>
                     )}
                 </div>
-                
+
+                {isStudentLikeUser && (
+                    <div className="user-content-grid">
+                        <section className="card card--padded user-section-card">
+                            <div className="section-head section-head--row">
+                                <div>
+                                    <h2 className="section-title">Жалобы</h2>
+                                    <p className="section-description">
+                                        Жалобы, связанные с текущим пользователем.
+                                    </p>
+                                </div>
+
+                                <span
+                                    className={
+                                        complaints.length > 0
+                                            ? "badge badge--danger"
+                                            : "badge badge--neutral"
+                                    }
+                                >
+                  {complaints.length}
+                </span>
+                            </div>
+
+                            {!isYou && (<div className="user-action-form">
+                                <div className="field">
+                                    <label className="field__label" htmlFor="complaintText">
+                                        Новая жалоба
+                                    </label>
+
+                                    <textarea
+                                        id="complaintText"
+                                        className="textarea"
+                                        placeholder="Введите текст жалобы на пользователя..."
+                                        maxLength={500}
+                                        value={complaintText}
+                                        onChange={(event) => setComplaintText(event.target.value)}
+                                    />
+                                </div>
+
+                                <div className="user-action-form__footer">
+                                    <button
+                                        className="btn btn--danger"
+                                        type="button"
+                                        disabled={!complaintText.trim() || isLoading}
+                                        onClick={() => void handleComplaintAdd()}
+                                    >
+                                        Отправить жалобу
+                                    </button>
+                                </div>
+                            </div>)}
+
+                            {complaints.length > 0 ? (
+                                <div className="feed">
+                                    {complaints.map((item) => (
+                                        <ComplaintCard
+                                            key={item.ID}
+                                            item={item}
+                                            onDelete={async () => {
+                                                await deleteComplaint(String(item.ID));
+                                                await refreshUser();
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-inline">Жалоб нет</div>
+                            )}
+                        </section>
+
+                        {canManageNotes && (
+                            <section className="card card--padded user-section-card">
+                                <div className="section-head section-head--row">
+                                    <div>
+                                        <h2 className="section-title">Заметки</h2>
+                                        <p className="section-description">
+                                            Поведенческие заметки, оставленные ответственными пользователями.
+                                        </p>
+                                    </div>
+
+                                    <span className="badge badge--neutral">{notes.length}</span>
+                                </div>
+
+                                {!isYou && (<div className="user-action-form">
+                                    <div className="field">
+                                        <label className="field__label" htmlFor="noteText">
+                                            Новая заметка
+                                        </label>
+
+                                        <textarea
+                                            id="noteText"
+                                            className="textarea"
+                                            placeholder="Введите заметку о поведении пользователя..."
+                                            maxLength={500}
+                                            value={noteText}
+                                            onChange={(event) => setNoteText(event.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="user-action-form__footer">
+                                        <button
+                                            className="btn btn--primary"
+                                            type="button"
+                                            disabled={!noteText.trim() || isLoading}
+                                            onClick={() => void handleNoteAdd()}
+                                        >
+                                            Добавить заметку
+                                        </button>
+                                    </div>
+                                </div>)}
+
+                                {notes.length > 0 ? (
+                                    <div className="feed">
+                                        {notes.map((note) => (
+                                            <NoteCard
+                                                key={note.ID}
+                                                item={note}
+                                                onDelete={async () => {
+                                                    await deleteNote(String(note.ID));
+                                                    await refreshUser();
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="empty-inline">Заметок нет</div>
+                                )}
+                            </section>
+                        )}
+                    </div>
+                )}
             </section>
         </main>
     );

@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { useAuthStore } from "../../auth/store/auth_store";
 import { UserRoles } from "../../../shared/entities/user/types/user_types";
-import {NoteCard} from "../../../shared/ui/note_card.tsx";
-import {ComplaintCard} from "../../../shared/ui/complaint_card.tsx";
+import { NoteCard } from "../../../shared/ui/note_card";
+import { ComplaintCard } from "../../../shared/ui/complaint_card";
 
 export function ProfilePage() {
     const navigate = useNavigate();
@@ -49,36 +50,45 @@ export function ProfilePage() {
         );
     }
 
+    const user = profile.User;
     const notes = profile.Notes ?? [];
     const complaints = profile.Complaints ?? [];
 
-    const fullName = `${profile.User.Name ?? ""} ${profile.User.LastName ?? ""}`.trim();
-    const initials =
-        `${profile.User.Name?.[0] ?? ""}${profile.User.LastName?.[0] ?? ""}` || "?";
+    const fullName = `${user.Name ?? ""} ${user.LastName ?? ""}`.trim();
+    const initials = `${user.Name?.[0] ?? ""}${user.LastName?.[0] ?? ""}` || "?";
 
-    const rating = profile.User.Rating ?? 0;
+    const isStudentLikeUser = user.Role === "User" || user.Role === "Helper";
+
+    const rating = user.Rating ?? 0;
     const ratingPercent = Math.min(Math.max((rating / 5000) * 100, 0), 100);
+
+    const ratingLevel =
+        rating < 1500 ? "low" : rating < 3500 ? "medium" : "high";
 
     return (
         <main className="main">
-            <section className="page profile-page">
-                <div className="profile-hero">
-                    <div className="profile-hero__main">
+            <section className="page user-page">
+                <div className="user-hero">
+                    <div className="user-hero__main">
                         <div className="profile-avatar">{initials}</div>
 
-                        <div className="profile-hero__info">
-                            <h1 className="profile-hero__name">{fullName || "Без имени"}</h1>
+                        <div className="user-hero__content">
+                            <h1 className="profile-hero__name">
+                                {fullName || "Без имени"}
+                            </h1>
 
                             <div className="profile-hero__meta">
                 <span className="badge badge--info">
-                  {UserRoles[profile.User.Role] ?? profile.User.Role}
+                  {UserRoles[user.Role] ?? user.Role}
                 </span>
 
-                                <span className="badge badge--neutral">
-                  Класс {profile.User.Class}
-                </span>
+                                {isStudentLikeUser && (
+                                    <span className="badge badge--neutral">
+                    Класс {user.Class}
+                  </span>
+                                )}
 
-                                <span className="profile-login">@{profile.User.Login}</span>
+                                <span className="profile-login">@{user.Login}</span>
                             </div>
                         </div>
                     </div>
@@ -114,9 +124,15 @@ export function ProfilePage() {
 
                 {isLoading && <div className="profile-progress" />}
 
-                {error && <div className="alert alert--danger mb-4">{error}</div>}
+                {error && <div className="alert alert--danger">{error}</div>}
 
-                <div className="profile-grid">
+                <div
+                    className={
+                        isStudentLikeUser
+                            ? "user-main-grid"
+                            : "user-main-grid user-main-grid--single"
+                    }
+                >
                     <section className="card card--padded">
                         <div className="section-head">
                             <h2 className="section-title">Основная информация</h2>
@@ -126,100 +142,118 @@ export function ProfilePage() {
                         </div>
 
                         <div className="info-list">
-                            <InfoRow label="ID пользователя" value={profile.User.Id} />
-                            <InfoRow label="Имя" value={profile.User.Name} />
-                            <InfoRow label="Фамилия" value={profile.User.LastName} />
+                            <InfoRow label="ID пользователя" value={user.Id} />
+                            <InfoRow label="Имя" value={user.Name} />
+                            <InfoRow label="Фамилия" value={user.LastName} />
                             <InfoRow label="Полное имя" value={fullName || "Не указано"} />
-                            <InfoRow label="Логин" value={profile.User.Login} />
-                            <InfoRow label="Класс" value={profile.User.Class} />
+                            <InfoRow label="Логин" value={user.Login} />
+
+                            {isStudentLikeUser && (
+                                <InfoRow label="Класс" value={user.Class} />
+                            )}
+
                             <InfoRow
                                 label="Роль"
-                                value={UserRoles[profile.User.Role] ?? profile.User.Role}
+                                value={UserRoles[user.Role] ?? user.Role}
                             />
                         </div>
                     </section>
 
-                    <section className="card card--padded profile-rating-card">
-                        <div className="section-head">
-                            <h2 className="section-title">Рейтинг</h2>
-                            <p className="section-description">
-                                Текущий социальный рейтинг пользователя.
-                            </p>
-                        </div>
-
-                        <div className="profile-rating-value">{rating}</div>
-
-                        <div className="rating">
-                            <div className="rating__top">
-                                <span className="rating__value">{rating} / 5000</span>
-                                <span className="rating__value">{Math.round(ratingPercent)}%</span>
-                            </div>
-
-                            <div className="rating__bar">
-                                <div
-                                    className="rating__fill rating__fill--high"
-                                    style={{ width: `${ratingPercent}%` }}
-                                />
-                            </div>
-                        </div>
-                    </section>
-                </div>
-
-                <div className="profile-grid profile-grid--equal">
-                    <section className="card card--padded">
-                        <div className="section-head section-head--row">
-                            <div>
-                                <h2 className="section-title">Заметки</h2>
+                    {isStudentLikeUser && (
+                        <section className="card card--padded user-rating-card">
+                            <div className="section-head">
+                                <h2 className="section-title">Рейтинг</h2>
                                 <p className="section-description">
-                                    Поведенческие заметки, оставленные ответственными пользователями.
+                                    Текущий социальный рейтинг пользователя.
                                 </p>
                             </div>
 
-                            <span className="badge badge--neutral">{notes.length}</span>
-                        </div>
+                            <div className="user-rating-summary">
+                                <div>
+                                    <div
+                                        className={`profile-rating-value profile-rating-value--${ratingLevel}`}
+                                    >
+                                        {rating}
+                                    </div>
 
-                        {notes.length > 0 ? (
-                            <div className="feed">
-                                {notes.map((note) => (
-                                    <NoteCard item={note}/>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="empty-inline">Заметок нет</div>
-                        )}
-                    </section>
+                                    <div className="text-muted">из 5000</div>
+                                </div>
 
-                    <section className="card card--padded">
-                        <div className="section-head section-head--row">
-                            <div>
-                                <h2 className="section-title">Жалобы</h2>
-                                <p className="section-description">
-                                    Жалобы, связанные с текущим пользователем.
-                                </p>
+                                <span className={`badge badge--${ratingLevel}`}>
+                  {Math.round(ratingPercent)}%
+                </span>
                             </div>
 
-                            <span
-                                className={
-                                    complaints.length > 0
-                                        ? "badge badge--danger"
-                                        : "badge badge--neutral"
-                                }
-                            >
-                {complaints.length}
-              </span>
-                        </div>
-
-                        {complaints.length > 0 ? (
-                            <div className="feed">
-                                {complaints.map((item) => (
-                                    <ComplaintCard key={item.ID} item={item} />
-                                ))}
+                            <div className="rating">
+                                <div className="rating__bar">
+                                    <div
+                                        className={`rating__fill rating__fill--${ratingLevel}`}
+                                        style={{ width: `${ratingPercent}%` }}
+                                    />
+                                </div>
                             </div>
-                        ) : (
-                            <div className="empty-inline">Жалоб нет</div>
-                        )}
-                    </section>
+                        </section>
+                    )}
                 </div>
+
+                {isStudentLikeUser && (
+                    <div className="user-content-grid">
+                        <section className="card card--padded user-section-card">
+                            <div className="section-head section-head--row">
+                                <div>
+                                    <h2 className="section-title">Жалобы</h2>
+                                    <p className="section-description">
+                                        Жалобы, связанные с текущим пользователем.
+                                    </p>
+                                </div>
+
+                                <span
+                                    className={
+                                        complaints.length > 0
+                                            ? "badge badge--danger"
+                                            : "badge badge--neutral"
+                                    }
+                                >
+                  {complaints.length}
+                </span>
+                            </div>
+
+                            {complaints.length > 0 ? (
+                                <div className="feed">
+                                    {complaints.map((item) => (
+                                        <ComplaintCard key={item.ID} item={item} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-inline">Жалоб нет</div>
+                            )}
+                        </section>
+
+                        <section className="card card--padded user-section-card">
+                            <div className="section-head section-head--row">
+                                <div>
+                                    <h2 className="section-title">Заметки</h2>
+                                    <p className="section-description">
+                                        Поведенческие заметки, оставленные ответственными
+                                        пользователями.
+                                    </p>
+                                </div>
+
+                                <span className="badge badge--neutral">{notes.length}</span>
+                            </div>
+
+                            {notes.length > 0 ? (
+                                <div className="feed">
+                                    {notes.map((note) => (
+                                        <NoteCard key={note.ID} item={note} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-inline">Заметок нет</div>
+                            )}
+                        </section>
+                    </div>
+                )}
             </section>
         </main>
     );

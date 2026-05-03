@@ -5,6 +5,7 @@ import {NoteCard} from "../../../../shared/ui/note_card.tsx";
 import {useClassDashboardStore} from "../../store/class_dashboard_store.ts";
 import {ComplaintCard} from "../../../../shared/ui/complaint_card.tsx";
 import {useAuthStore} from "../../../auth/store/auth_store.ts";
+import {ChangeTeacherModal} from "../components/change_teacher_modal.tsx";
 
 type SelectedList = | "users" | "notes" | "complaints";
 
@@ -13,6 +14,7 @@ export function ClassDashboard() {
     
     const location = useLocation();
     const className = location.state?.name;
+    const teacher = useClassDashboardStore((state) => state.teacher);
     const classId = location.state?.id;
     const role = useAuthStore((state) => state.user?.User.Role);
     
@@ -21,29 +23,40 @@ export function ClassDashboard() {
     const status = useClassDashboardStore((state) => state.status);
     const error = useClassDashboardStore((state) => state.error);
     const notes = useClassDashboardStore((state) => state.notes);
+    const staff = useClassDashboardStore((state) => state.staff);
     const getNotes = useClassDashboardStore((state) => state.getNotesByClass);
     const deleteNote = useClassDashboardStore((state) => state.deleteNote);
     const complaints = useClassDashboardStore((state) => state.complaints);
     const getComplaints = useClassDashboardStore((state) => state.getComplaints);
     const deleteComplaint = useClassDashboardStore((state) => state.deleteComplaint);
+    const changeTeacher = useClassDashboardStore((state) => state.changeTeacher);
+    const getStaff = useClassDashboardStore((state) => state.getStaff);
+    const getClassTeacher = useClassDashboardStore((state) => state.getClassTeacher);
     
     const isLoading = status === "loading";
     
     const [selectedList, setSelectedList] = useState<SelectedList>("users"); 
+    const [isModalOpen, setModalOpen] = useState(false);
         
     useEffect(() => {
         void getUsers(classId);
+        void getClassTeacher(classId);
     }, [getUsers, classId])
 
     return (
         <main className={"main"}>
             <section className={"page"}>
-                <div className={"page__head"}>
-                    <div>
-                        <h1 className={"page__title"}>{className} Класс</h1>
-                        <p className={"page__description"}>Посмотрите список учеников конкретного класса и информацию о них</p>
+                <div className={"profile-hero"}>
+                    <div className={"info-row"}>
+                        <h1 className={"info-row__value"}>{className} Класс</h1>
+                        <h2 className={"info-row__label"}>Классный руководитель - {teacher?.Name} {teacher?.LastName}</h2>
+                        {role === "Owner" && (
+                            <button className={"btn btn--primary"} onClick={async () => {
+                                await getStaff();
+                                setModalOpen(!isModalOpen)
+                            }}>Изменить классного руководителя</button>
+                        )}
                     </div>
-                    
                     <div className={"btn-group"}>
                         <button
                             className={"btn btn--secondary"}
@@ -91,6 +104,8 @@ export function ClassDashboard() {
                         </button>
                     </div>
                 </div>
+                
+                <div style={{ height: 16}}></div>
 
                 {isLoading && (
                     <div className="grid grid--3">
@@ -163,6 +178,12 @@ export function ClassDashboard() {
                     </div>
                 )}
             </section>
+            <ChangeTeacherModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} onChangeTeacher={async (dto) => {
+                await changeTeacher(classId, dto);
+                await getUsers(classId);
+                await getClassTeacher(classId);
+                setModalOpen(false);
+            }} staff={staff} className={className}/>
         </main>
     );
 }

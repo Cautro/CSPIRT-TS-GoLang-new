@@ -34,6 +34,6 @@ export type UserRole = z.infer<typeof userRoleSchema>;
 export const UserRoles: Record<UserRole, string> = {
     Admin: "Учитель",
     User: "Ученик",
-    Owner: "...",
+    Owner: "Руководство",
     Helper: "Староста",
 };
