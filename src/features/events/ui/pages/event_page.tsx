@@ -5,6 +5,7 @@ import { ru } from "date-fns/locale";
 
 import { useEventStore } from "../../store/event_store.ts";
 import { ClassCard } from "../../../../shared/ui/class_card.tsx";
+import {useAuthStore} from "../../../auth/store/auth_store.ts";
 
 interface EventPageState {
     eventId?: number;
@@ -55,6 +56,7 @@ export function EventPage() {
     const deleteEvent = useEventStore((state) => state.deleteEvent);
     const error = useEventStore((state) => state.error);
     const status = useEventStore((state) => state.status);
+    const role = useAuthStore((state) => state.user?.User.Role);
 
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [isCompleteConfirmOpen, setIsCompleteConfirmOpen] = useState(false);
@@ -184,25 +186,29 @@ export function EventPage() {
                         
                         <div className="btn-group">
 
-                            <button
-                                className="btn btn--danger"
-                                type="button"
-                                onClick={() => setIsDeleteConfirmOpen(true)}
-                                disabled={isLoading}
-                            >
-                                Удалить мероприятие
-                            </button>
+                            {role === "Owner" && (
+                                <div className="btn-group">
+                                    <button
+                                        className="btn btn--danger"
+                                        type="button"
+                                        onClick={() => setIsDeleteConfirmOpen(true)}
+                                        disabled={isLoading}
+                                    >
+                                        Удалить мероприятие
+                                    </button>
 
-                            {event.Status !== "completed" && (
-                                <button
-                                    className="btn btn--primary"
-                                    type="button"
-                                    onClick={() => setIsCompleteConfirmOpen(true)}
-                                    disabled={isLoading}
-                                >
-                                    Завершить мероприятие
-                                </button>
-                            )}
+                                    {event.Status !== "completed" && (
+                                        <button
+                                            className="btn btn--primary"
+                                            type="button"
+                                            onClick={() => setIsCompleteConfirmOpen(true)}
+                                            disabled={isLoading}
+                                        >
+                                            Завершить мероприятие
+                                    </button>
+                                        )}
+                                </div>
+                        )}
     
                             <button
                                 className="btn btn--secondary"
@@ -263,7 +269,7 @@ export function EventPage() {
                         </div>
                     )}
 
-                    {!isLoading && !error && eventClasses.length > 0 && (
+                    {!isLoading && !error && eventClasses.length > 0 && role === "Owner" && (
                         <div className="class-list">
                             {eventClasses.map((item) => (
                                 <ClassCard
