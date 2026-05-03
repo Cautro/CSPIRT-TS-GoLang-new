@@ -1,16 +1,19 @@
 package repo
 
-import "cspirt/internal/events/models"
+import (
+	eventModels "cspirt/internal/events/models"
+	userModels "cspirt/internal/users/models"
+)
 
 type EventsRepository interface {
-	AddEvent(event models.Event) error
-	GetEventsByUserID(userID int) ([]models.Event, error)
-	GetEventsByClassID(classID int) ([]models.Event, error)
+	AddEvent(event eventModels.Event) error
+	GetEventsByUserID(userID int) ([]eventModels.Event, error)
+	GetEventsByClassID(classID int) ([]eventModels.Event, error)
 	DeleteEvent(eventID int) error
-	GetEvents() ([]models.Event, error)
+	GetEvents() ([]eventModels.Event, error)
 	AddPlayersToEvent(eventID int, playerIDs []int) error
 	DeletePlayersFromEvent(eventID int, playerIDs []int) error
-	GetEventPlayers(eventID int) ([]int, error)
+	GetEventPlayers(eventID int) ([]userModels.SafeUser, error)
 	GetEventPlayersCount(eventID int) (int, error)
 	EventComplete(eventID int, ratingReward int) error
 }
