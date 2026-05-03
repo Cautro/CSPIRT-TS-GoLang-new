@@ -35,7 +35,7 @@ const meResponseSchema = z.object({
     Notes: z.array(noteSchema).optional(),
     Complaints: z.array(complaintSchema).optional(),
     Events: z.array(noteSchema).optional(),
-    ClassTeacher: userSchema.optional(),
+    ClassTeacher: userSchema.optional().nullable(),
 })
 
 export type meType = z.infer<typeof meResponseSchema>
