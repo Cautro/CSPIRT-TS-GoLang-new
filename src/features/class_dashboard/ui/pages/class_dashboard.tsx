@@ -105,7 +105,7 @@ export function ClassDashboard() {
                     </div>
                 </div>
                 
-                <div style={{ height: 16}}></div>
+                <div className="page-spacer"></div>
 
                 {isLoading && (
                     <div className="grid grid--3">

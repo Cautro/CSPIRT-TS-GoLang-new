@@ -134,7 +134,7 @@ export function DashboardPage() {
                     </div>
                 </div>
 
-                <div style={{ height: 16 }} />
+                <div className="page-spacer" />
 
                 {isLoading && (
                     <div className="class-list">

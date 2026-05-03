@@ -139,6 +139,13 @@ export function EventClassPlayersPage() {
     async function handleSaveChanges() {
         setFormError(null);
 
+        if (!event) {
+            setFormError("Мероприятие не найдено");
+            return;
+        }
+
+        const eventId = event.ID;
+
         const initialSet = new Set(initialSelectedUserIds);
         const selectedSet = new Set(selectedUserIds);
 
@@ -167,7 +174,7 @@ export function EventClassPlayersPage() {
                 return;
             }
 
-            await addPlayersToEvent(event.ID, parsedAdd.data);
+            await addPlayersToEvent(eventId, parsedAdd.data);
         }
 
         if (removedIds.length > 0) {
@@ -179,7 +186,7 @@ export function EventClassPlayersPage() {
                 return;
             }
 
-            await removePlayersFromEvent(event.ID, parsedRemove.data);
+            await removePlayersFromEvent(eventId, parsedRemove.data);
         }
 
         navigate(-1);

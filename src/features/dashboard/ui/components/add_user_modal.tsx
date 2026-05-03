@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import type { ClassType } from "../../../../shared/entities/class/types/class_types";
-import { UserRoles } from "../../../../shared/entities/user/types/user_types";
+import {type UserRole, UserRoles} from "../../../../shared/entities/user/types/user_types";
 import { addUserDto, type addUserType } from "../../../../shared/entities/user/api/user_api";
 
 interface AddUserModalProps {
@@ -18,7 +18,7 @@ export function AddUserModal({
                              }: AddUserModalProps) {
     const [formError, setFormError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<AddUserRole>("User");
+    const [selectedRole, setSelectedRole] = useState<UserRole>("User");
     const shouldShowClass = selectedRole === "User" || selectedRole === "Helper";
 
     useEffect(() => {
@@ -55,8 +55,8 @@ export function AddUserModal({
         const lastName = String(formData.get("lastName") ?? "").trim();
         const login = String(formData.get("login") ?? "").trim();
         const password = String(formData.get("password") ?? "").trim();
-        let classIdRaw = String(formData.get("classId") ?? "");
-        const role = String(formData.get("role") ?? "User").trim() as AddUserRole;
+        const classIdRaw = String(formData.get("classId") ?? "");
+        const role = String(formData.get("role") ?? "User").trim() as UserRole;
         
         const dto = {
             Name: name,
@@ -208,7 +208,7 @@ export function AddUserModal({
                                     name="role"
                                     className="select"
                                     value={selectedRole}
-                                    onChange={(event) => setSelectedRole(event.target.value as AddUserRole)}
+                                    onChange={(event) => setSelectedRole(event.target.value as UserRole)}
                                     required
                                 >
                                     <option value="User">{UserRoles.User}</option>

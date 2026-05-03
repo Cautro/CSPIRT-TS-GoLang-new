@@ -2,13 +2,13 @@ import { type FormEvent, useEffect, useState } from "react";
 import type { ClassType } from "../../../../shared/entities/class/types/class_types.ts";
 import {
     addEventSchema,
-    type AddEventType,
+    type addEventType,
 } from "../../../../shared/entities/events/api/events_api.ts";
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
-    onEventAdd: (dto: AddEventType) => Promise<void>;
+    onEventAdd: (dto: addEventType) => Promise<void>;
     classes: ClassType[];
 }
 
