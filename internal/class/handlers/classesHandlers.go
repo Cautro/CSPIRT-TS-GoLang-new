@@ -36,9 +36,11 @@ func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		classService := sr.NewClassService(s, s.Secret)
-		err := classService.AddClass(input, s, c.GetString("Login"))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add class"})
+
+		if err := classService.AddClass(input, c.GetString("Login")); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(), // временно для отладки
+			})
 			return
 		}
 

@@ -22,12 +22,8 @@ func (s *ClassService) GetAllClassTeachers() ([]userModels.SafeUser, error) {
 	return s.classes.GetAllClassTeachers()
 }
 
-func (s *ClassService) AddClass(input classModels.ClassInput, st *storage.Storage, login string) error {
-	if err := s.classes.EnsureClass(input.Name); err != nil {
-		return err
-	}
-
-	teacher, err := st.GetUserByLogin(input.TeacherLogin)
+func (s *ClassService) AddClass(input classModels.ClassInput, login string) error {
+	teacher, err := s.classes.GetUserByLogin(input.TeacherLogin)
 	if err != nil {
 		return err
 	}

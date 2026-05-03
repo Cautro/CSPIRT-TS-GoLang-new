@@ -5,6 +5,7 @@ import (
 	"cspirt/internal/logger"
 	ratingModels "cspirt/internal/rating/models"
 	userModels "cspirt/internal/users/models"
+	"cspirt/internal/utils"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -112,6 +113,14 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 		return errors.New("class name is required")
 	}
 
+	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
+	if err != nil {
+		return err
+	}
+	if !check {
+		return errors.New("only owners can add classes")
+	}
+
 	teacherLogin := normalizeLogin(input.TeacherLogin)
 
 	if teacherLogin != "" {
@@ -125,14 +134,6 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 		if !isTeacherCandidate(teacher.Role) {
 			return errors.New("class teacher must have helper, admin or owner role")
 		}
-	}
-
-	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
-	if err != nil {
-		return err
-	}
-	if !check {
-		return errors.New("only owners can add classes")
 	}
 
 	_, err = s.db.Exec(`
@@ -202,8 +203,8 @@ func (s *Storage) saveClassTeacherLocked(name string, teacherLogin string) error
 	if class == nil {
 		return errors.New("class not found")
 	}
-	if teacher.ClassID != class.ID {
-		return errors.New("teacher must belong to this class")
+	if !utils.IsSystemRole(teacher.Role) && teacher.ClassID != class.ID {
+	return errors.New("teacher must belong to this class")
 	}
 	if !isTeacherCandidate(teacher.Role) {
 		return errors.New("class teacher must have helper, admin or owner role")
