@@ -1,12 +1,13 @@
 package storage
 
 import (
+	classModels "cspirt/internal/class/models"
 	"cspirt/internal/logger"
 	userModels "cspirt/internal/users/models"
-	classModels "cspirt/internal/class/models"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 )
 
 func (s *Storage) initClassStorage() error {
@@ -33,6 +34,9 @@ func (s *Storage) initClassStorage() error {
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_users_class_id ON users(ClassID);`); err != nil {
 		return err
 	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_classes_teacher_login ON classes(TeacherLogin);`); err != nil {
+		return err
+	}
 
 	return s.syncAllClassesLocked()
 }
@@ -51,6 +55,90 @@ func (s *Storage) EnsureClass(name string) error {
 	}
 
 	return s.syncClassLocked(name)
+}
+
+func (s *Storage) DeleteClassByID(classID int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if classID <= 0 {
+		return errors.New("class id is required")
+	}
+
+	_, err := s.db.Exec(`
+		DELETE FROM classes
+		WHERE Id = ?
+	`, classID)
+	if err != nil {
+		return err
+	}
+
+	return s.syncAllClassesLocked()
+}
+
+func (s *Storage) GetAllClassTeachers() ([]userModels.SafeUser, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT u.Id, u.Name, u.FullName, u.LastName, u.Login, u.Rating, u.Role, u.Class, u.ClassID
+		FROM users u
+		JOIN classes c ON c.TeacherLogin = u.Login
+		ORDER BY u.LastName, u.Name, u.Login
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanSafeUsers(rows)
+}
+
+func (s *Storage) AddClass(input classModels.ClassInput) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	name := normalizeClassName(input.Name)
+	if name == "" {
+		return errors.New("class name is required")
+	}
+
+	teacherLogin := normalizeLogin(input.TeacherLogin)
+
+	if teacherLogin != "" {
+		teacher, err := s.getUserByLoginLocked(teacherLogin)
+		if err != nil {
+			return err
+		}
+		if teacher == nil {
+			return errors.New("teacher not found")
+		}
+		if !isTeacherCandidate(teacher.Role) {
+			return errors.New("class teacher must have helper, admin or owner role")
+		}
+	}
+
+	_, err := s.db.Exec(`
+		INSERT INTO classes (Name, TeacherLogin)
+		VALUES (?, ?)
+	`, name, nullableString(teacherLogin))
+	if err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_class",
+			Message: "failed to insert class: " + err.Error(),
+		})
+		return err
+	}
+
+	return s.syncClassLocked(name)
+}
+
+func nullableString(value string) interface{} {
+	if value == "" {
+		return nil
+	}
+	return value
 }
 
 func (s *Storage) saveClassTeacherLocked(name string, teacherLogin string) error {
@@ -105,15 +193,6 @@ func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := s.syncAllClassesLocked(); err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_all_classes",
-			Message: "failed to sync classes: " + err.Error(),
-		})
-		return nil, err
-	}
-
 	rows, err := s.db.Query(`
 		SELECT Id, Name, TeacherLogin, Members, TotalRating
 		FROM classes
@@ -149,16 +228,8 @@ func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 	}
 	rows.Close()
 
-	for i := range classes {
-		if classes[i].TeacherLogin == "" {
-			continue
-		}
-
-		teacher, err := s.getSafeUserByLoginLocked(classes[i].TeacherLogin)
-		if err != nil {
-			return nil, err
-		}
-		classes[i].Teacher = teacher
+	if err := s.loadClassTeachersLocked(classes); err != nil {
+		return nil, err
 	}
 
 	return classes, nil
@@ -191,18 +262,6 @@ func (s *Storage) GetClassByID(id int) (*classModels.Class, error) {
 		return nil, errors.New("class id is required")
 	}
 
-	class, err := s.getClassByIDLocked(id)
-	if err != nil {
-		return nil, err
-	}
-	if class == nil {
-		return nil, nil
-	}
-
-	if err := s.syncClassByIDLocked(id); err != nil {
-		return nil, err
-	}
-
 	return s.getClassByIDLocked(id)
 }
 
@@ -222,19 +281,11 @@ func (s *Storage) GetClassTeacherByID(classID int) (*userModels.SafeUser, error)
 		return nil, nil
 	}
 
-	if err := s.syncClassByIDLocked(classID); err != nil {
-		return nil, err
-	}
-	class, err = s.getClassByIDLocked(classID)
-	if err != nil {
-		return nil, err
-	}
-	if class == nil {
-		return nil, nil
-	}
-
 	if class.TeacherLogin == "" {
 		return nil, nil
+	}
+	if class.Teacher != nil {
+		return class.Teacher, nil
 	}
 
 	return s.getSafeUserByLoginLocked(class.TeacherLogin)
@@ -267,37 +318,13 @@ func (s *Storage) syncAllClasses() error {
 }
 
 func (s *Storage) syncAllClassesLocked() error {
-	rows, err := s.db.Query(`
-		SELECT DISTINCT Class
+	if _, err := s.db.Exec(`
+		INSERT OR IGNORE INTO classes (Name)
+		SELECT DISTINCT UPPER(TRIM(Class))
 		FROM users
 		WHERE TRIM(Class) <> ''
-	`)
-	if err != nil {
+	`); err != nil {
 		return err
-	}
-
-	classNames := make([]string, 0)
-	for rows.Next() {
-		var className string
-		if err := rows.Scan(&className); err != nil {
-			rows.Close()
-			return err
-		}
-		className = normalizeClassName(className)
-		if className != "" {
-			classNames = append(classNames, className)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	rows.Close()
-
-	for _, className := range classNames {
-		if err := s.ensureClassLocked(className); err != nil {
-			return err
-		}
 	}
 
 	if _, err := s.db.Exec(`
@@ -305,14 +332,14 @@ func (s *Storage) syncAllClassesLocked() error {
 		SET ClassID = (
 			SELECT Id
 			FROM classes
-			WHERE classes.Name = users.Class
+			WHERE classes.Name = UPPER(TRIM(users.Class))
 		)
 		WHERE (ClassID IS NULL OR ClassID = 0)
 		AND TRIM(Class) <> ''
 		AND EXISTS (
 			SELECT 1
 			FROM classes
-			WHERE classes.Name = users.Class
+			WHERE classes.Name = UPPER(TRIM(users.Class))
 		)
 	`); err != nil {
 		return err
@@ -336,7 +363,7 @@ func (s *Storage) syncAllClassesLocked() error {
 		return err
 	}
 
-	rows, err = s.db.Query(`SELECT Id FROM classes`)
+	rows, err := s.db.Query(`SELECT Id FROM classes`)
 	if err != nil {
 		return err
 	}
@@ -405,8 +432,13 @@ func (s *Storage) syncClassByIDLocked(classID int) error {
 	}
 
 	totalRating := 0
-	for _, member := range members {
-		totalRating += member.Rating
+
+	if len(members) > 0 {
+		for _, member := range members {
+			totalRating += member.Rating
+		}
+
+		totalRating = totalRating / len(members)
 	}
 
 	membersJSON, err := json.Marshal(members)
@@ -586,6 +618,62 @@ func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool)
 
 func (s *Storage) scanClassRowsLocked(rows *sql.Rows) (classModels.Class, error) {
 	return s.scanClassScannerLocked(rows, false)
+}
+
+func (s *Storage) loadClassTeachersLocked(classes []classModels.Class) error {
+	logins := make([]string, 0, len(classes))
+	seen := make(map[string]struct{}, len(classes))
+
+	for i := range classes {
+		login := classes[i].TeacherLogin
+		if login == "" {
+			continue
+		}
+		if _, ok := seen[login]; ok {
+			continue
+		}
+
+		seen[login] = struct{}{}
+		logins = append(logins, login)
+	}
+	if len(logins) == 0 {
+		return nil
+	}
+
+	placeholders := make([]string, len(logins))
+	args := make([]interface{}, len(logins))
+	for i, login := range logins {
+		placeholders[i] = "?"
+		args[i] = login
+	}
+
+	rows, err := s.db.Query(`
+		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
+		FROM users
+		WHERE Login IN (`+strings.Join(placeholders, ",")+`)
+	`, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	teachers, err := scanSafeUsers(rows)
+	if err != nil {
+		return err
+	}
+
+	teachersByLogin := make(map[string]*userModels.SafeUser, len(teachers))
+	for i := range teachers {
+		teachersByLogin[teachers[i].Login] = &teachers[i]
+	}
+
+	for i := range classes {
+		if teacher, ok := teachersByLogin[classes[i].TeacherLogin]; ok {
+			classes[i].Teacher = teacher
+		}
+	}
+
+	return nil
 }
 
 func (s *Storage) findTeacherCandidateLocked(classID int) (string, error) {

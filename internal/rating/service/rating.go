@@ -2,16 +2,16 @@ package rating
 
 import (
 	"cspirt/internal/logger"
-	userModels "cspirt/internal/users/models"
-	usersRepo "cspirt/internal/users/repo"
 	"cspirt/internal/rating/models"
 	"cspirt/internal/rating/repo"
+	userModels "cspirt/internal/users/models"
+	usersRepo "cspirt/internal/users/repo"
 	u "cspirt/internal/utils"
 	"errors"
 )
 
 type RatingsService struct {
-	users usersRepo.UserRepository
+	users     usersRepo.UserRepository
 	rating    repo.RatingRepository
 	jwtSecret string
 }
@@ -26,8 +26,8 @@ type RatingResponceResult struct {
 
 func NewRatingsService(rating repo.RatingRepository, users usersRepo.UserRepository, jwtSecret string) *RatingsService {
 	return &RatingsService{
-		rating:     rating,
-		users:      users,
+		rating:    rating,
+		users:     users,
 		jwtSecret: jwtSecret,
 	}
 }
@@ -70,8 +70,7 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user
 		return errors.New("user not found")
 	}
 
-	check, err := u.CheckUserRole(s.users, login, string(models.RoleAdmin), string(models.RoleOwner))
-	if err != nil || !check {
+	if !u.CanManageClasses(user.Role) {
 		writeLog(logger.LogEntry{
 			Level:   "info",
 			Action:  "update_rating",

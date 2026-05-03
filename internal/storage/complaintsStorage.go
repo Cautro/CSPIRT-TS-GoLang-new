@@ -132,6 +132,7 @@ func (s *Storage) GetAllComplaints() ([]userModels.Complaint, error) {
 
 	for rows.Next() {
 		var complaint userModels.Complaint
+		var createdAt interface{}
 
 		if err := rows.Scan(
 			&complaint.ID,
@@ -140,7 +141,7 @@ func (s *Storage) GetAllComplaints() ([]userModels.Complaint, error) {
 			&complaint.AuthorID,
 			&complaint.AuthorName,
 			&complaint.Content,
-			&complaint.CreatedAt,
+			&createdAt,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -149,6 +150,12 @@ func (s *Storage) GetAllComplaints() ([]userModels.Complaint, error) {
 			})
 			return nil, err
 		}
+
+		parsedTime, err := parseEventTime(createdAt)
+		if err != nil {
+			return nil, err
+		}
+		complaint.CreatedAt = parsedTime
 
 		complaints = append(complaints, complaint)
 	}
@@ -194,6 +201,7 @@ func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 
 	for rows.Next() {
 		var complaint userModels.Complaint
+		var createdAt interface{}
 
 		if err := rows.Scan(
 			&complaint.ID,
@@ -202,7 +210,7 @@ func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 			&complaint.AuthorID,
 			&complaint.AuthorName,
 			&complaint.Content,
-			&complaint.CreatedAt,
+			&createdAt,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -211,6 +219,12 @@ func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 			})
 			return nil, err
 		}
+
+		parsedTime, err := parseEventTime(createdAt)
+		if err != nil {
+			return nil, err
+		}
+		complaint.CreatedAt = parsedTime
 
 		complaints = append(complaints, complaint)
 	}
@@ -257,6 +271,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, er
 
 	for rows.Next() {
 		var c userModels.Complaint
+		var createdAt interface{}
 
 		if err := rows.Scan(
 			&c.ID,
@@ -265,7 +280,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, er
 			&c.AuthorID,
 			&c.AuthorName,
 			&c.Content,
-			&c.CreatedAt,
+			&createdAt,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -274,6 +289,12 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, er
 			})
 			return []userModels.Complaint{}, err
 		}
+
+		parsedTime, err := parseEventTime(createdAt)
+		if err != nil {
+			return nil, err
+		}
+		c.CreatedAt = parsedTime
 
 		complaints = append(complaints, c)
 	}
@@ -298,10 +319,6 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, e
 		return nil, errors.New("invalid class id")
 	}
 
-	if err := s.syncAllClassesLocked(); err != nil {
-		return nil, err
-	}
-
 	rows, err := s.db.Query(`
 		SELECT c.Id, c.TargetID, c.TargetName, c.AuthorID, c.AuthorName, c.Content, c.CreatedAt
 		FROM complaints c
@@ -323,6 +340,7 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, e
 
 	for rows.Next() {
 		var c userModels.Complaint
+		var createdAt interface{}
 
 		if err := rows.Scan(
 			&c.ID,
@@ -331,7 +349,7 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, e
 			&c.AuthorID,
 			&c.AuthorName,
 			&c.Content,
-			&c.CreatedAt,
+			&createdAt,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -340,6 +358,12 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, e
 			})
 			return nil, err
 		}
+
+		parsedTime, err := parseEventTime(createdAt)
+		if err != nil {
+			return nil, err
+		}
+		c.CreatedAt = parsedTime
 
 		complaints = append(complaints, c)
 	}

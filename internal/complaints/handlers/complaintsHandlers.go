@@ -187,8 +187,7 @@ func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		checkRole, err := u.CheckUserRole(s, login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
-		if err != nil || !checkRole {
+		if !u.CanManageClasses(foundUser.Role) {
 			writeLog(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_user",

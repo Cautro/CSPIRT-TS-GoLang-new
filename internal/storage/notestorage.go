@@ -112,6 +112,7 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 	notes := make([]models.Note, 0)
 	for rows.Next() {
 		var n models.Note
+		var createdAt interface{}
 
 		if err := rows.Scan(
 			&n.ID,
@@ -120,7 +121,7 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 			&n.AuthorID,
 			&n.AuthorName,
 			&n.Content,
-			&n.CreatedAt,
+			&createdAt,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -129,6 +130,12 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 			})
 			return nil, err
 		}
+
+		parsedTime, err := parseEventTime(createdAt)
+		if err != nil {
+			return nil, err
+		}
+		n.CreatedAt = parsedTime
 
 		notes = append(notes, n)
 	}
@@ -175,6 +182,7 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 
 	for rows.Next() {
 		var n models.Note
+		var createdAt interface{}
 
 		if err := rows.Scan(
 			&n.ID,
@@ -183,7 +191,7 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 			&n.AuthorID,
 			&n.AuthorName,
 			&n.Content,
-			&n.CreatedAt,
+			&createdAt,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -192,6 +200,12 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 			})
 			return []models.Note{}, err
 		}
+
+		parsedTime, err := parseEventTime(createdAt)
+		if err != nil {
+			return nil, err
+		}
+		n.CreatedAt = parsedTime
 
 		notes = append(notes, n)
 	}
@@ -216,10 +230,6 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 		return nil, errors.New("invalid class id")
 	}
 
-	if err := s.syncAllClassesLocked(); err != nil {
-		return nil, err
-	}
-
 	rows, err := s.db.Query(`
 		SELECT n.Id, n.TargetID, n.TargetName, n.AuthorID, n.AuthorName, n.Content, n.CreatedAt
 		FROM notes n
@@ -241,6 +251,7 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 
 	for rows.Next() {
 		var n models.Note
+		var createdAt interface{}
 
 		if err := rows.Scan(
 			&n.ID,
@@ -249,7 +260,7 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 			&n.AuthorID,
 			&n.AuthorName,
 			&n.Content,
-			&n.CreatedAt,
+			&createdAt,
 		); err != nil {
 			writeLog(logger.LogEntry{
 				Level:   "error",
@@ -258,6 +269,12 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 			})
 			return nil, err
 		}
+
+		parsedTime, err := parseEventTime(createdAt)
+		if err != nil {
+			return nil, err
+		}
+		n.CreatedAt = parsedTime
 
 		notes = append(notes, n)
 	}
@@ -291,6 +308,7 @@ func (s *Storage) GetNoteByID(id int) ([]models.Note, error) {
 	notes := make([]models.Note, 0)
 	for rows.Next() {
 		var n models.Note
+		var createdAt interface{}
 		if err := rows.Scan(
 			&n.ID,
 			&n.TargetID,
@@ -298,10 +316,15 @@ func (s *Storage) GetNoteByID(id int) ([]models.Note, error) {
 			&n.AuthorID,
 			&n.AuthorName,
 			&n.Content,
-			&n.CreatedAt,
+			&createdAt,
 		); err != nil {
 			return nil, err
 		}
+		parsedTime, err := parseEventTime(createdAt)
+		if err != nil {
+			return nil, err
+		}
+		n.CreatedAt = parsedTime
 		notes = append(notes, n)
 	}
 

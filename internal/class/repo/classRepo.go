@@ -12,4 +12,7 @@ type ClassRepository interface {
 	GetClassByID(id int) (*classModels.Class, error)
 	GetClassTeacherByID(classID int) (*models.SafeUser, error)
 	GetUsersByClassID(classID int) ([]models.SafeUser, error)
+	DeleteClassByID(classID int) error
+	GetAllClassTeachers() ([]models.SafeUser, error)
+	AddClass(input classModels.ClassInput) error
 }

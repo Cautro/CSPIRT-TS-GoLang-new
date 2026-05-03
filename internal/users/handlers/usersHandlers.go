@@ -1,12 +1,11 @@
 package handlers
 
 import (
-	"cspirt/internal/logger"
-	"cspirt/internal/users/models"
 	eventModels "cspirt/internal/events/models"
-	ratingModels "cspirt/internal/rating/models"
-	sr "cspirt/internal/users/service"
+	"cspirt/internal/logger"
 	"cspirt/internal/storage"
+	"cspirt/internal/users/models"
+	sr "cspirt/internal/users/service"
 	u "cspirt/internal/utils"
 	"net/http"
 	"strconv"
@@ -81,15 +80,17 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 		var classTeacher *models.SafeUser
 
 		if SafeNeedUser.ClassID > 0 {
-			class, err := s.ClassRepo.GetClassByID(SafeNeedUser.ClassID)
+			classTeacher, err = s.ClassRepo.GetClassTeacherByID(SafeNeedUser.ClassID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class teacher"})
 				return
 			}
+		}
 
-			if class != nil {
-				classTeacher = class.Teacher
-			}
+		events, err := s.EventsRepo.GetEventsByUserID(SafeNeedUser.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve events"})
+			return
 		}
 
 		answerResponse := models.UserWithFullInfo{
@@ -97,7 +98,7 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 			Notes:        notes,
 			Complaints:   complaints,
 			ClassTeacher: classTeacher,
-			Events: []eventModels.Event{}, 
+			Events:       events,
 		}
 
 		c.JSON(http.StatusOK, answerResponse)
@@ -133,8 +134,7 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		check, err := u.CheckUserRole(s, login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
-		if err != nil || !check {
+		if !u.CanManageClasses(targetUser.Role) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
 			return
 		}
@@ -208,8 +208,7 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		checkRole, err := u.CheckUserRole(s, login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
-		if err != nil || !checkRole {
+		if !u.CanManageClasses(foundUser.Role) {
 			writeLog(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_user",
@@ -288,14 +287,10 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 		var classTeacher *models.SafeUser
 
 		if user.ClassID > 0 {
-			class, err := s.ClassRepo.GetClassByID(user.ClassID)
+			classTeacher, err = s.ClassRepo.GetClassTeacherByID(user.ClassID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class teacher"})
 				return
-			}
-
-			if class != nil {
-				classTeacher = class.Teacher
 			}
 		}
 
@@ -304,7 +299,7 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			Notes:        notes,
 			Complaints:   complaints,
 			ClassTeacher: classTeacher,
-			Events: []eventModels.Event{}, 
+			Events:       []eventModels.Event{},
 		}
 
 		c.JSON(http.StatusOK, answerResponse)

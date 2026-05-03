@@ -14,6 +14,57 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func GetClassTeachersHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		classService := sr.NewClassService(s, s.Secret)
+		teachers, err := classService.GetAllClassTeachers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class teachers"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"Teachers": teachers})
+	}
+}
+
+func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input classModels.ClassInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
+		err := classService.AddClass(input, s)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add class"})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{"message": "Class added"})
+	}
+}
+
+func DeleteClassHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		classIdStr := c.Param("id")
+		classId, err := strconv.Atoi(classIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Class ID format"})
+			return
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
+		if err := classService.DeleteClass(classId); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete class"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Class deleted"})
+	}
+}
+
 func GetClassesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classService := sr.NewClassService(s, s.Secret)

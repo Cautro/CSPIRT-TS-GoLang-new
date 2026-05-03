@@ -14,3 +14,8 @@ type Class struct {
 type ClassTeacherInput struct {
 	TeacherLogin string `json:"TeacherLogin" binding:"required"`
 }
+
+type ClassInput struct {
+	Name         string     `json:"Name"`
+	TeacherLogin string     `json:"TeacherLogin,omitempty"`
+}

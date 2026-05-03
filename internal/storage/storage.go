@@ -1,11 +1,11 @@
 package storage
 
 import (
-	ratingRepo "cspirt/internal/rating/repo"
-	noteRepo "cspirt/internal/note/repo"
-	complaintRepo "cspirt/internal/complaints/repo"
 	classRepo "cspirt/internal/class/repo"
+	complaintRepo "cspirt/internal/complaints/repo"
 	eventsRepo "cspirt/internal/events/repo"
+	noteRepo "cspirt/internal/note/repo"
+	ratingRepo "cspirt/internal/rating/repo"
 
 	_ "modernc.org/sqlite"
 
@@ -23,7 +23,7 @@ type Storage struct {
 	NotesRepo      noteRepo.NoteRepository
 	ComplaintsRepo complaintRepo.ComplaintRepository
 	ClassRepo      classRepo.ClassRepository
-	EventsRepo	   eventsRepo.EventsRepository
+	EventsRepo     eventsRepo.EventsRepository
 
 	Secret string
 }
@@ -50,14 +50,24 @@ func (s *Storage) initUserStorage() error {
 		return err
 	}
 
-	return s.ensureColumn("users", "ClassID", "INTEGER")
+	if err := s.ensureColumn("users", "ClassID", "INTEGER"); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_users_class_id ON users(ClassID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_users_class_role_id ON users(ClassID, Role, Id);`); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Storage) initEventsStorage() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	query := `
+	eventsQuery := `
 	CREATE TABLE IF NOT EXISTS events (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		Title TEXT NOT NULL,
@@ -68,8 +78,27 @@ func (s *Storage) initEventsStorage() error {
 		Players TEXT NOT NULL
 	);`
 
-	_, err := s.db.Exec(query)
-	return err	
+	if _, err := s.db.Exec(eventsQuery); err != nil {
+		return err
+	}
+
+	eventPlayersQuery := `
+	CREATE TABLE IF NOT EXISTS event_players (
+		event_id INTEGER NOT NULL,
+		player_id INTEGER NOT NULL,
+		PRIMARY KEY (event_id, player_id),
+		FOREIGN KEY (event_id) REFERENCES events(Id) ON DELETE CASCADE,
+		FOREIGN KEY (player_id) REFERENCES users(Id) ON DELETE CASCADE
+	);`
+
+	if _, err := s.db.Exec(eventPlayersQuery); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_players_player_id ON event_players(player_id);`); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Storage) initNoteStorage() error {
@@ -87,8 +116,17 @@ func (s *Storage) initNoteStorage() error {
 		CreatedAt TEXT NOT NULL
 	);`
 
-	_, err := s.db.Exec(query)
-	return err
+	if _, err := s.db.Exec(query); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_target_id ON notes(TargetID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_author_id ON notes(AuthorID);`); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Storage) initHTTPOnlyStorage() error {
@@ -105,8 +143,14 @@ func (s *Storage) initHTTPOnlyStorage() error {
 		FOREIGN KEY (user_id) REFERENCES users(Id) ON DELETE CASCADE
 	);`
 
-	_, err := s.db.Exec(query)
-	return err
+	if _, err := s.db.Exec(query); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);`); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Storage) initComplaintStorage() error {
@@ -126,8 +170,17 @@ func (s *Storage) initComplaintStorage() error {
 		FOREIGN KEY (AuthorID) REFERENCES users(Id) ON DELETE CASCADE
 	);`
 
-	_, err := s.db.Exec(query)
-	return err
+	if _, err := s.db.Exec(query); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_complaints_target_id ON complaints(TargetID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_complaints_author_id ON complaints(AuthorID);`); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
@@ -140,12 +193,12 @@ func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
 		return nil, err
 	}
 
-	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+	db.SetMaxOpenConns(1)
+
+	if err := configureSQLite(db); err != nil {
 		db.Close()
 		return nil, err
 	}
-
-	db.SetMaxOpenConns(1)
 
 	st := &Storage{
 		db:     db,
@@ -189,6 +242,24 @@ func NewUserStorage(path string, jwt_secret string) (*Storage, error) {
 	}
 
 	return st, nil
+}
+
+func configureSQLite(db *sql.DB) error {
+	pragmas := []string{
+		`PRAGMA foreign_keys = ON`,
+		`PRAGMA journal_mode = WAL`,
+		`PRAGMA synchronous = NORMAL`,
+		`PRAGMA busy_timeout = 5000`,
+		`PRAGMA temp_store = MEMORY`,
+	}
+
+	for _, pragma := range pragmas {
+		if _, err := db.Exec(pragma); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Storage) Close() error {

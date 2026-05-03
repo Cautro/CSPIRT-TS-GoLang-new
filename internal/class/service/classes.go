@@ -3,7 +3,9 @@ package classes
 import (
 	classModels "cspirt/internal/class/models"
 	"cspirt/internal/class/repo"
+	"cspirt/internal/storage"
 	userModels "cspirt/internal/users/models"
+	"errors"
 )
 
 type ClassService struct {
@@ -14,6 +16,35 @@ func NewClassService(classes repo.ClassRepository, jwtSecret string) *ClassServi
 	return &ClassService{
 		classes: classes,
 	}
+}
+
+func (s *ClassService) GetAllClassTeachers() ([]userModels.SafeUser, error) {
+	return s.classes.GetAllClassTeachers()
+}
+
+func (s *ClassService) AddClass(input classModels.ClassInput, st *storage.Storage) error {
+	if err := s.classes.EnsureClass(input.Name); err != nil {
+		return err
+	}
+
+	teacher, err := st.GetUserByLogin(input.TeacherLogin)
+	if err != nil {
+		return err
+	}
+	if teacher == nil {
+		return errors.New("teacher not found")
+	}
+
+	err = s.classes.AddClass(input)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *ClassService) DeleteClass(classID int) error {
+	return s.classes.DeleteClassByID(classID)
 }
 
 func (s *ClassService) GetAllClasses() ([]classModels.Class, error) {

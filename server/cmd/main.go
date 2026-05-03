@@ -77,6 +77,9 @@ func main() {
 
 		// Class handlers
 		auth.GET("/classes", clHandlers.GetClassesHandler(s))                          // Получить все классы
+		auth.GET("/classes/teacher", clHandlers.GetClassTeachersHandler(s))            // Получить всех классных руководителей
+		auth.PATCH("/classes/add", clHandlers.AddClassHandler(s))                      // Добавить класс
+		auth.DELETE("/classes/delete/:id", clHandlers.DeleteClassHandler(s))           // Удалить класс по ID
 		auth.GET("/classes/:class_id/users", clHandlers.GetClassUsersHandler(s))       // Получить всех пользователей класса
 		auth.GET("/classes/:class_id/teacher", clHandlers.GetClassTeacherHandler(s))   // Получить учителя
 		auth.PATCH("/classes/:class_id/teacher", clHandlers.SetClassTeacherHandler(s)) // Установить учителя
@@ -96,7 +99,7 @@ func main() {
 		auth.DELETE("/complaint/delete/:id", cmHandlers.DeletecomplaintHandler(s)) // Удалить жалобу
 
 		// Events handlers
-		auth.GET("/events", eHandlers.GetEventsHandler(s))				// Получить события, с возможностью фильтрации по классу Query параметром
+		auth.GET("/events", eHandlers.GetEventsHandler(s))		                     		// Получить события, с возможностью фильтрации по классу Query параметром
 		auth.PATCH("/event/add", eHandlers.AddEventHandler(s))                              // Добавить событие
 		auth.DELETE("/event/delete/:id", eHandlers.DeleteEventHandler(s))                   // Удалить событие
 		auth.PATCH("/event/:eventId/players/add", eHandlers.AddPlayersToEvent(s))           // Добавить игроков к событию

@@ -1,13 +1,13 @@
 package handlers
 
 import (
+	srClass "cspirt/internal/class/service"
 	"cspirt/internal/logger"
-	"cspirt/internal/users/models"
-	ratingModels "cspirt/internal/rating/models"
 	noteModels "cspirt/internal/note/models"
 	sr "cspirt/internal/note/service"
-	srClass "cspirt/internal/class/service"
+	ratingModels "cspirt/internal/rating/models"
 	"cspirt/internal/storage"
+	"cspirt/internal/users/models"
 	u "cspirt/internal/utils"
 
 	"net/http"
@@ -193,8 +193,7 @@ func DeleteNoteHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		checkRole, err := u.CheckUserRole(s, login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
-		if err != nil || !checkRole {
+		if !u.CanManageClasses(foundUser.Role) {
 			writeLog(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_user",
