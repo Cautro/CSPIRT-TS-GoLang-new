@@ -7,6 +7,8 @@ import { ClassCard } from "../../../../shared/ui/class_card";
 import { AddUserModal } from "../components/add_user_modal.tsx";
 import {StaffCard} from "../../../../shared/ui/staff_card.tsx";
 import {AddClassModal} from "../components/add_class_modal.tsx";
+import {EventCard} from "../../../../shared/ui/event_card.tsx";
+import {AddEventModal} from "../components/add_event_modal.tsx";
 
 type Lists = "classes" | "events" | "staff";
 
@@ -18,16 +20,20 @@ export function DashboardPage() {
     const error = useDashboardStore((state) => state.error);
     const classes = useDashboardStore((state) => state.classes);
     const staff = useDashboardStore((state) => state.staff);
+    const events = useDashboardStore((state) => state.events);
     const getStaff = useDashboardStore((state) => state.getStaff);
     const getClasses = useDashboardStore((state) => state.getClasses);
     const addUser = useDashboardStore((state) => state.addUser);
     const addClass = useDashboardStore((state) => state.addClass);
+    const getEvents = useDashboardStore((state) => state.getEvents);
+    const addEvent = useDashboardStore((state) => state.addEvent);
 
     const isLoading = status === "loading";
 
     const [selectedList, setSelectedList] = useState<Lists>("classes");
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
+    const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
 
     useEffect(() => {
         void getClasses();
@@ -71,6 +77,17 @@ export function DashboardPage() {
                             </div>
                         )}
 
+                        {selectedList === "events" && role === "Owner" && (<button
+                            className="btn btn--primary"
+                            type="button"
+                            onClick={() => {
+                                void getEvents
+                                setIsAddEventModalOpen(true);
+                            }}
+                        >
+                            Добавить мероприятие
+                        </button>)}
+
                         <button
                             className="btn btn--secondary"
                             type="button"
@@ -97,7 +114,10 @@ export function DashboardPage() {
                         <button
                             className="btn btn--secondary"
                             type="button"
-                            onClick={() => setSelectedList("events")}
+                            onClick={() => {
+                                void getEvents();
+                                setSelectedList("events");
+                            }}
                             disabled={selectedList === "events"}
                         >
                             Мероприятия
@@ -131,7 +151,14 @@ export function DashboardPage() {
                 {!isLoading && !error && selectedList === "classes" && classes.length > 0 && (
                     <div className="class-list">
                         {classes.map((item) => (
-                            <ClassCard key={item.Id} item={item} />
+                            <ClassCard key={item.Id} item={item} onClick={() => {
+                                navigate("/classDashboard", {
+                                    state: {
+                                        name: item.Name,
+                                        id: item.Id,
+                                    },
+                                });
+                            }}/>
                         ))}
                     </div>
                 )}
@@ -140,16 +167,24 @@ export function DashboardPage() {
                     <div className="empty-state">
                         <h2 className="empty-state__title">Классы не найдены</h2>
                         <p className="empty-state__text">
-                            В системе пока нет доступных классов или у вашей роли нет прав на их просмотр.
+                            В системе пока нет доступных классов
                         </p>
                     </div>
                 )}
 
-                {!isLoading && !error && selectedList === "events" && (
+                {!isLoading && !error && selectedList === "events" && classes.length > 0 && (
+                    <div className="class-list">
+                        {events.map((item) => (
+                            <EventCard key={item.ID} item={item} />
+                        ))}
+                    </div>
+                )}
+
+                {!isLoading && !error && selectedList === "events" && events.length === 0 && (
                     <div className="empty-state">
                         <h2 className="empty-state__title">Мероприятия не найдены</h2>
                         <p className="empty-state__text">
-                            Раздел мероприятий пока не заполнен.
+                            Не удалось найти доступные мероприятия
                         </p>
                     </div>
                 )}
@@ -187,6 +222,12 @@ export function DashboardPage() {
                     await getClasses();
                     setIsAddClassModalOpen(false);
                 }} staff={staff}/>
+                
+                <AddEventModal isOpen={isAddEventModalOpen} onClose={() => setIsAddEventModalOpen(false)} onEventAdd={async (dto) => {
+                 await addEvent(dto);
+                 await getEvents();
+                 setIsAddEventModalOpen(false);
+                }} classes={classes}/>
             </section>
         </main>
     );

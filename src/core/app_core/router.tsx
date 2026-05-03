@@ -7,6 +7,8 @@ import {ClassDashboard} from "../../features/class_dashboard/ui/pages/class_dash
 import {UserPage} from "../../features/user/ui/pages/user_page.tsx";
 import { ErrorBoundary } from "../error/error_boundary";
 import type {ReactNode} from "react";
+import {EventPage} from "../../features/events/ui/pages/event_page.tsx";
+import {EventClassPlayersPage} from "../../features/events/ui/pages/event_class_players_page.tsx";
 
 const withBoundary = (element: ReactNode, name: string) => (
     <ErrorBoundary
@@ -46,6 +48,14 @@ export const router = createBrowserRouter([
         path: "/user/:id",
         element: withBoundary(<UserPage />, "пользователя"),
       },
+      {
+        path: "/event",
+        element: withBoundary(<EventPage />, "мероприятия"),
+      },
+      {
+        path: "/events/:eventId/classes/:classId/players/add",
+        element: withBoundary(<EventClassPlayersPage/>, "мероприятия"),
+      }
     ],
   },
 ]);

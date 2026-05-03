@@ -1,28 +1,22 @@
-import { useNavigate } from "react-router-dom";
 import type { ClassType } from "../entities/class/types/class_types.ts";
 
 interface Props {
     item: ClassType;
+    onClick?: () => void;
 }
 
-export function ClassCard({ item }: Props) {
-    const navigate = useNavigate();
+export function ClassCard({ item, onClick }: Props) {
+    const teacherFullName = item.Teacher
+        ? `${item.Teacher.Name} ${item.Teacher.LastName}`
+        : "Не назначен";
 
-    const teacherFullName = `${item.Teacher.Name} ${item.Teacher.LastName}`;
     const membersCount = item.Members.length;
 
     return (
         <button
             className="class-flat-card"
             type="button"
-            onClick={() => {
-                navigate("/classDashboard", {
-                    state: {
-                        name: item.Name,
-                        id: item.Id,
-                    },
-                });
-            }}
+            onClick={onClick}
         >
             <div className="class-flat-card__main">
                 <div className="class-flat-card__icon">
