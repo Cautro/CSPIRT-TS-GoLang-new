@@ -498,7 +498,10 @@ func (s *Storage) syncClassByIDLocked(classID int) error {
 		if err != nil {
 			return err
 		}
-		if teacher == nil || teacher.ClassID != classID {
+
+		if teacher == nil {
+			teacherLogin = sql.NullString{}
+		} else if !utils.IsSystemRole(teacher.Role) && teacher.ClassID != classID {
 			teacherLogin = sql.NullString{}
 		}
 	}
