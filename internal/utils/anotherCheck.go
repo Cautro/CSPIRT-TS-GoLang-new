@@ -14,6 +14,14 @@ type UserGetter interface {
     GetUserByLogin(login string) (*models.User, error)
 }
 
+func IsSystemRole(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "admin", "owner":
+		return true
+	default:
+		return false
+	}
+}
 
 func AuthenticatedUser(c *gin.Context, s UserGetter, action string) (*models.User, bool) {
 	login := c.GetString("Login")

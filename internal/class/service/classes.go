@@ -22,7 +22,7 @@ func (s *ClassService) GetAllClassTeachers() ([]userModels.SafeUser, error) {
 	return s.classes.GetAllClassTeachers()
 }
 
-func (s *ClassService) AddClass(input classModels.ClassInput, st *storage.Storage) error {
+func (s *ClassService) AddClass(input classModels.ClassInput, st *storage.Storage, login string) error {
 	if err := s.classes.EnsureClass(input.Name); err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func (s *ClassService) AddClass(input classModels.ClassInput, st *storage.Storag
 		return errors.New("teacher not found")
 	}
 
-	err = s.classes.AddClass(input)
+	err = s.classes.AddClass(input, login)
 	if err != nil {
 		return err
 	}
@@ -43,8 +43,8 @@ func (s *ClassService) AddClass(input classModels.ClassInput, st *storage.Storag
 	return nil
 }
 
-func (s *ClassService) DeleteClass(classID int) error {
-	return s.classes.DeleteClassByID(classID)
+func (s *ClassService) DeleteClass(classID int, login string) error {
+	return s.classes.DeleteClassByID(classID, login)
 }
 
 func (s *ClassService) GetAllClasses() ([]classModels.Class, error) {

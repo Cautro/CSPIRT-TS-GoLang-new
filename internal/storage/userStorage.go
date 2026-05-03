@@ -10,23 +10,29 @@ import (
 	"strings"
 )
 
+func (s *Storage) GetOnlyStaffUsers() ([]models.SafeUser, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
+		FROM users
+		WHERE LOWER(Role) IN ('admin', 'owner')
+		ORDER BY LastName, Name, Login
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanSafeUsers(rows)
+}
+
 func (s *Storage) AddUser(user models.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	trimUserInput(&user)
-
-	if err := validateNewUser(&user); err != nil {
-		writeLog(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Class:   user.Class,
-			Message: err.Error(),
-		})
-		return err
-	}
 
 	role, err := normalizeRole(user.Role)
 	if err != nil {
@@ -41,6 +47,24 @@ func (s *Storage) AddUser(user models.User) error {
 		return err
 	}
 	user.Role = role
+
+	if utils.IsSystemRole(user.Role) {
+		user.Class = ""
+		user.ClassID = 0
+		user.Rating = 0
+	}
+
+	if err := validateNewUser(&user); err != nil {
+		writeLog(logger.LogEntry{
+			Level:   "info",
+			Action:  "add_user",
+			Login:   user.Login,
+			Role:    user.Role,
+			Class:   user.Class,
+			Message: err.Error(),
+		})
+		return err
+	}
 
 	fullNameJSON, err := json.Marshal(user.FullName)
 	if err != nil {
@@ -68,8 +92,10 @@ func (s *Storage) AddUser(user models.User) error {
 		return err
 	}
 
-	if err := s.resolveUserClassLocked(&user); err != nil {
-		return err
+	if !utils.IsSystemRole(user.Role) {
+		if err := s.resolveUserClassLocked(&user); err != nil {
+			return err
+		}
 	}
 
 	query := `
@@ -102,8 +128,10 @@ func (s *Storage) AddUser(user models.User) error {
 		return err
 	}
 
-	if err := s.syncClassByIDLocked(user.ClassID); err != nil {
-		return err
+	if user.ClassID > 0 {
+		if err := s.syncClassByIDLocked(user.ClassID); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -241,6 +269,10 @@ func (s *Storage) UpdateRating(login string, rating int) error {
 		return errors.New("user not found")
 	}
 
+	if utils.IsSystemRole(user.Role) {
+		return errors.New("cannot update rating for system user")
+	}
+
 	rating = clampRating(rating)
 	_, err = s.db.Exec(`UPDATE users SET Rating = ? WHERE Login = ?`, rating, login)
 	if err != nil {
@@ -372,7 +404,7 @@ func validateNewUser(user *models.User) error {
 	if user.Role == "" {
 		return errors.New("role is required")
 	}
-	if user.Class == "" && user.ClassID <= 0 {
+	if !utils.IsSystemRole(user.Role) && user.Class == "" && user.ClassID <= 0 {
 		return errors.New("class is required")
 	}
 	if user.Rating < 0 {

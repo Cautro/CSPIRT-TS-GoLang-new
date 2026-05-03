@@ -4,9 +4,9 @@ import (
 	aHandlers "cspirt/internal/auth/handlers"
 	clHandlers "cspirt/internal/class/handlers"
 	cmHandlers "cspirt/internal/complaints/handlers"
+	eHandlers "cspirt/internal/events/handlers"
 	hHandlers "cspirt/internal/health/handlers"
 	"cspirt/internal/logger"
-	eHandlers "cspirt/internal/events/handlers"
 	nHandlers "cspirt/internal/note/handlers"
 	rHandlers "cspirt/internal/rating/handler"
 	rs "cspirt/internal/rating/service"
@@ -71,6 +71,7 @@ func main() {
 	{
 		// user handlers
 		auth.GET("/users", uHandlers.GetUsersHandler(s))                // Получить всех пользователей или конкретного пользователя по ID (через Query параметр)
+		auth.GET("/users/get/staff", uHandlers.GetStaffHandler(s))      // Получить всех сотрудников (учителей, руководителей)
 		auth.PATCH("/user/add", uHandlers.AddUserHandler(s))            // Добавление нового пользователя
 		auth.DELETE("/user/delete/:id", uHandlers.DeleteUserHandler(s)) // Удаление пользователя по ID
 		auth.GET("/me", uHandlers.GetMeHandler(s))                      // Получить информацию о текущем пользователе
@@ -99,11 +100,14 @@ func main() {
 		auth.DELETE("/complaint/delete/:id", cmHandlers.DeletecomplaintHandler(s)) // Удалить жалобу
 
 		// Events handlers
-		auth.GET("/events", eHandlers.GetEventsHandler(s))		                     		// Получить события, с возможностью фильтрации по классу Query параметром
+		auth.GET("/events", eHandlers.GetEventsHandler(s))                                  // Получить события, с возможностью фильтрации по классу Query параметром
 		auth.PATCH("/event/add", eHandlers.AddEventHandler(s))                              // Добавить событие
 		auth.DELETE("/event/delete/:id", eHandlers.DeleteEventHandler(s))                   // Удалить событие
 		auth.PATCH("/event/:eventId/players/add", eHandlers.AddPlayersToEvent(s))           // Добавить игроков к событию
 		auth.DELETE("/event/:eventId/players/delete", eHandlers.DeletePlayersFromEvent(s))  // Удалить игроков из события
+		auth.GET("/event/:eventId/players", eHandlers.GetEventPlayersHandler(s))            // Получить игроков события
+		auth.GET("/event/:eventId/players/count", eHandlers.GetEventPlayersCountHandler(s)) // Получить количество игроков события
+		auth.PATCH("/event/:eventId/complete", eHandlers.EventComplete(s))                  // Завершить событие
 	}
 
 	addr := os.Getenv("PORT")

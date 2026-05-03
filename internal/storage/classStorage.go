@@ -3,6 +3,7 @@ package storage
 import (
 	classModels "cspirt/internal/class/models"
 	"cspirt/internal/logger"
+	ratingModels "cspirt/internal/rating/models"
 	userModels "cspirt/internal/users/models"
 	"database/sql"
 	"encoding/json"
@@ -57,7 +58,7 @@ func (s *Storage) EnsureClass(name string) error {
 	return s.syncClassLocked(name)
 }
 
-func (s *Storage) DeleteClassByID(classID int) error {
+func (s *Storage) DeleteClassByID(classID int, login string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -65,7 +66,15 @@ func (s *Storage) DeleteClassByID(classID int) error {
 		return errors.New("class id is required")
 	}
 
-	_, err := s.db.Exec(`
+	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
+	if err != nil {
+		return err
+	}
+	if !check {
+		return errors.New("only owners can delete classes")
+	}
+
+	_, err = s.db.Exec(`
 		DELETE FROM classes
 		WHERE Id = ?
 	`, classID)
@@ -94,7 +103,7 @@ func (s *Storage) GetAllClassTeachers() ([]userModels.SafeUser, error) {
 	return scanSafeUsers(rows)
 }
 
-func (s *Storage) AddClass(input classModels.ClassInput) error {
+func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -118,7 +127,15 @@ func (s *Storage) AddClass(input classModels.ClassInput) error {
 		}
 	}
 
-	_, err := s.db.Exec(`
+	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
+	if err != nil {
+		return err
+	}
+	if !check {
+		return errors.New("only owners can add classes")
+	}
+
+	_, err = s.db.Exec(`
 		INSERT INTO classes (Name, TeacherLogin)
 		VALUES (?, ?)
 	`, name, nullableString(teacherLogin))
@@ -139,6 +156,25 @@ func nullableString(value string) interface{} {
 		return nil
 	}
 	return value
+}
+
+func (s *Storage) hasUserRoleLocked(login string, roles ...string) (bool, error) {
+	user, err := s.getUserByLoginLocked(login)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, errors.New("user not found")
+	}
+
+	userRole := strings.ToLower(strings.TrimSpace(user.Role))
+	for _, role := range roles {
+		if userRole == strings.ToLower(strings.TrimSpace(role)) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s *Storage) saveClassTeacherLocked(name string, teacherLogin string) error {

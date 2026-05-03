@@ -36,7 +36,7 @@ func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		classService := sr.NewClassService(s, s.Secret)
-		err := classService.AddClass(input, s)
+		err := classService.AddClass(input, s, c.GetString("Login"))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add class"})
 			return
@@ -56,7 +56,7 @@ func DeleteClassHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		classService := sr.NewClassService(s, s.Secret)
-		if err := classService.DeleteClass(classId); err != nil {
+		if err := classService.DeleteClass(classId, c.GetString("Login")); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete class"})
 			return
 		}

@@ -2,7 +2,9 @@ package storage
 
 import (
 	"cspirt/internal/logger"
+	ratingModels "cspirt/internal/rating/models"
 	userModels "cspirt/internal/users/models"
+	utils "cspirt/internal/utils"
 	"errors"
 	"strings"
 )
@@ -19,6 +21,18 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 		return errors.New("content is required")
 	}
 
+	targetUser, err := s.getUserByIDLocked(complaint.TargetID)
+	if err != nil {
+		return err
+	}
+	if targetUser == nil {
+		return errors.New("target user not found")
+	}
+
+	if utils.IsSystemRole(targetUser.Role) {
+		return errors.New("system users cannot be complained about")
+	}
+
 	writeLog(logger.LogEntry{
 		Level:   "info",
 		Action:  "add_complaint",
@@ -27,13 +41,26 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 		Message: "adding new complaint",
 	})
 
+	if targetUser.Login == login {
+		return errors.New("users cannot complain about themselves")
+	}
+	if complaint.TargetID == complaint.AuthorID {
+		return errors.New("author and target cannot be the same")
+	}
+	if len(complaint.Content) > 1000 {
+		return errors.New("content exceeds maximum length of 1000 characters")
+	}
+	if login == "" {
+		return errors.New("invalid login or token")
+	}
+
 	query := `
 		INSERT INTO complaints
 		(TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
-	_, err := s.db.Exec(
+	_, err = s.db.Exec(
 		query,
 		complaint.TargetID,
 		complaint.TargetName,
@@ -77,6 +104,14 @@ func (s *Storage) DeleteComplaint(id int, user userModels.SafeUser) error {
 	})
 
 	query := `DELETE FROM complaints WHERE Id = ?`
+
+	check, err := s.hasUserRoleLocked(user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
+	if err != nil {
+		return err
+	}
+	if !check {
+		return errors.New("only admins can delete complaints")
+	}
 
 	result, err := s.db.Exec(query, id)
 	if err != nil {

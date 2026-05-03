@@ -72,13 +72,21 @@ func (s *Storage) initEventsStorage() error {
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		Title TEXT NOT NULL,
 		Status TEXT NOT NULL,
+		RatingReward INTEGER NOT NULL DEFAULT 0,
 		Description TEXT NOT NULL,
 		CreatedAt TEXT NOT NULL,
 		StartedAt TEXT NOT NULL,
-		Players TEXT NOT NULL
+		Players TEXT NOT NULL,
+		Classes TEXT NOT NULL DEFAULT '[]'
 	);`
 
 	if _, err := s.db.Exec(eventsQuery); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("events", "RatingReward", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("events", "Classes", "TEXT NOT NULL DEFAULT '[]'"); err != nil {
 		return err
 	}
 
@@ -94,7 +102,23 @@ func (s *Storage) initEventsStorage() error {
 	if _, err := s.db.Exec(eventPlayersQuery); err != nil {
 		return err
 	}
+
+	eventClassesQuery := `
+	CREATE TABLE IF NOT EXISTS event_classes (
+		event_id INTEGER NOT NULL,
+		class_id INTEGER NOT NULL,
+		PRIMARY KEY (event_id, class_id),
+		FOREIGN KEY (event_id) REFERENCES events(Id) ON DELETE CASCADE,
+		FOREIGN KEY (class_id) REFERENCES classes(Id) ON DELETE CASCADE
+	);`
+
+	if _, err := s.db.Exec(eventClassesQuery); err != nil {
+		return err
+	}
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_players_player_id ON event_players(player_id);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_classes_class_id ON event_classes(class_id);`); err != nil {
 		return err
 	}
 

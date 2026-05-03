@@ -305,3 +305,15 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 		c.JSON(http.StatusOK, answerResponse)
 	}
 }
+
+func GetStaffHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		staff, err := s.GetOnlyStaffUsers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve staff"})
+			return
+		}
+
+		c.JSON(http.StatusOK, staff)
+	}
+}

@@ -85,21 +85,22 @@ func TestUsersAndClassesFeature(t *testing.T) {
 	st := newTestStorage(t)
 	owner := addTestUser(t, st, "owner", string(ratingModels.RoleOwner), "10A", 1000)
 	helper := addTestUser(t, st, "helper", string(ratingModels.RoleHelper), "10A", 500)
-	student := addTestUser(t, st, "student", string(ratingModels.RoleUser), "11B", 300)
+	student := addTestUser(t, st, "student", string(ratingModels.RoleUser), "10A", 300)
+	otherStudent := addTestUser(t, st, "otherstudent", string(ratingModels.RoleUser), "11B", 200)
 
 	users, err := st.GetAllUsers()
 	if err != nil {
 		t.Fatalf("get all users returned error: %v", err)
 	}
-	if len(users) != 3 {
-		t.Fatalf("expected 3 users, got %d", len(users))
+	if len(users) != 4 {
+		t.Fatalf("expected 4 users, got %d", len(users))
 	}
 
-	if owner.ClassID <= 0 || helper.ClassID != owner.ClassID || student.ClassID == owner.ClassID {
-		t.Fatalf("class IDs were not assigned correctly: owner=%d helper=%d student=%d", owner.ClassID, helper.ClassID, student.ClassID)
+	if owner.ClassID != 0 || helper.ClassID <= 0 || student.ClassID != helper.ClassID || otherStudent.ClassID == helper.ClassID {
+		t.Fatalf("class IDs were not assigned correctly: owner=%d helper=%d student=%d other=%d", owner.ClassID, helper.ClassID, student.ClassID, otherStudent.ClassID)
 	}
 
-	classUsers, err := st.GetUsersByClassID(owner.ClassID)
+	classUsers, err := st.GetUsersByClassID(helper.ClassID)
 	if err != nil {
 		t.Fatalf("get users by class returned error: %v", err)
 	}
@@ -107,7 +108,7 @@ func TestUsersAndClassesFeature(t *testing.T) {
 		t.Fatalf("expected 2 users in class 10A, got %d", len(classUsers))
 	}
 
-	class, err := st.GetClassByID(owner.ClassID)
+	class, err := st.GetClassByID(helper.ClassID)
 	if err != nil {
 		t.Fatalf("get class returned error: %v", err)
 	}
@@ -117,25 +118,25 @@ func TestUsersAndClassesFeature(t *testing.T) {
 	if class.Name != "10A" {
 		t.Fatalf("class name was not normalized: %q", class.Name)
 	}
-	if class.TotalRating != 750 {
-		t.Fatalf("expected class average rating 750, got %d", class.TotalRating)
+	if class.TotalRating != 400 {
+		t.Fatalf("expected class average rating 400, got %d", class.TotalRating)
 	}
 	if len(class.Members) != 2 {
 		t.Fatalf("expected class members to be synced, got %d", len(class.Members))
 	}
 
-	teacher, err := st.GetClassTeacherByID(owner.ClassID)
+	teacher, err := st.GetClassTeacherByID(helper.ClassID)
 	if err != nil {
 		t.Fatalf("get class teacher returned error: %v", err)
 	}
-	if teacher == nil || teacher.Login != owner.Login {
-		t.Fatalf("expected owner to be auto-selected as teacher, got %+v", teacher)
+	if teacher == nil || teacher.Login != helper.Login {
+		t.Fatalf("expected helper to be auto-selected as teacher, got %+v", teacher)
 	}
 
-	if err := st.SaveClassTeacherByID(owner.ClassID, helper.Login); err != nil {
+	if err := st.SaveClassTeacherByID(helper.ClassID, helper.Login); err != nil {
 		t.Fatalf("save class teacher returned error: %v", err)
 	}
-	teacher, err = st.GetClassTeacherByID(owner.ClassID)
+	teacher, err = st.GetClassTeacherByID(helper.ClassID)
 	if err != nil {
 		t.Fatalf("get class teacher after update returned error: %v", err)
 	}
@@ -143,20 +144,20 @@ func TestUsersAndClassesFeature(t *testing.T) {
 		t.Fatalf("expected helper teacher, got %+v", teacher)
 	}
 
-	updatedOwner := utils.UserToSafeUser(*owner)
-	updatedOwner.Rating = 1200
-	if err := st.SaveUser(*updatedOwner); err != nil {
+	updatedHelper := utils.UserToSafeUser(*helper)
+	updatedHelper.Rating = 700
+	if err := st.SaveUser(*updatedHelper); err != nil {
 		t.Fatalf("save user returned error: %v", err)
 	}
-	owner, err = st.GetUserByLogin(owner.Login)
+	helper, err = st.GetUserByLogin(helper.Login)
 	if err != nil {
-		t.Fatalf("get owner after save returned error: %v", err)
+		t.Fatalf("get helper after save returned error: %v", err)
 	}
-	if owner.Rating != 1200 {
-		t.Fatalf("expected updated owner rating 1200, got %d", owner.Rating)
+	if helper.Rating != 700 {
+		t.Fatalf("expected updated helper rating 700, got %d", helper.Rating)
 	}
 
-	if err := st.AddClass(classModels.ClassInput{Name: "12c"}); err != nil {
+	if err := st.AddClass(classModels.ClassInput{Name: "12c"}, owner.Login); err != nil {
 		t.Fatalf("add class returned error: %v", err)
 	}
 	classes, err := st.GetAllClasses()
@@ -167,10 +168,10 @@ func TestUsersAndClassesFeature(t *testing.T) {
 		t.Fatalf("added class 12C not found: %+v", classes)
 	}
 
-	if err := st.DeleteUser(student.ID, *utils.UserToSafeUser(*owner)); err != nil {
+	if err := st.DeleteUser(otherStudent.ID, *utils.UserToSafeUser(*owner)); err != nil {
 		t.Fatalf("delete user returned error: %v", err)
 	}
-	deleted, err := st.GetUserByLogin(student.Login)
+	deleted, err := st.GetUserByLogin(otherStudent.Login)
 	if err != nil {
 		t.Fatalf("get deleted user returned error: %v", err)
 	}
@@ -354,16 +355,19 @@ func TestRatingFeature(t *testing.T) {
 
 func TestEventsFeature(t *testing.T) {
 	st := newTestStorage(t)
-	owner := addTestUser(t, st, "owner", string(ratingModels.RoleOwner), "10A", 1000)
+	helper := addTestUser(t, st, "helper", string(ratingModels.RoleHelper), "10A", 1000)
 	student := addTestUser(t, st, "student", string(ratingModels.RoleUser), "10A", 500)
+	other := addTestUser(t, st, "other", string(ratingModels.RoleUser), "11B", 400)
 
 	if err := st.AddEvent(eventModels.Event{
-		Title:       "Tournament",
-		Status:      "planned",
-		Description: "Class tournament",
-		CreatedAt:   time.Now().UTC().Truncate(time.Second),
-		StartedAt:   "2026-05-03T10:00:00Z",
-		Players:     []int{owner.ID},
+		Title:        "Tournament",
+		Status:       "planned",
+		Description:  "Class tournament",
+		CreatedAt:    time.Now().UTC().Truncate(time.Second),
+		StartedAt:    "2026-05-03T10:00:00Z",
+		Players:      []int{helper.ID},
+		Classes:      []int{helper.ClassID, other.ClassID},
+		RatingReward: 100,
 	}); err != nil {
 		t.Fatalf("add event returned error: %v", err)
 	}
@@ -375,19 +379,30 @@ func TestEventsFeature(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(events))
 	}
-	if !reflect.DeepEqual(events[0].Players, []int{owner.ID}) {
+	if !reflect.DeepEqual(events[0].Players, []int{helper.ID}) {
 		t.Fatalf("unexpected event players: %+v", events[0].Players)
 	}
+	if !reflect.DeepEqual(events[0].Classes, []int{helper.ClassID, other.ClassID}) {
+		t.Fatalf("unexpected event classes: %+v", events[0].Classes)
+	}
 
-	ownerEvents, err := st.GetEventsByUserID(owner.ID)
+	helperEvents, err := st.GetEventsByUserID(helper.ID)
 	if err != nil {
-		t.Fatalf("get events by owner returned error: %v", err)
+		t.Fatalf("get events by helper returned error: %v", err)
 	}
-	if len(ownerEvents) != 1 {
-		t.Fatalf("expected owner to have 1 event, got %d", len(ownerEvents))
+	if len(helperEvents) != 1 {
+		t.Fatalf("expected helper to have 1 event, got %d", len(helperEvents))
 	}
 
-	if err := st.AddPlayersToEvent(events[0].ID, []int{student.ID, owner.ID}); err != nil {
+	classEvents, err := st.GetEventsByClassID(other.ClassID)
+	if err != nil {
+		t.Fatalf("get events by class returned error: %v", err)
+	}
+	if len(classEvents) != 1 {
+		t.Fatalf("expected other class to have 1 event, got %d", len(classEvents))
+	}
+
+	if err := st.AddPlayersToEvent(events[0].ID, []int{student.ID, helper.ID}); err != nil {
 		t.Fatalf("add players to event returned error: %v", err)
 	}
 	studentEvents, err := st.GetEventsByUserID(student.ID)
@@ -397,19 +412,37 @@ func TestEventsFeature(t *testing.T) {
 	if len(studentEvents) != 1 {
 		t.Fatalf("expected student to have 1 event, got %d", len(studentEvents))
 	}
-	if !reflect.DeepEqual(studentEvents[0].Players, []int{owner.ID, student.ID}) {
+	if !reflect.DeepEqual(studentEvents[0].Players, []int{helper.ID, student.ID}) {
 		t.Fatalf("unexpected players after add: %+v", studentEvents[0].Players)
 	}
 
-	if err := st.DeletePlayersFromEvent(events[0].ID, []int{owner.ID}); err != nil {
+	if err := st.DeletePlayersFromEvent(events[0].ID, []int{helper.ID}); err != nil {
 		t.Fatalf("delete players from event returned error: %v", err)
 	}
-	ownerEvents, err = st.GetEventsByUserID(owner.ID)
+	helperEvents, err = st.GetEventsByUserID(helper.ID)
 	if err != nil {
-		t.Fatalf("get owner events after delete player returned error: %v", err)
+		t.Fatalf("get helper events after delete player returned error: %v", err)
 	}
-	if len(ownerEvents) != 0 {
-		t.Fatalf("expected owner events to be empty after removal, got %+v", ownerEvents)
+	if len(helperEvents) != 0 {
+		t.Fatalf("expected helper events to be empty after removal, got %+v", helperEvents)
+	}
+
+	if err := st.EventComplete(events[0].ID, 100); err != nil {
+		t.Fatalf("complete event returned error: %v", err)
+	}
+	student, err = st.GetUserByLogin(student.Login)
+	if err != nil {
+		t.Fatalf("get student after event complete returned error: %v", err)
+	}
+	if student.Rating != 600 {
+		t.Fatalf("expected student rating 600 after event reward, got %d", student.Rating)
+	}
+	events, err = st.GetEvents()
+	if err != nil {
+		t.Fatalf("get events after complete returned error: %v", err)
+	}
+	if events[0].Status != "completed" || events[0].RatingReward != 100 {
+		t.Fatalf("event was not completed correctly: %+v", events[0])
 	}
 
 	if err := st.DeleteEvent(events[0].ID); err != nil {
