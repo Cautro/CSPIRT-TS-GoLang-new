@@ -10,6 +10,7 @@ import (
 
 	"cspirt/internal/events/models"
 	"cspirt/internal/logger"
+	userModels "cspirt/internal/users/models"
 )
 
 func (s *Storage) GetEvents() ([]models.Event, error) {
@@ -92,11 +93,42 @@ func (s *Storage) AddEvent(event models.Event) error {
 	return tx.Commit()
 }
 
-func (s *Storage) GetEventPlayers(eventID int) ([]int, error) {
+func (s *Storage) GetEventPlayers(eventID int) ([]userModels.SafeUser, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.getEventPlayersLocked(eventID)
+	if eventID <= 0 {
+		return nil, errors.New("invalid event id")
+	}
+
+	var exists int
+	if err := s.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1
+			FROM events
+			WHERE Id = ?
+		)
+	`, eventID).Scan(&exists); err != nil {
+		return nil, err
+	}
+
+	if exists == 0 {
+		return nil, errors.New("event not found")
+	}
+
+	rows, err := s.db.Query(`
+		SELECT u.Id, u.Name, u.FullName, u.LastName, u.Login, u.Rating, u.Role, u.Class, u.ClassID
+		FROM event_players ep
+		JOIN users u ON u.Id = ep.player_id
+		WHERE ep.event_id = ?
+		ORDER BY u.LastName, u.Name, u.Login
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanSafeUsers(rows)
 }
 
 func (s *Storage) GetEventPlayersCount(eventID int) (int, error) {
