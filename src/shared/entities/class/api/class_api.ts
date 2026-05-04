@@ -112,5 +112,15 @@ export const classApi = {
         }
         
         return true;
+    },
+    
+    async deleteClass(id: number): Promise<boolean> {
+        const response = await client.delete(`/api/classes/delete/${id}`, {}, true);
+        
+        if (!response.checkStatus()) {
+            throw new Error("Ошибка при попытке удаления класса");
+        }
+        
+        return true;
     }
 };

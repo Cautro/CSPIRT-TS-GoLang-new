@@ -18,9 +18,8 @@ function getStatusLabel(status: string): string {
 
     const statusMap: Record<string, string> = {
         active: "Активно",
-        finished: "Завершено",
-        cancelled: "Отменено",
-        pending: "Ожидает начала",
+        completed: "Завершено",
+        planned: "Запланировано",
     };
 
     return statusMap[status] ?? status;

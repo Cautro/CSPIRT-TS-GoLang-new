@@ -10,6 +10,22 @@ interface Props {
 export function EventCard({ item }: Props) {
     const navigate = useNavigate();
 
+    function getStatusLabel(status: string): string {
+        if (!status.trim()) {
+            return "Статус не указан";
+        }
+
+        const statusMap: Record<string, string> = {
+            active: "Активно",
+            completed: "Завершено",
+            planned: "Запланировано",
+        };
+
+        return statusMap[status] ?? status;
+    }
+    
+    const status = getStatusLabel(item.Status);
+
     const date = format(new Date(item.StartedAt), "d MMMM yyyy, HH:mm", {
         locale: ru,
     });
@@ -36,10 +52,10 @@ export function EventCard({ item }: Props) {
 
             <div className="class-flat-card__meta">
 
-                {item.Status === "completed" && (<div className="class-flat-card__metric">
+                <div className="class-flat-card__metric">
                     <span className="class-flat-card__metric-label">Статус</span>
-                    <span className="class-flat-card__metric-value">Завершено</span>
-                </div>)}
+                    <span className="class-flat-card__metric-value">{status}</span>
+                </div>
                 
                 <div className="class-flat-card__metric">
                     <span className="class-flat-card__metric-label">Количество участников</span>

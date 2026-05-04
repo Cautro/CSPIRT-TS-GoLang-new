@@ -18,6 +18,7 @@ interface State {
     addComplaint: (dto: complaintAddType) => Promise<void>;
     deleteComplaint: (id: number) => Promise<void>;
     changeRating: (dto: ratingChangeType) => Promise<void>;
+    deleteUser: (id: number) => Promise<void>;
 }
 
 export const useUserStore = create<State>()((set) => ({
@@ -103,6 +104,20 @@ export const useUserStore = create<State>()((set) => ({
         try {
             const response = await RatingApi.changeRating(dto);
             set({status: "idle", message: response, error: null});
+        } catch (e) {
+            set({
+                error: e instanceof Error ? e.message : "Неизвестная ошибка",
+                status: "error",
+            });
+        }
+    },
+    
+    deleteUser: async (id: number) => {
+        set({status: "loading"});
+        
+        try {
+            await UserApi.deleteUser(id);
+            set({status: "idle", message: null});
         } catch (e) {
             set({
                 error: e instanceof Error ? e.message : "Неизвестная ошибка",

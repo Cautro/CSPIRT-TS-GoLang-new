@@ -33,11 +33,13 @@ export function ClassDashboard() {
     const changeTeacher = useClassDashboardStore((state) => state.changeTeacher);
     const getStaff = useClassDashboardStore((state) => state.getStaff);
     const getClassTeacher = useClassDashboardStore((state) => state.getClassTeacher);
+    const deleteClass = useClassDashboardStore((state) => state.deleteClass);
     
     const isLoading = status === "loading";
     
     const [selectedList, setSelectedList] = useState<SelectedList>("users"); 
-    const [isModalOpen, setModalOpen] = useState(false);
+    const [isChangeTeacherModalOpen, setChangeTeacherModalOpen] = useState(false);
+    const [isDeleteClassModalOpen, setDeleteClassModalOpen] = useState(false);
         
     useEffect(() => {
         if (classId !== null) {
@@ -53,11 +55,19 @@ export function ClassDashboard() {
                     <div className={"info-row"}>
                         <h1 className={"info-row__value"}>{name} Класс</h1>
                         <h2 className={"info-row__label"}>Классный руководитель - {teacher?.Name} {teacher?.LastName}</h2>
-                        {role === "Owner" && (
-                            <button className={"btn btn--primary"} onClick={async () => {
-                                await getStaff();
-                                setModalOpen(!isModalOpen)
-                            }}>Изменить классного руководителя</button>
+                        {role === "Owner" &&  (
+                            <div className="btn-group">
+                                <button className={"btn btn--primary"} onClick={async () => {
+                                    await getStaff();
+                                    setChangeTeacherModalOpen(!isChangeTeacherModalOpen);
+                                }}>Изменить классного руководителя
+                                </button>
+                                {/*<button className={"btn btn--danger"} onClick={async () => {*/}
+                                {/*    await getStaff();*/}
+                                {/*    setDeleteClassModalOpen(!isDeleteClassModalOpen)*/}
+                                {/*}}>Удалить класс*/}
+                                {/*</button>*/}
+                            </div>
                         )}
                     </div>
                     <div className={"btn-group"}>
@@ -183,14 +193,75 @@ export function ClassDashboard() {
                     </div>
                 )}
             </section>
-            <ChangeTeacherModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} onChangeTeacher={async (dto) => {
+            <ChangeTeacherModal isOpen={isChangeTeacherModalOpen} onClose={() => setChangeTeacherModalOpen(false)} onChangeTeacher={async (dto) => {
                 if (classId !== null) {
                     await changeTeacher(classId, dto);
                     await getUsers(classId);
                     await getClassTeacher(classId);
                 } 
-                setModalOpen(false);
+                setChangeTeacherModalOpen(false);
             }} staff={staff} className={name ?? ""}/>
+
+            {isDeleteClassModalOpen && (
+                <div className="modal-backdrop" onMouseDown={() => setDeleteClassModalOpen(false)}>
+                    <section
+                        className="modal modal--confirm"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-event-title"
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="modal__header">
+                            <div>
+                                <h2 className="modal__title" id="delete-event-title">
+                                    Удалить класс?
+                                </h2>
+
+                                <p className="modal__description">
+                                    Это действие удалит мероприятие {name} класс. Отменить удаление будет нельзя.
+                                </p>
+                            </div>
+
+                            <button
+                                className="modal__close"
+                                type="button"
+                                onClick={() => setDeleteClassModalOpen(false)}
+                                aria-label="Закрыть окно подтверждения"
+                                disabled={isLoading}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="modal__footer">
+                            <button
+                                className="btn btn--secondary"
+                                type="button"
+                                onClick={() => setDeleteClassModalOpen(false)}
+                                disabled={isLoading}
+                            >
+                                Отмена
+                            </button>
+
+                            <button
+                                className="btn btn--danger"
+                                type="button"
+                                disabled={isLoading}
+                                onClick={async () => {
+                                    if (classId !== null) {
+                                        await deleteClass(classId);
+                                        setDeleteClassModalOpen(false);
+                                        navigate(-1);
+                                    }
+                                }}
+                            >
+                                {isLoading ? "Удаление..." : "Удалить"}
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            )}
+            
         </main>
     );
 }

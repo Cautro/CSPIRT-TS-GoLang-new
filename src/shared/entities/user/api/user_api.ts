@@ -3,12 +3,13 @@ import {ApiClient} from "../../../../core/api/api_client.ts";
 import {fullNameSchema, userSchema, type UserType} from "../types/user_types.ts";
 import {noteSchema} from "../../notes/types/notes_types.ts";
 import {complaintSchema} from "../../complaints/types/complaints_types.ts";
+import {EventSchema} from "../../events/types/events_types.ts";
 
 const getUserResponseSchema = z.object({
     User: userSchema,
     Notes: z.array(noteSchema).optional(),
     Complaints: z.array(complaintSchema).optional(),
-    Events: z.array(noteSchema).optional(),
+    Events: z.array(EventSchema).optional(),
     ClassTeacher: userSchema.nullable().optional(),
 });
 
@@ -88,5 +89,15 @@ export const UserApi = {
       }
       
       return true;
+    },
+    
+    async deleteUser(id: number): Promise<boolean> {
+        const response = await client.delete(`/api/user/delete/${id}`, {}, true);
+        
+        if (!response.checkStatus()) {
+            throw new Error("Ошибка при попытке удаления пользователя");
+        }
+        
+        return true;
     }
 }

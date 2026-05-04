@@ -27,6 +27,7 @@ interface State {
     changeTeacher: (id: number, dto: changeClassTeacherType) => Promise<void>
     getStaff: () => Promise<void>
     getClassTeacher: (id: number) => Promise<void>
+    deleteClass: (id: number) => Promise<void>
 }
 
 export const useClassDashboardStore = create<State>()((set) => ({
@@ -145,6 +146,20 @@ export const useClassDashboardStore = create<State>()((set) => ({
         try {
             const response = await classApi.getClassTeacher(id);
             set({teacher: response, error: null, status: "idle"});
+        } catch (e) {
+            set({
+                error: e instanceof Error ? e.message : "Неизвестная ошибка",
+                status: "error",
+            });
+        }
+    },
+    
+    deleteClass: async (id: number) => {
+        set({status: "loading"});
+        
+        try {
+            await classApi.deleteClass(id);
+            set({status: "idle", error: null});
         } catch (e) {
             set({
                 error: e instanceof Error ? e.message : "Неизвестная ошибка",

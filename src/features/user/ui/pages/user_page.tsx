@@ -15,6 +15,7 @@ import { ratingChangeDTO } from "../../../../shared/entities/rating/api/rating_a
 export function UserPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
+    const userId = Number(id ?? 0); 
 
     const currentUser = useAuthStore((state) => state.user?.User);
 
@@ -28,12 +29,14 @@ export function UserPage() {
     const addComplaint = useUserStore((state) => state.addComplaint);
     const deleteComplaint = useUserStore((state) => state.deleteComplaint);
     const changeRating = useUserStore((state) => state.changeRating);
+    const deleteUser = useUserStore((state) => state.deleteUser);
 
     const [noteText, setNoteText] = useState("");
     const [complaintText, setComplaintText] = useState("");
     const [ratingReason, setRatingReason] = useState("");
     const [ratingValue, setRatingValue] = useState("");
     const [formError, setFormError] = useState<string | null>(null);
+    const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
 
     const isLoading = status === "loading";
 
@@ -42,7 +45,7 @@ export function UserPage() {
             return;
         }
 
-        void getUser(id);
+        void getUser(userId);
     }, [id, getUser]);
 
     async function refreshUser() {
@@ -50,7 +53,7 @@ export function UserPage() {
             return;
         }
 
-        await getUser(id);
+        await getUser(userId);
     }
 
     async function handleNoteAdd() {
@@ -217,6 +220,21 @@ export function UserPage() {
                     </div>
 
                     <div className="profile-actions">
+
+                        {currentRole === "Owner" && (
+                            <button
+                                className="btn btn--danger"
+                                type="button"
+                                onClick={async () => {
+                                    if (id !== null) {
+                                        setIsDeleteUserModalOpen(true);
+                                    }
+                                }}
+                            >
+                                Удалить пользователя
+                            </button>
+                        )}
+                        
                         <button
                             className="btn btn--secondary"
                             type="button"
@@ -397,7 +415,7 @@ export function UserPage() {
                                             key={item.ID}
                                             item={item}
                                             onDelete={async () => {
-                                                await deleteComplaint(String(item.ID));
+                                                await deleteComplaint(item.ID);
                                                 await refreshUser();
                                             }}
                                         />
@@ -456,7 +474,7 @@ export function UserPage() {
                                                 key={note.ID}
                                                 item={note}
                                                 onDelete={async () => {
-                                                    await deleteNote(String(note.ID));
+                                                    await deleteNote(note.ID);
                                                     await refreshUser();
                                                 }}
                                             />
@@ -469,6 +487,67 @@ export function UserPage() {
                         )}
                     </div>
                 )}
+
+                {isDeleteUserModalOpen && (
+                    <div className="modal-backdrop" onMouseDown={() => setIsDeleteUserModalOpen(false)}>
+                        <section
+                            className="modal modal--confirm"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="delete-event-title"
+                            onMouseDown={(event) => event.stopPropagation()}
+                        >
+                            <div className="modal__header">
+                                <div>
+                                    <h2 className="modal__title" id="delete-event-title">
+                                        Удалить пользователя?
+                                    </h2>
+
+                                    <p className="modal__description">
+                                        Это действие удалит пользователя "${user.User.Name} ${user.User.LastName}". Отменить удаление будет нельзя.
+                                    </p>
+                                </div>
+
+                                <button
+                                    className="modal__close"
+                                    type="button"
+                                    onClick={() => setIsDeleteUserModalOpen(false)}
+                                    aria-label="Закрыть окно подтверждения"
+                                    disabled={isLoading}
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="modal__footer">
+                                <button
+                                    className="btn btn--secondary"
+                                    type="button"
+                                    onClick={() => setIsDeleteUserModalOpen(false)}
+                                    disabled={isLoading}
+                                >
+                                    Отмена
+                                </button>
+
+                                <button
+                                    className="btn btn--danger"
+                                    type="button"
+                                    disabled={isLoading}
+                                    onClick={async () => {
+                                        if (id !== null) {
+                                            await deleteUser(userId);
+                                            setIsDeleteUserModalOpen(false);
+                                            navigate(-1);
+                                        }
+                                    }}
+                                >
+                                    {isLoading ? "Удаление..." : "Удалить"}
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                )}
+                
             </section>
         </main>
     );
