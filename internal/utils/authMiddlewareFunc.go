@@ -20,7 +20,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		auth := c.GetHeader("Authorization")
 		if auth == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "auth_middleware",
 				Message: "authorization header missing",
@@ -32,7 +32,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		parts := strings.Fields(auth)
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header"})
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "auth_middleware",
 				Message: "invalid authorization header",
@@ -46,7 +46,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 
 		tok, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				writeLog(logger.LogEntry{
+				logger.WriteSafe(logger.LogEntry{
 					Level:   "info",
 					Action:  "auth_middleware",
 					Message: "unexpected signing method",
@@ -61,7 +61,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			if err != nil {
 				message += ": " + err.Error()
 			}
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "auth_middleware",
 				Message: message,
@@ -72,7 +72,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 
 		if claims.Login == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "auth_middleware",
 				Message: "token login is empty",

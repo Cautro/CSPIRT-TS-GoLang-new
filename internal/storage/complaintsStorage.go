@@ -13,6 +13,11 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if login == "" {
+		return errors.New("invalid login or token")
+	}
+
+
 	complaint.Content = strings.TrimSpace(complaint.Content)
 	if complaint.TargetID <= 0 || complaint.AuthorID <= 0 {
 		return errors.New("target and author are required")
@@ -33,7 +38,7 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 		return errors.New("system users cannot be complained about")
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "add_complaint",
 		Login:   user.Login,
@@ -50,10 +55,7 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 	if len(complaint.Content) > 1000 {
 		return errors.New("content exceeds maximum length of 1000 characters")
 	}
-	if login == "" {
-		return errors.New("invalid login or token")
-	}
-
+	
 	query := `
 		INSERT INTO complaints
 		(TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt)
@@ -70,7 +72,7 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 		complaint.CreatedAt,
 	)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_complaint",
 			Login:   user.Login,
@@ -80,7 +82,7 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 		return err
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "add_complaint",
 		Login:   user.Login,
@@ -95,7 +97,7 @@ func (s *Storage) DeleteComplaint(id int, user userModels.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_complaint",
 		Login:   user.Login,
@@ -115,7 +117,7 @@ func (s *Storage) DeleteComplaint(id int, user userModels.SafeUser) error {
 
 	result, err := s.db.Exec(query, id)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_complaint",
 			Login:   user.Login,
@@ -128,7 +130,7 @@ func (s *Storage) DeleteComplaint(id int, user userModels.SafeUser) error {
 		return errors.New("complaint not found")
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_complaint",
 		Login:   user.Login,
@@ -143,7 +145,7 @@ func (s *Storage) GetAllComplaints() ([]userModels.Complaint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_all_complaints",
 		Message: "getting all complaints",
@@ -154,7 +156,7 @@ func (s *Storage) GetAllComplaints() ([]userModels.Complaint, error) {
 		FROM complaints
 	`)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_complaints",
 			Message: "failed to query complaints: " + err.Error(),
@@ -178,7 +180,7 @@ func (s *Storage) GetAllComplaints() ([]userModels.Complaint, error) {
 			&complaint.Content,
 			&createdAt,
 		); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_all_complaints",
 				Message: "failed to scan complaint: " + err.Error(),
@@ -196,7 +198,7 @@ func (s *Storage) GetAllComplaints() ([]userModels.Complaint, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_complaints",
 			Message: "row iteration failed: " + err.Error(),
@@ -211,7 +213,7 @@ func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_complaint_by_id",
 		Message: "getting needed complaint by id",
@@ -223,7 +225,7 @@ func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 		WHERE Id = ?
 	`, id)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_complaint_by_id",
 			Message: "failed to query complaints: " + err.Error(),
@@ -247,7 +249,7 @@ func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 			&complaint.Content,
 			&createdAt,
 		); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_complaint_by_id",
 				Message: "failed to scan complaint: " + err.Error(),
@@ -265,7 +267,7 @@ func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_complaint_by_id",
 			Message: "row iteration failed: " + err.Error(),
@@ -280,7 +282,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_complaint_by_user_id",
 		Message: "getting needed complaint by user id",
@@ -293,7 +295,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, er
 	`, User_id)
 
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_complaint_by_user_id",
 			Message: "failed to query complaints: " + err.Error(),
@@ -317,7 +319,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, er
 			&c.Content,
 			&createdAt,
 		); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_complaint_by_user_id",
 				Message: "Server error: " + err.Error(),
@@ -335,7 +337,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, er
 	}
 
 	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_note_by_user_id",
 			Message: "row iteration failed: " + err.Error(),
@@ -362,7 +364,7 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, e
 		ORDER BY c.Id DESC
 	`, classID)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_complaints_by_class",
 			Message: "failed to query complaints by class: " + err.Error(),
@@ -386,7 +388,7 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, e
 			&c.Content,
 			&createdAt,
 		); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_complaints_by_class",
 				Message: "failed to scan complaint: " + err.Error(),
@@ -404,7 +406,7 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, e
 	}
 
 	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_complaints_by_class",
 			Message: "row iteration failed: " + err.Error(),

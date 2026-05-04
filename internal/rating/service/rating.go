@@ -42,7 +42,7 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user
 
 	targetUser, err := s.users.GetUserByLogin(in.TargetLogin)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "update_rating",
 			Login:   login,
@@ -51,7 +51,7 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user
 		return err
 	}
 	if targetUser == nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "update_rating",
 			Login:   login,
@@ -61,7 +61,7 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user
 	}
 
 	if user == nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "update_rating",
 			Login:   login,
@@ -71,7 +71,7 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user
 	}
 
 	if !u.CanManageClasses(user.Role) {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "update_rating",
 			Role:    user.Role,
@@ -106,7 +106,7 @@ func (s *RatingsService) UpdateRating(login string, in *models.RatingInput, user
 		return err
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "update_rating",
 		Login:   login,

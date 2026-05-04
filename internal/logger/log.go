@@ -51,6 +51,12 @@ func Write(entry LogEntry) error {
 	return nil
 }
 
+func WriteSafe(entry LogEntry) {
+	if err := Write(entry); err != nil {
+		slog.Error("failed to write log", "error", err)
+	}
+}
+
 func Sync() error {
 	if !started.Load() {
 		return nil

@@ -141,7 +141,7 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 		VALUES (?, ?)
 	`, name, nullableString(teacherLogin))
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_class",
 			Message: "failed to insert class: " + err.Error(),
@@ -204,7 +204,7 @@ func (s *Storage) saveClassTeacherLocked(name string, teacherLogin string) error
 		return errors.New("class not found")
 	}
 	if !utils.IsSystemRole(teacher.Role) && teacher.ClassID != class.ID {
-	return errors.New("teacher must belong to this class")
+		return errors.New("teacher must belong to this class")
 	}
 	if !isTeacherCandidate(teacher.Role) {
 		return errors.New("class teacher must have helper, admin or owner role")
@@ -236,7 +236,7 @@ func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 		ORDER BY Name
 	`)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_classes",
 			Message: "failed to query classes: " + err.Error(),
@@ -249,7 +249,7 @@ func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 	for rows.Next() {
 		class, err := s.scanClassRowsLocked(rows)
 		if err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_all_classes",
 				Message: "failed to scan class: " + err.Error(),

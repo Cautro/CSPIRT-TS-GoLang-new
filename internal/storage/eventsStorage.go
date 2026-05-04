@@ -17,7 +17,7 @@ func (s *Storage) GetEvents() ([]models.Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_all_events",
 		Message: "Getting all events",
@@ -29,7 +29,7 @@ func (s *Storage) GetEvents() ([]models.Event, error) {
 		ORDER BY Id
 	`)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_events",
 			Message: "failed to query events: " + err.Error(),
@@ -45,27 +45,53 @@ func (s *Storage) AddEvent(event models.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "add_event",
+		Message: "adding event",
+	})
+
 	event.Players = normalizePositiveIDs(event.Players)
 	classes := normalizePositiveIDs(event.Classes)
 	if len(classes) == 0 {
 		var err error
 		classes, err = s.getClassIDsByPlayerIDsLocked(event.Players)
 		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "add_event",
+				Message: "failed to resolve event classes: " + err.Error(),
+			})
 			return err
 		}
 	}
 
 	playersJSON, err := marshalPlayerIDs(event.Players)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event",
+			Message: "failed to marshal event players: " + err.Error(),
+		})
 		return err
 	}
 	classesJSON, err := marshalClassIDs(classes)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event",
+			Message: "failed to marshal event classes: " + err.Error(),
+		})
 		return err
 	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event",
+			Message: "failed to start transaction: " + err.Error(),
+		})
 		return err
 	}
 	defer tx.Rollback()
@@ -75,22 +101,56 @@ func (s *Storage) AddEvent(event models.Event) error {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`, event.Title, event.Status, event.RatingReward, event.Description, event.CreatedAt, event.StartedAt, playersJSON, classesJSON)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event",
+			Message: "failed to insert event: " + err.Error(),
+		})
 		return err
 	}
 
 	eventID, err := result.LastInsertId()
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event",
+			Message: "failed to get inserted event id: " + err.Error(),
+		})
 		return err
 	}
 
 	if err := insertEventPlayers(tx, int(eventID), event.Players); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event",
+			Message: "failed to insert event players: " + err.Error(),
+		})
 		return err
 	}
 	if err := insertEventClasses(tx, int(eventID), classes); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event",
+			Message: "failed to insert event classes: " + err.Error(),
+		})
 		return err
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event",
+			Message: "failed to commit event: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "add_event",
+		Message: "event inserted",
+	})
+	return nil
 }
 
 func (s *Storage) GetEventPlayers(eventID int) ([]userModels.SafeUser, error) {
@@ -147,17 +207,33 @@ func (s *Storage) EventComplete(eventID int, ratingReward int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "complete_event",
+		Message: "completing event",
+	})
+
 	if eventID <= 0 {
 		return errors.New("invalid event id")
 	}
 
 	classIDs, err := s.getEventClassIDsForRatingLocked(eventID)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "complete_event",
+			Message: "failed to resolve event classes: " + err.Error(),
+		})
 		return err
 	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "complete_event",
+			Message: "failed to start transaction: " + err.Error(),
+		})
 		return err
 	}
 	defer tx.Rollback()
@@ -168,6 +244,11 @@ func (s *Storage) EventComplete(eventID int, ratingReward int) error {
 		WHERE Id = ? AND Status != 'completed'
 	`, ratingReward, eventID)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "complete_event",
+			Message: "failed to update event status: " + err.Error(),
+		})
 		return err
 	}
 
@@ -176,6 +257,11 @@ func (s *Storage) EventComplete(eventID int, ratingReward int) error {
 		return err
 	}
 	if affected == 0 {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "complete_event",
+			Message: "event not found or already completed",
+		})
 		return errors.New("event not found or already completed")
 	}
 
@@ -185,6 +271,11 @@ func (s *Storage) EventComplete(eventID int, ratingReward int) error {
 		WHERE event_id = ?
 	`, eventID)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "complete_event",
+			Message: "failed to query event players: " + err.Error(),
+		})
 		return err
 	}
 
@@ -212,20 +303,40 @@ func (s *Storage) EventComplete(eventID int, ratingReward int) error {
 			SET Rating = MAX(0, MIN(5000, Rating + ?))
 			WHERE Id = ?
 		`, ratingReward, playerID); err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "complete_event",
+				Message: "failed to update player rating: " + err.Error(),
+			})
 			return err
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "complete_event",
+			Message: "failed to commit event completion: " + err.Error(),
+		})
 		return err
 	}
 
 	for _, classID := range classIDs {
 		if err := s.syncClassByIDLocked(classID); err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "complete_event",
+				Message: "failed to sync class rating: " + err.Error(),
+			})
 			return err
 		}
 	}
 
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "complete_event",
+		Message: "event completed",
+	})
 	return nil
 }
 
@@ -271,45 +382,111 @@ func (s *Storage) DeleteEvent(eventID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "delete_event",
+		Message: "deleting event",
+	})
+
 	tx, err := s.db.Begin()
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event",
+			Message: "failed to start transaction: " + err.Error(),
+		})
 		return err
 	}
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(`DELETE FROM event_players WHERE event_id = ?`, eventID); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event",
+			Message: "failed to delete event players: " + err.Error(),
+		})
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM event_classes WHERE event_id = ?`, eventID); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event",
+			Message: "failed to delete event classes: " + err.Error(),
+		})
 		return err
 	}
 
 	result, err := tx.Exec(`DELETE FROM events WHERE Id = ?`, eventID)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event",
+			Message: "failed to delete event: " + err.Error(),
+		})
 		return err
 	}
 	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "delete_event",
+			Message: "event not found",
+		})
 		return errors.New("event not found")
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event",
+			Message: "failed to commit event delete: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "delete_event",
+		Message: "event deleted",
+	})
+	return nil
 }
 
 func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "add_event_players",
+		Message: "adding players to event",
+	})
+
 	currentPlayers, err := s.getEventPlayersLocked(eventID)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to get current event players: " + err.Error(),
+		})
 		return err
 	}
 
 	currentClasses, err := s.getEventClassesLocked(eventID)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to get current event classes: " + err.Error(),
+		})
 		return err
 	}
 	addedClasses, err := s.getClassIDsByPlayerIDsLocked(playerIDs)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to resolve player classes: " + err.Error(),
+		})
 		return err
 	}
 
@@ -317,51 +494,116 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int) error {
 	players := appendUniquePlayerIDs(currentPlayers, playerIDs)
 	playersJSON, err := marshalPlayerIDs(players)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to marshal event players: " + err.Error(),
+		})
 		return err
 	}
 	classes := appendUniqueIDs(currentClasses, addedClasses)
 	classesJSON, err := marshalClassIDs(classes)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to marshal event classes: " + err.Error(),
+		})
 		return err
 	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to start transaction: " + err.Error(),
+		})
 		return err
 	}
 	defer tx.Rollback()
 
 	if err := insertEventPlayers(tx, eventID, playerIDs); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to insert event players: " + err.Error(),
+		})
 		return err
 	}
 	if err := insertEventClasses(tx, eventID, addedClasses); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to insert event classes: " + err.Error(),
+		})
 		return err
 	}
 
 	if _, err := tx.Exec(`UPDATE events SET Players = ?, Classes = ? WHERE Id = ?`, playersJSON, classesJSON, eventID); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to update event players: " + err.Error(),
+		})
 		return err
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_players",
+			Message: "failed to commit event players: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "add_event_players",
+		Message: "players added to event",
+	})
+	return nil
 }
 
 func (s *Storage) DeletePlayersFromEvent(eventID int, playerIDs []int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "delete_event_players",
+		Message: "deleting players from event",
+	})
+
 	currentPlayers, err := s.getEventPlayersLocked(eventID)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_players",
+			Message: "failed to get current event players: " + err.Error(),
+		})
 		return err
 	}
 
 	players := removePlayerIDs(currentPlayers, playerIDs)
 	playersJSON, err := marshalPlayerIDs(players)
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_players",
+			Message: "failed to marshal event players: " + err.Error(),
+		})
 		return err
 	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_players",
+			Message: "failed to start transaction: " + err.Error(),
+		})
 		return err
 	}
 	defer tx.Rollback()
@@ -371,15 +613,39 @@ func (s *Storage) DeletePlayersFromEvent(eventID int, playerIDs []int) error {
 			DELETE FROM event_players
 			WHERE event_id = ? AND player_id = ?
 		`, eventID, playerID); err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "delete_event_players",
+				Message: "failed to delete event player: " + err.Error(),
+			})
 			return err
 		}
 	}
 
 	if _, err := tx.Exec(`UPDATE events SET Players = ? WHERE Id = ?`, playersJSON, eventID); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_players",
+			Message: "failed to update event players: " + err.Error(),
+		})
 		return err
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_players",
+			Message: "failed to commit event players: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "delete_event_players",
+		Message: "players deleted from event",
+	})
+	return nil
 }
 
 func (s *Storage) getEventPlayersLocked(eventID int) ([]int, error) {

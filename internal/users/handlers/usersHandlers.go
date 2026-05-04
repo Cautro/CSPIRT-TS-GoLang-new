@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	eventModels "cspirt/internal/events/models"
 	"cspirt/internal/logger"
 	"cspirt/internal/storage"
 	"cspirt/internal/users/models"
@@ -109,7 +108,7 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
 		if login == "" {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "add_user",
 				Message: "invalid login or token",
@@ -124,7 +123,7 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 		if targetUser == nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "add_user",
 				Login:   login,
@@ -142,7 +141,7 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 		var user models.User
 
 		if err := c.ShouldBindJSON(&user); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "add_user",
 				Login:   login,
@@ -159,7 +158,7 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
 			Login:   login,
@@ -182,7 +181,7 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if login == "" {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_user",
 				Message: "invalid login or token",
@@ -198,7 +197,7 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if foundUser == nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_user",
 				Login:   login,
@@ -209,7 +208,7 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if !u.CanManageClasses(foundUser.Role) {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_user",
 				Login:   login,
@@ -228,7 +227,7 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "delete_user",
 			Login:   login,
@@ -244,7 +243,7 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
 		if login == "" {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "get_me",
 				Message: "invalid login or token",
@@ -260,7 +259,7 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if user == nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "get_me",
 				Login:   login,
@@ -294,12 +293,18 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 			}
 		}
 
+		events, err := s.EventsRepo.GetEventsByUserID(user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve events"})
+			return
+		}
+
 		answerResponse := models.UserWithFullInfo{
 			User:         resp,
 			Notes:        notes,
 			Complaints:   complaints,
 			ClassTeacher: classTeacher,
-			Events:       []eventModels.Event{},
+			Events:       events,
 		}
 
 		c.JSON(http.StatusOK, answerResponse)

@@ -14,7 +14,7 @@ func GetRatingsHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
 		if login == "" {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "get_rating",
 				Message: "invalid login or token",
@@ -29,7 +29,7 @@ func GetRatingsHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 		if user == nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "get_rating",
 				Login:   login,
@@ -47,7 +47,7 @@ func UpdateRatingsHandler(rs *rating.RatingsService, s *storage.Storage) gin.Han
 	return func(c *gin.Context) {
 		var input models.RatingInput
 		if err := c.ShouldBindJSON(&input); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "update_rating",
 				Message: "invalid input: " + err.Error(),
@@ -58,7 +58,7 @@ func UpdateRatingsHandler(rs *rating.RatingsService, s *storage.Storage) gin.Han
 
 		login := c.GetString("Login")
 		if login == "" {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "update_rating",
 				Message: "invalid login or token",
@@ -68,7 +68,7 @@ func UpdateRatingsHandler(rs *rating.RatingsService, s *storage.Storage) gin.Han
 		}
 
 		if login == input.TargetLogin {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "update_rating",
 				Login:   login,

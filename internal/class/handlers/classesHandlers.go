@@ -195,7 +195,7 @@ func SetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "set_class_teacher",
 			Login:   user.Login,
@@ -211,7 +211,7 @@ func SetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 func authenticatedUser(c *gin.Context, s *storage.Storage, action string) (*userModels.User, bool) {
 	login := c.GetString("Login")
 	if login == "" {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  action,
 			Message: "invalid login or token",

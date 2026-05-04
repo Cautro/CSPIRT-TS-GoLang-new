@@ -9,6 +9,7 @@ import (
 	"cspirt/internal/storage"
 	userModels "cspirt/internal/users/models"
 	u "cspirt/internal/utils"
+	"errors"
 
 	"net/http"
 	"strconv"
@@ -23,13 +24,13 @@ func GetComplaintsHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		check, err := u.CheckUserRole(s, user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner), string(ratingModels.RoleHelper))
+		_, err := u.CheckUserRole(s, user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner), string(ratingModels.RoleHelper))
 		if err != nil {
+			if errors.Is(err, u.ErrAccessDenied) || errors.Is(err, u.ErrUserNotFound) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
-			return
-		}
-		if !check {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
 			return
 		}
 
@@ -107,7 +108,7 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 		complaintService := complaintsservice.NewComplaintsService(s, s.Secret)
 		user, err := s.GetUserByLogin(login)
 		if err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "notes",
 				Message: "server error: " + err.Error(),
@@ -122,7 +123,7 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 
 		var in complaintModels.AddNewComplaintResponse
 		if err := c.ShouldBindJSON(&in); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "notes",
 				Message: "invalid input: " + err.Error(),
@@ -148,7 +149,7 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Login:   login,
 			Class:   user.Class,
@@ -177,7 +178,7 @@ func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if foundUser == nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_note",
 				Login:   login,
@@ -188,7 +189,7 @@ func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if !u.CanManageClasses(foundUser.Role) {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_user",
 				Login:   login,

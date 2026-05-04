@@ -11,10 +11,15 @@ type UserProvider interface {
 	GetUserByLogin(login string) (*models.User, error)
 }
 
+var (
+	ErrUserNotFound = errors.New("user not found")
+	ErrAccessDenied = errors.New("access denied")
+)
+
 func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, error) {
 	user, err := provider.GetUserByLogin(login)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "check_user_role",
 			Login:   login,
@@ -24,13 +29,13 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 	}
 
 	if user == nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "check_user_role",
 			Login:   login,
 			Message: "user not found",
 		})
-		return false, errors.New("user not found")
+		return false, ErrUserNotFound
 	}
 
 	userRole := strings.ToLower(strings.TrimSpace(user.Role))
@@ -43,7 +48,7 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 		}
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "check_user_role",
 		Login:   login,
@@ -51,5 +56,5 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 		Message: "user does not have the required role",
 	})
 
-	return false, errors.New("access denied")
+	return false, ErrAccessDenied
 }

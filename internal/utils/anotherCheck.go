@@ -26,7 +26,7 @@ func IsSystemRole(role string) bool {
 func AuthenticatedUser(c *gin.Context, s UserGetter, action string) (*models.User, bool) {
 	login := c.GetString("Login")
 	if login == "" {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  action,
 			Message: "invalid login or token",

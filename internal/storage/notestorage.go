@@ -35,7 +35,7 @@ func (s *Storage) AddNote(login string, note models.Note, user models.SafeUser) 
 		note.CreatedAt,
 	)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_note",
 			Login:   user.Login,
@@ -51,7 +51,7 @@ func (s *Storage) DeleteNote(id int, user models.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_note",
 		Message: "deleting note",
@@ -62,7 +62,7 @@ func (s *Storage) DeleteNote(id int, user models.SafeUser) error {
 	query := `DELETE FROM notes WHERE Id = ?`
 	result, err := s.db.Exec(query, id)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_note",
 			Login:   user.Login,
@@ -75,7 +75,7 @@ func (s *Storage) DeleteNote(id int, user models.SafeUser) error {
 		return errors.New("note not found")
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_note",
 		Login:   user.Login,
@@ -89,7 +89,7 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_all_notes",
 		Message: "getting all notes",
@@ -100,7 +100,7 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 		FROM notes
 	`)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_notes",
 			Message: "failed to query notes: " + err.Error(),
@@ -123,7 +123,7 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 			&n.Content,
 			&createdAt,
 		); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_all_notes",
 				Message: "failed to scan note: " + err.Error(),
@@ -141,7 +141,7 @@ func (s *Storage) GetAllNotes() ([]models.Note, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_notes",
 			Message: "row iteration failed: " + err.Error(),
@@ -156,7 +156,7 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_note_by_user_id",
 		Message: "getting needed note by user id",
@@ -169,7 +169,7 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 	`, User_id)
 
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_note_by_user_id",
 			Message: "failed to query notes: " + err.Error(),
@@ -193,7 +193,7 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 			&n.Content,
 			&createdAt,
 		); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_note_by_user_id",
 				Message: "Server error: " + err.Error(),
@@ -211,7 +211,7 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_note_by_user_id",
 			Message: "row iteration failed: " + err.Error(),
@@ -238,7 +238,7 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 		ORDER BY n.Id DESC
 	`, classID)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_notes_by_class",
 			Message: "failed to query notes by class: " + err.Error(),
@@ -262,7 +262,7 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 			&n.Content,
 			&createdAt,
 		); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_notes_by_class",
 				Message: "failed to scan note: " + err.Error(),
@@ -280,7 +280,7 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_notes_by_class",
 			Message: "row iteration failed: " + err.Error(),

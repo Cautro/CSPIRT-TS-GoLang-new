@@ -36,7 +36,7 @@ func (s *Storage) AddUser(user models.User) error {
 
 	role, err := normalizeRole(user.Role)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
 			Login:   user.Login,
@@ -55,7 +55,7 @@ func (s *Storage) AddUser(user models.User) error {
 	}
 
 	if err := validateNewUser(&user); err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_user",
 			Login:   user.Login,
@@ -68,7 +68,7 @@ func (s *Storage) AddUser(user models.User) error {
 
 	fullNameJSON, err := json.Marshal(user.FullName)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_user",
 			Login:   user.Login,
@@ -81,7 +81,7 @@ func (s *Storage) AddUser(user models.User) error {
 
 	passwordHash, err := utils.HashPassword(user.Password)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_user",
 			Login:   user.Login,
@@ -117,7 +117,7 @@ func (s *Storage) AddUser(user models.User) error {
 		user.ClassID,
 	)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_user",
 			Login:   user.Login,
@@ -185,7 +185,7 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 		fullNameJSON = []byte("[]")
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "save_user",
 		Login:   user.Login,
@@ -213,7 +213,7 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 		user.ID,
 	)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "save_user",
 			Login:   user.Login,
@@ -237,7 +237,7 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 		}
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "save_user",
 		Login:   user.Login,
@@ -286,7 +286,7 @@ func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_user",
 		Login:   user.Login,
@@ -306,7 +306,7 @@ func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
 	query := `DELETE FROM users WHERE Id = ?`
 	result, err := s.db.Exec(query, id)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_user",
 			Login:   user.Login,
@@ -328,7 +328,7 @@ func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
 		return err
 	}
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_user",
 		Login:   user.Login,
@@ -343,7 +343,7 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	writeLog(logger.LogEntry{
+	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_all_users",
 		Message: "getting all users",
@@ -355,7 +355,7 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 		ORDER BY ClassID, LastName, Name, Login
 	`)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_users",
 			Message: "failed to query users: " + err.Error(),
@@ -366,7 +366,7 @@ func (s *Storage) GetAllUsers() ([]models.SafeUser, error) {
 
 	users, err := scanSafeUsers(rows)
 	if err != nil {
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "get_all_users",
 			Message: "failed to scan users: " + err.Error(),

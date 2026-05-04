@@ -15,7 +15,7 @@ func LoginHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input models.LoginInput
 		if err := c.ShouldBindJSON(&input); err != nil {
-			writeLog(logger.LogEntry{
+			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "login",
 				Message: "invalid input: " + err.Error(),
@@ -27,11 +27,23 @@ func LoginHandler(s *storage.Storage) gin.HandlerFunc {
 		authService := sr.NewAuthService(s, s.Secret)
 		result, err := authService.Login(input)
 		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "login",
+				Login:   input.Login,
+				Message: "login failed: " + err.Error(),
+			})
 			c.JSON(500, gin.H{"error": "Internal server error"})
 			return
 		}
 
 		if result.Token == "" {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "login",
+				Login:   input.Login,
+				Message: "invalid login or password",
+			})
 			c.JSON(401, gin.H{"error": "Invalid login or password"})
 			return
 		}
@@ -51,7 +63,7 @@ func LoginHandler(s *storage.Storage) gin.HandlerFunc {
 			"accessToken": result.Token,
 		})
 
-		writeLog(logger.LogEntry{
+		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "login",
 			Login:   input.Login,
@@ -64,6 +76,11 @@ func RefreshHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		refreshToken, err := c.Cookie("refresh_token")
 		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "refresh_token",
+				Message: "refresh token missing",
+			})
 			c.JSON(401, gin.H{"error": "refresh token missing"})
 			return
 		}
@@ -72,10 +89,20 @@ func RefreshHandler(s *storage.Storage) gin.HandlerFunc {
 
 		result, err := authService.Refresh(refreshToken)
 		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "refresh_token",
+				Message: "refresh failed: " + err.Error(),
+			})
 			c.JSON(401, gin.H{"error": err.Error()})
 			return
 		}
 
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "refresh_token",
+			Message: "token refreshed",
+		})
 		c.JSON(200, gin.H{
 			"token": result.Token,
 		})
