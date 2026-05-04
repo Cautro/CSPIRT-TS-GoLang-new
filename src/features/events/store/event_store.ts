@@ -1,4 +1,3 @@
-import type { UserType } from "../../../shared/entities/user/types/user_types.ts";
 import type { ClassType } from "../../../shared/entities/class/types/class_types.ts";
 import { create } from "zustand";
 import { classApi } from "../../../shared/entities/class/api/class_api.ts";
@@ -14,10 +13,9 @@ interface State {
     status: Status;
     error: string | null;
     message: string | null;
-
-    users: UserType[];
     classes: ClassType[];
     event: EventType | null;
+    class: ClassType | null;
 
     getClasses: () => Promise<void>;
     removePlayersFromEvent : (id: number, dto: AddEventPlayersType) => Promise<void>; 
@@ -28,14 +26,14 @@ interface State {
     getEventById: (id: number) => Promise<void>;
     completeEvent: (item: EventType) => Promise<void>;
     deleteEvent: (id: number) => Promise<void>;
+    getClassById: (id: number) => Promise<void>;
 }
 
 export const useEventStore = create<State>()((set) => ({
     error: null,
     status: "idle",
     message: null,
-
-    users: [],
+    class: null,
     classes: [],
     event: null,
 
@@ -97,11 +95,8 @@ export const useEventStore = create<State>()((set) => ({
         set({status: "loading", error: null, event: null,});
 
         try {
-            const response = await EventsApi.getEvents();
-
-            const foundEvent = response.find((item) => item.ID === id) ?? null;
-
-            set({status: "idle", event: foundEvent, error: null,});
+            const response = await EventsApi.getEventById(id);
+            set({status: "idle", event: response, error: null,});
             
         } catch (e) {
             set({
@@ -133,6 +128,21 @@ export const useEventStore = create<State>()((set) => ({
         try {
             await EventsApi.deleteEvent(id);
             set({status: "idle", event: null, message: "Мероприятие успешно удалено", error: null});
+        } catch (e) {
+            set({
+                error: e instanceof Error ? e.message : "Неизвестная ошибка",
+                status: "error",
+                event: null,
+            });
+        }
+    },
+    
+    getClassById: async (id: number) => {
+        set({status: "loading", error: null,});
+
+        try {
+            const response = await classApi.getClassById(id);
+            set({status: "idle", error: null, class: response });
         } catch (e) {
             set({
                 error: e instanceof Error ? e.message : "Неизвестная ошибка",

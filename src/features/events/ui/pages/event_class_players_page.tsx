@@ -1,26 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import type { ClassType } from "../../../../shared/entities/class/types/class_types.ts";
+import { useNavigate, useParams } from "react-router-dom";
+
 import type { UserType } from "../../../../shared/entities/user/types/user_types.ts";
 import { addEventPlayersSchema } from "../../../../shared/entities/events/api/events_api.ts";
 import { useEventStore } from "../../store/event_store.ts";
-
-interface EventData {
-    ID: number;
-    Title: string;
-    Status: string;
-    RatingReward: number;
-    Description: string;
-    CreatedAt: string;
-    StartedAt: string;
-    Players?: unknown[];
-    Classes?: number[];
-}
-
-interface PageState {
-    event?: EventData;
-    classItem?: ClassType;
-}
 
 function getPlayerId(player: unknown): number | null {
     if (typeof player === "number") {
@@ -28,43 +11,62 @@ function getPlayerId(player: unknown): number | null {
     }
 
     if (typeof player === "object" && player !== null) {
-        const data = player as { Id?: unknown; ID?: unknown; UserID?: unknown };
+        const data = player as {
+            Id?: unknown;
+            ID?: unknown;
+            UserID?: unknown;
+            userId?: unknown;
+            playerId?: unknown;
+        };
 
-        if (typeof data.Id === "number") {
-            return data.Id;
-        }
-
-        if (typeof data.ID === "number") {
-            return data.ID;
-        }
-
-        if (typeof data.UserID === "number") {
-            return data.UserID;
-        }
+        if (typeof data.Id === "number") return data.Id;
+        if (typeof data.ID === "number") return data.ID;
+        if (typeof data.UserID === "number") return data.UserID;
+        if (typeof data.userId === "number") return data.userId;
+        if (typeof data.playerId === "number") return data.playerId;
     }
 
     return null;
 }
 
-function uniqueNumbers(values: number[]): number[] {
-    return Array.from(new Set(values));
-}
-
 export function EventClassPlayersPage() {
     const navigate = useNavigate();
-    const location = useLocation();
 
-    const { event, classItem } = (location.state ?? {}) as PageState;
+    const { eventId, classId } = useParams<{
+        eventId: string;
+        classId: string;
+    }>();
 
+    const numericEventId = eventId ? Number(eventId) : null;
+    const numericClassId = classId ? Number(classId) : null;
+
+    const event = useEventStore((state) => state.event);
     const status = useEventStore((state) => state.status);
     const error = useEventStore((state) => state.error);
+
+    const getEventById = useEventStore((state) => state.getEventById);
     const addPlayersToEvent = useEventStore((state) => state.addPlayersToEvent);
     const removePlayersFromEvent = useEventStore((state) => state.removePlayersFromEvent);
-
+    const getClassById = useEventStore((state) => state.getClassById)
+    
     const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
     const [formError, setFormError] = useState<string | null>(null);
 
     const isLoading = status === "loading";
+
+    useEffect(() => {
+        if (!numericEventId || Number.isNaN(numericEventId)) {
+            return;
+        }
+
+        void getEventById(numericEventId);
+    }, [numericEventId, getEventById]);
+
+    useEffect(() => {
+        void getClassById(numericClassId);
+    }, [getClassById]);
+
+    const classItem = useEventStore((state) => state.class);
 
     const students = useMemo<UserType[]>(() => {
         if (!classItem) {
@@ -76,30 +78,94 @@ export function EventClassPlayersPage() {
         });
     }, [classItem]);
 
-    const initialSelectedUserIds = useMemo<number[]>(() => {
-        if (!event?.Players) {
-            return [];
-        }
+    const studentIdSet = useMemo(() => {
+        return new Set(students.map((student) => student.Id));
+    }, [students]);
 
-        return uniqueNumbers(
-            event.Players
-                .map(getPlayerId)
-                .filter((id): id is number => typeof id === "number")
-        );
+    const eventPlayerIdSet = useMemo(() => {
+        const ids = event?.Players
+            ?.map(getPlayerId)
+            .filter((id): id is number => typeof id === "number") ?? [];
+
+        return new Set(ids);
     }, [event]);
+
+    /**
+     * ВАЖНО:
+     * Берём только тех участников ивента, которые есть среди учеников текущего класса.
+     */
+    const initialSelectedUserIds = useMemo(() => {
+        return students
+            .filter((student) => eventPlayerIdSet.has(student.Id))
+            .map((student) => student.Id);
+    }, [students, eventPlayerIdSet]);
 
     useEffect(() => {
         setSelectedUserIds(initialSelectedUserIds);
     }, [initialSelectedUserIds]);
+
+    if (!numericEventId || Number.isNaN(numericEventId)) {
+        return (
+            <main className="main">
+                <section className="page">
+                    <div className="empty-state">
+                        <h2 className="empty-state__title">ID мероприятия не найден</h2>
+                        <p className="empty-state__text">Некорректный адрес страницы.</p>
+
+                        <button
+                            className="btn btn--primary"
+                            type="button"
+                            onClick={() => navigate(-1)}
+                        >
+                            Вернуться назад
+                        </button>
+                    </div>
+                </section>
+            </main>
+        );
+    }
+
+    if (!numericClassId || Number.isNaN(numericClassId)) {
+        return (
+            <main className="main">
+                <section className="page">
+                    <div className="empty-state">
+                        <h2 className="empty-state__title">ID класса не найден</h2>
+                        <p className="empty-state__text">Некорректный адрес страницы.</p>
+
+                        <button
+                            className="btn btn--primary"
+                            type="button"
+                            onClick={() => navigate(-1)}
+                        >
+                            Вернуться назад
+                        </button>
+                    </div>
+                </section>
+            </main>
+        );
+    }
+
+    if (isLoading && (!event || !classItem)) {
+        return (
+            <main className="main">
+                <section className="page">
+                    <div className="class-list">
+                        <div className="skeleton" style={{ height: 120 }} />
+                        <div className="skeleton" style={{ height: 88 }} />
+                        <div className="skeleton" style={{ height: 88 }} />
+                    </div>
+                </section>
+            </main>
+        );
+    }
 
     if (!event || !classItem) {
         return (
             <main className="main">
                 <section className="page">
                     <div className="empty-state">
-                        <h2 className="empty-state__title">
-                            Данные не найдены
-                        </h2>
+                        <h2 className="empty-state__title">Данные не найдены</h2>
 
                         <p className="empty-state__text">
                             Не удалось получить мероприятие или класс.
@@ -139,34 +205,34 @@ export function EventClassPlayersPage() {
     async function handleSaveChanges() {
         setFormError(null);
 
-        if (!event) {
-            setFormError("Мероприятие не найдено");
-            return;
-        }
-
-        const eventId = event.ID;
-
         const initialSet = new Set(initialSelectedUserIds);
         const selectedSet = new Set(selectedUserIds);
 
-        const addedIds = selectedUserIds.filter((id) => !initialSet.has(id));
-        const removedIds = initialSelectedUserIds.filter((id) => !selectedSet.has(id));
+        /**
+         * Добавляем только учеников текущего класса,
+         * которых раньше не было среди участников.
+         */
+        const addedIds = selectedUserIds.filter((id) => {
+            return studentIdSet.has(id) && !initialSet.has(id);
+        });
+
+        /**
+         * Удаляем только учеников текущего класса,
+         * которые были участниками, но теперь сняты.
+         */
+        const removedIds = initialSelectedUserIds.filter((id) => {
+            return studentIdSet.has(id) && !selectedSet.has(id);
+        });
 
         if (addedIds.length === 0 && removedIds.length === 0) {
             setFormError("Изменений нет");
             return;
         }
 
-        const addDto = {
-            playerIds: addedIds,
-        };
-
-        const removeDto = {
-            playerIds: removedIds,
-        };
-
         if (addedIds.length > 0) {
-            const parsedAdd = addEventPlayersSchema.safeParse(addDto);
+            const parsedAdd = addEventPlayersSchema.safeParse({
+                playerIds: addedIds,
+            });
 
             if (!parsedAdd.success) {
                 console.log(parsedAdd.error.issues);
@@ -174,11 +240,13 @@ export function EventClassPlayersPage() {
                 return;
             }
 
-            await addPlayersToEvent(eventId, parsedAdd.data);
+            await addPlayersToEvent(numericEventId, parsedAdd.data);
         }
 
         if (removedIds.length > 0) {
-            const parsedRemove = addEventPlayersSchema.safeParse(removeDto);
+            const parsedRemove = addEventPlayersSchema.safeParse({
+                playerIds: removedIds,
+            });
 
             if (!parsedRemove.success) {
                 console.log(parsedRemove.error.issues);
@@ -186,9 +254,10 @@ export function EventClassPlayersPage() {
                 return;
             }
 
-            await removePlayersFromEvent(eventId, parsedRemove.data);
+            await removePlayersFromEvent(numericEventId, parsedRemove.data);
         }
 
+        await getEventById(numericEventId);
         navigate(-1);
     }
 

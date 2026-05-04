@@ -12,11 +12,11 @@ interface State {
     user: GettedUser | null;
     message: string | null;
     
-    getUser: (id: string) => Promise<void>;
+    getUser: (id: number) => Promise<void>;
     addNote: (dto: noteAddType) => Promise<void>;
-    deleteNote: (id: string) => Promise<void>;
+    deleteNote: (id: number) => Promise<void>;
     addComplaint: (dto: complaintAddType) => Promise<void>;
-    deleteComplaint: (id: string) => Promise<void>;
+    deleteComplaint: (id: number) => Promise<void>;
     changeRating: (dto: ratingChangeType) => Promise<void>;
 }
 
@@ -26,8 +26,8 @@ export const useUserStore = create<State>()((set) => ({
     user: null,
     message: null,
     
-    getUser: async (id: string) => {
-        set({status: "loading"});
+    getUser: async (id: number) => {
+        set({status: "loading", user: null});
         
         try {
             const response = await UserApi.getUser(id);
@@ -55,7 +55,7 @@ export const useUserStore = create<State>()((set) => ({
         }
     },
     
-    deleteNote: async (id: string) => {
+    deleteNote: async (id: number) => {
         set({status: "loading"});
 
         try {
@@ -83,7 +83,7 @@ export const useUserStore = create<State>()((set) => ({
         }
     },
 
-    deleteComplaint: async (id: string) => {
+    deleteComplaint: async (id: number) => {
         set({status: "loading"});
 
         try {

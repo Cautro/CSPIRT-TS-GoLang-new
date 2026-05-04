@@ -17,18 +17,10 @@ const notesResponseShema = z.object({
     Notes: z.array(noteSchema),
 });
 
-const noteAddResponseSchema = z.object({
-    message: z.string(),
-});
-
-const noteDeleteResponseSchema = z.object({
-    message: z.string(),
-});
-
 const client = new ApiClient();
 
 export const NotesApi = {
-    async getNotes(id: string): Promise<NoteType[]> {
+    async getNotes(id: number): Promise<NoteType[]> {
       const response = await client.get(`/api/notes?class=${id}`, true);
       
       if (!response.checkStatus()) {
@@ -51,28 +43,16 @@ export const NotesApi = {
             throw new Error("Ошибка при добавлении заметки");
         }
         
-        const parsed = noteAddResponseSchema.safeParse(response.data);
-        
-        if (!parsed.success) {
-            throw new Error("Некорректный ответ сервера");
-        }
-        
         return true;
     },
     
-    async deleteNote(id: string): Promise<boolean> {
+    async deleteNote(id: number): Promise<boolean> {
         const response = await client.delete(`/api/note/delete/${id}`, {}, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при удалении заметки");
         }
 
-        const parsed = noteDeleteResponseSchema.safeParse(response.data);
-        
-        if (!parsed.success) {
-            throw new Error("Некорректный ответ сервера");
-        }
-        
         return true;
     }
 }

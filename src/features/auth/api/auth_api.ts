@@ -4,6 +4,7 @@ import { userSchema } from "../../../shared/entities/user/types/user_types.ts";
 import { LOGIN_REGEX, SECURITY_LIMITS } from "../../../core/security/security_limits.ts";
 import {noteSchema} from "../../../shared/entities/notes/types/notes_types.ts";
 import {complaintSchema} from "../../../shared/entities/complaints/types/complaints_types.ts";
+import {EventSchema} from "../../../shared/entities/events/types/events_types.ts";
 
 export interface AuthDto {
     login: string;
@@ -32,10 +33,10 @@ const refreshResponseSchema = z.object({
 
 const meResponseSchema = z.object({
     User: userSchema,
-    Notes: z.array(noteSchema).optional(),
-    Complaints: z.array(complaintSchema).optional(),
-    Events: z.array(noteSchema).optional(),
-    ClassTeacher: userSchema.optional().nullable(),
+    Notes: z.array(noteSchema).optional().nullable(),
+    Complaints: z.array(complaintSchema).optional().nullable(),
+    Events: z.array(EventSchema).optional().nullable(),
+    ClassTeacher: userSchema.optional().nullable().nullable(),
 })
 
 export type meType = z.infer<typeof meResponseSchema>

@@ -41,7 +41,7 @@ export const router = createBrowserRouter([
         element: withBoundary(<ProfilePage />, "профиля"),
       },
       {
-        path: "/classDashboard",
+        path: "/class/:id",
         element: withBoundary(<ClassDashboard />, "класса"),
       },
       {

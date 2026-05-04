@@ -38,6 +38,22 @@ export const EventsApi = {
         return parsed.data as EventType[];
     },
     
+    async getEventById(id: number): Promise<EventType> {
+        const response = await client.get(`/api/events?event_id=${id}`, true);
+
+        if (!response.checkStatus()) {
+            throw new Error("Ошибка при получении мероприятия");
+        }
+
+        const parsed =EventSchema.safeParse(response.data);
+
+        if (!parsed.success) {
+            throw new Error("Некорректный ответ сервера");
+        }
+        
+        return parsed.data;
+    },
+    
     async addEvent(dto: addEventType): Promise<boolean> {
         const response = await client.patch('/api/event/add', dto,true);
         

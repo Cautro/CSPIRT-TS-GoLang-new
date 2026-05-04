@@ -152,12 +152,7 @@ export function DashboardPage() {
                     <div className="class-list">
                         {classes.map((item) => (
                             <ClassCard key={item.Id} item={item} onClick={() => {
-                                navigate("/classDashboard", {
-                                    state: {
-                                        name: item.Name,
-                                        id: item.Id,
-                                    },
-                                });
+                                navigate(`/class/${item.Id}?name=${item.Name}`);
                             }}/>
                         ))}
                     </div>
@@ -172,7 +167,7 @@ export function DashboardPage() {
                     </div>
                 )}
 
-                {!isLoading && !error && selectedList === "events" && classes.length > 0 && (
+                {!isLoading && !error && selectedList === "events" && events.length > 0 && (
                     <div className="class-list">
                         {events.map((item) => (
                             <EventCard key={item.ID} item={item} />
@@ -189,7 +184,7 @@ export function DashboardPage() {
                     </div>
                 )}
 
-                {!isLoading && !error && selectedList === "staff" && classes.length > 0 && (
+                {!isLoading && !error && selectedList === "staff" && staff.length > 0 && (
                     <div className="class-list">
                         {staff.map((item) => (
                             <StaffCard key={item.Id} user={item} />

@@ -17,18 +17,10 @@ const complaintsResponseShema = z.object({
     Complaints: z.array(complaintSchema),
 });
 
-const complaintAddResponseSchema = z.object({
-    messsage: z.string(),
-});
-
-const complaintDeleteResponseSchema = z.object({
-    messsage: z.string(),
-});
-
 const client = new ApiClient();
 
 export const ComplaintsApi = {
-    async getComplaints(id: string): Promise<ComplaintType[]> {
+    async getComplaints(id: number): Promise<ComplaintType[]> {
         const response = await client.get(`/api/complaints?class=${id}`, true);
 
         if (!response.checkStatus()) {
@@ -51,26 +43,14 @@ export const ComplaintsApi = {
             throw new Error("Ошибка при добавлении жалобы");
         }
 
-        const parsed = complaintAddResponseSchema.safeParse(response.data);
-
-        if (!parsed.success) {
-            throw new Error("Некорректный ответ сервера");
-        }
-
         return true;
     },
 
-    async deleteComplaint(id: string): Promise<boolean> {
+    async deleteComplaint(id: number): Promise<boolean> {
         const response = await client.delete(`/api/complaint/delete/${id}`, {}, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при удалении жалобы");
-        }
-
-        const parsed = complaintDeleteResponseSchema.safeParse(response.data);
-
-        if (!parsed.success) {
-            throw new Error("Некорректный ответ сервера");
         }
 
         return true;

@@ -47,8 +47,24 @@ export const classApi = {
         return parsed.data.Classes;
     },
     
-    async getUsersByClass(className: string): Promise<UserType[]> {
-        const response = await client.get(`/api/classes/${className}/users`, true);    
+    async getClassById(id: number): Promise<ClassType> {
+        const response = await client.get(`/api/classes/?class_id=${id}`, true);
+
+        if (!response.checkStatus()) {
+            throw new Error("Ошибка при получении класса");
+        }
+
+        const parsed = classesResponseSchema.safeParse(response.data);
+
+        if (!parsed.success) {
+            throw new Error("Некорректный формат классов");
+        }
+
+        return parsed.data.Classes[0];
+    },
+    
+    async getUsersByClass(id: number): Promise<UserType[]> {
+        const response = await client.get(`/api/classes/${id}/users`, true);    
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении списка учениокв");

@@ -87,6 +87,7 @@ export class ApiClient {
                 const refreshed = await this.refreshAccessToken();
 
                 if (refreshed) {
+                    headers.set("Authorization", `Bearer ${getAccessToken()!}`);
                     response = await fetch(url, config);
                 }
             }

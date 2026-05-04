@@ -39,7 +39,7 @@ export type addUserType = z.infer<typeof addUserDto>;
 const client = new ApiClient();
 
 export const UserApi = {
-    async getUser(id: string): Promise<GettedUser> {
+    async getUser(id: number): Promise<GettedUser> {
         const response = await client.get(`/api/users/?id=${id}`, true);
         
         if (!response.checkStatus()) {

@@ -19,11 +19,11 @@ interface State {
     staff: UserType[];
     teacher: UserType | null;
     
-    getUsersByClass: (name: string) => Promise<void>
-    getNotesByClass: (id: string) => Promise<void>
-    deleteNote: (id: string) => Promise<void>
-    getComplaints: (id: string) => Promise<void>
-    deleteComplaint: (id: string) => Promise<void>
+    getUsersByClass: (id: number) => Promise<void>
+    getNotesByClass: (id: number) => Promise<void>
+    deleteNote: (id: number) => Promise<void>
+    getComplaints: (id: number) => Promise<void>
+    deleteComplaint: (id: number) => Promise<void>
     changeTeacher: (id: number, dto: changeClassTeacherType) => Promise<void>
     getStaff: () => Promise<void>
     getClassTeacher: (id: number) => Promise<void>
@@ -39,11 +39,11 @@ export const useClassDashboardStore = create<State>()((set) => ({
     staff: [],
     teacher: null,
 
-    getUsersByClass: async (name: string) => {
+    getUsersByClass: async (id: number) => {
         set({status: "loading"});
 
         try {
-            const response = await classApi.getUsersByClass(name);
+            const response = await classApi.getUsersByClass(id);
 
             set({status: "idle", users: response, error: null});
         } catch (e) {
@@ -54,7 +54,7 @@ export const useClassDashboardStore = create<State>()((set) => ({
         }
     },
 
-    getNotesByClass: async (id: string) => {
+    getNotesByClass: async (id: number) => {
         set({status: "loading"});
 
         try {
@@ -69,7 +69,7 @@ export const useClassDashboardStore = create<State>()((set) => ({
         }
     },
 
-    deleteNote: async (id: string) => {
+    deleteNote: async (id: number) => {
         set({status: "loading"});
 
         try {
@@ -83,7 +83,7 @@ export const useClassDashboardStore = create<State>()((set) => ({
         }
     },
 
-    getComplaints: async (id: string) => {
+    getComplaints: async (id: number) => {
         set({status: "loading"});
         
         try {
@@ -97,7 +97,7 @@ export const useClassDashboardStore = create<State>()((set) => ({
         }
     },
     
-    deleteComplaint: async (id: string) => {
+    deleteComplaint: async (id: number) => {
         set({status: "loading"});
 
         try {

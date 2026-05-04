@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import {useLocation, useNavigate} from "react-router-dom";
+import {useNavigate, useParams, useSearchParams} from "react-router-dom";
 import {UserCard} from "../../../../shared/ui/user_card.tsx";
 import {NoteCard} from "../../../../shared/ui/note_card.tsx";
 import {useClassDashboardStore} from "../../store/class_dashboard_store.ts";
@@ -11,11 +11,12 @@ type SelectedList = | "users" | "notes" | "complaints";
 
 export function ClassDashboard() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     
-    const location = useLocation();
-    const className = location.state?.name;
     const teacher = useClassDashboardStore((state) => state.teacher);
-    const classId = location.state?.id;
+    const { id } = useParams<{id: string, name: string}>();
+    const name = searchParams.get("name");
+    const classId = id ? parseInt(id, 10) : null;
     const role = useAuthStore((state) => state.user?.User.Role);
     
     const getUsers = useClassDashboardStore((state) => state.getUsersByClass);
@@ -39,16 +40,18 @@ export function ClassDashboard() {
     const [isModalOpen, setModalOpen] = useState(false);
         
     useEffect(() => {
-        void getUsers(classId);
-        void getClassTeacher(classId);
-    }, [getUsers, classId])
+        if (classId !== null) {
+            void getUsers(classId);
+            void getClassTeacher(classId);
+        }
+    }, [getUsers, id, getClassTeacher])
 
     return (
         <main className={"main"}>
             <section className={"page"}>
                 <div className={"profile-hero"}>
                     <div className={"info-row"}>
-                        <h1 className={"info-row__value"}>{className} Класс</h1>
+                        <h1 className={"info-row__value"}>{name} Класс</h1>
                         <h2 className={"info-row__label"}>Классный руководитель - {teacher?.Name} {teacher?.LastName}</h2>
                         {role === "Owner" && (
                             <button className={"btn btn--primary"} onClick={async () => {
@@ -67,26 +70,30 @@ export function ClassDashboard() {
                             Список учеников
                         </button>
 
-                        {role === "Admin" || role === "Owner" || role === "Helper" ? (
+                        {role === "Admin" || role === "Owner" || role === "Helper" && (
                             <button
                                 className={"btn btn--secondary"}
                                 type={"button"}
                                 onClick={() => {
-                                    void getNotes(classId);
-                                    setSelectedList('notes');
+                                    if (classId !== null) {
+                                        void getNotes(classId);
+                                        setSelectedList('notes');
+                                    }
                                 }}
                                 disabled={(selectedList === "notes")}
                             >
                                 Список заметок класса
                             </button>
-                        ) : <div></div>}
+                        )}
 
                         <button
                             className={"btn btn--secondary"}
                             type={"button"}
                             onClick={() => {
-                                setSelectedList('complaints');
-                                getComplaints(classId);
+                                if (classId !== null) {
+                                    setSelectedList('complaints');
+                                    void getComplaints(classId);
+                                }
                             }}
                             disabled={(selectedList === "complaints")}
                         >
@@ -129,7 +136,7 @@ export function ClassDashboard() {
                     !isLoading && <div className="empty-state">
                         <h2 className="empty-state__title">Ученики не найдены</h2>
                         <p className="empty-state__text">
-                            Не удалось найти учеников по {className} классу
+                            Не удалось найти учеников по {name} классу
                         </p>
                     </div>
                 ) : <div></div>}
@@ -140,11 +147,10 @@ export function ClassDashboard() {
                     <div className={"class-list"}>
                         {notes.map((note) => (
                             <NoteCard item={note} key={note.ID} onDelete={() => {
-                                deleteNote(note.ID.toString());
-                                if (!classId) {
-                                    return
+                                deleteNote(note.ID);
+                                if (classId !== null) {
+                                    getNotes(classId);
                                 }
-                                getNotes(classId);
                             }} />
                         ))}
                     </div>
@@ -152,7 +158,7 @@ export function ClassDashboard() {
                     selectedList === "notes" && !isLoading && <div className="empty-state">
                         <h2 className="empty-state__title">Заметки не найдены</h2>
                         <p className="empty-state__text">
-                            Не удалось найти заметки по {className} классу
+                            Не удалось найти заметки по {name} классу
                         </p>
                     </div>
                 )}
@@ -161,11 +167,10 @@ export function ClassDashboard() {
                     <div className={"class-list"}>
                         {complaints.map((item) => (
                             <ComplaintCard item={item} key={item.ID} onDelete={() => {
-                                deleteComplaint(item.ID.toString());
-                                if (!classId) {
-                                    return
+                                deleteComplaint(item.ID);
+                                if (classId !== null) {
+                                    getComplaints(classId);
                                 }
-                                getComplaints(classId);
                             }} />
                         ))}
                     </div>
@@ -173,17 +178,19 @@ export function ClassDashboard() {
                     selectedList === "complaints" && !isLoading && <div className="empty-state">
                         <h2 className="empty-state__title">Жалобы не найдены</h2>
                         <p className="empty-state__text">
-                            Не удалось найти жалобы по {className} классу
+                            Не удалось найти жалобы по {name} классу
                         </p>
                     </div>
                 )}
             </section>
             <ChangeTeacherModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} onChangeTeacher={async (dto) => {
-                await changeTeacher(classId, dto);
-                await getUsers(classId);
-                await getClassTeacher(classId);
+                if (classId !== null) {
+                    await changeTeacher(classId, dto);
+                    await getUsers(classId);
+                    await getClassTeacher(classId);
+                } 
                 setModalOpen(false);
-            }} staff={staff} className={className}/>
+            }} staff={staff} className={name ?? ""}/>
         </main>
     );
 }
