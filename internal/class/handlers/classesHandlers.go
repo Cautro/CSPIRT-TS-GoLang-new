@@ -31,11 +31,6 @@ func GetClassTeachersHandler(s *storage.Storage) gin.HandlerFunc {
 func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input classModels.ClassInput
-		err := checkInputClass(input)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
@@ -47,11 +42,18 @@ func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "add_class",
+			Login:   c.GetString("Login"),
+			Message: "Add class input: " + input.Name + ", " + input.TeacherLogin,
+		})
+
 		classService := sr.NewClassService(s, s.Secret)
 
 		if err := classService.AddClass(input, c.GetString("Login")); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(), // временно для отладки
+				"error": err.Error(),
 			})
 			return
 		}

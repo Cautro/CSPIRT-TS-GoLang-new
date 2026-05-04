@@ -4,6 +4,9 @@ import (
 	"cspirt/internal/events/models"
 	"cspirt/internal/events/repo"
 	"cspirt/internal/logger"
+	"errors"
+	"time"
+	"strings"
 	userModels "cspirt/internal/users/models"
 )
 
@@ -35,6 +38,10 @@ func (s *EventsService) GetEvents() ([]models.Event, error) {
 }
 
 func (s *EventsService) GetEventsByUserID(userID int) ([]models.Event, error) {
+	if userID <= 0 {
+		return nil, errors.New("invalid user id")
+	}
+
 	events, err := s.events.GetEventsByUserID(userID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -69,6 +76,19 @@ func (s *EventsService) GetEventsByClassID(classID int) ([]models.Event, error) 
 }
 
 func (s *EventsService) AddEvent(event models.Event) error {
+	event.Status = strings.ToLower(strings.TrimSpace(event.Status))
+	if event.Status == "" {
+		event.Status = "planned"
+	}
+
+	if event.CreatedAt.IsZero() {
+		event.CreatedAt = time.Now()
+	}
+
+	if event.StartedAt == "" {
+		return errors.New("started at is required")
+	}
+
 	if err := s.events.AddEvent(event); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -87,20 +107,11 @@ func (s *EventsService) AddEvent(event models.Event) error {
 }
 
 func (s *EventsService) GetEventsByEventID(eventID int) (*models.Event, error) {
-	event, err := s.events.GetEventByID(eventID)
-	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_events_by_event",
-			Message: "failed to get event by ID: " + err.Error(),
-		})
-		return nil, err
-	}
-	if event == nil {
-		return nil, nil
+	if eventID <= 0 {
+		return nil, errors.New("invalid event id")
 	}
 
-	return event, nil
+	return s.events.GetEventsByID(eventID)
 }
 
 func (s *EventsService) DeleteEvent(eventID int) error {

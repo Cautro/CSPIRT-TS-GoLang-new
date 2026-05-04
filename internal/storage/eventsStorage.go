@@ -29,23 +29,35 @@ func (s *Storage) ActivateDueEvents() error {
 	return err
 }
 
-func (s *Storage) GetEventByID(eventID int) (*models.Event, error) {
+func (s *Storage) GetEventsByID(eventID int) (*models.Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	logger.WriteSafe(logger.LogEntry{
-		Level:   "info",
-		Action:  "get_event_by_id",
-		Message: "Getting event by ID",
-	})
+	if eventID <= 0 {
+		return nil, errors.New("invalid event id")
+	}
 
-	row := s.db.QueryRow(`
+	rows, err := s.db.Query(`
 		SELECT Id, Title, Status, RatingReward, Description, CreatedAt, StartedAt, Players, Classes
 		FROM events
 		WHERE Id = ?
+		LIMIT 1
 	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	return scanEvent(row)
+	events, err := scanEvents(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(events) == 0 {
+		return nil, nil
+	}
+
+	return &events[0], nil
 }
 
 func scanEvent(row *sql.Row) (*models.Event, error) {
@@ -140,10 +152,16 @@ func (s *Storage) AddEvent(event models.Event) error {
 	}
 	defer tx.Rollback()
 
+	if event.CreatedAt.IsZero() {
+		event.CreatedAt = time.Now()
+	}
+
+	createdAt := event.CreatedAt.Format(time.RFC3339)
+
 	result, err := tx.Exec(`
 		INSERT INTO events (Title, Status, RatingReward, Description, CreatedAt, StartedAt, Players, Classes)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, event.Title, event.Status, event.RatingReward, event.Description, event.CreatedAt, event.StartedAt, playersJSON, classesJSON)
+	`, event.Title, event.Status, event.RatingReward, event.Description, createdAt, event.StartedAt, playersJSON, classesJSON)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",

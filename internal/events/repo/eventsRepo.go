@@ -9,7 +9,7 @@ type EventsRepository interface {
 	AddEvent(event eventModels.Event) error
 	GetEventsByUserID(userID int) ([]eventModels.Event, error)
 	GetEventsByClassID(classID int) ([]eventModels.Event, error)
-	GetEventByID(eventID int) (*eventModels.Event, error)
+	GetEventsByID(eventID int) (*eventModels.Event, error)
 	DeleteEvent(eventID int) error
 	GetEvents() ([]eventModels.Event, error)
 	AddPlayersToEvent(eventID int, playerIDs []int) error
