@@ -16,7 +16,7 @@ var (
 	ErrAccessDenied = errors.New("access denied")
 )
 
-func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, error) {
+func CheckUserRole(provider UserProvider, login string, roles ...string) error {
 	user, err := provider.GetUserByLogin(login)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -25,7 +25,7 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 			Login:   login,
 			Message: "failed to retrieve user: " + err.Error(),
 		})
-		return false, err
+		return err
 	}
 
 	if user == nil {
@@ -35,7 +35,7 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 			Login:   login,
 			Message: "user not found",
 		})
-		return false, ErrUserNotFound
+		return ErrUserNotFound
 	}
 
 	userRole := strings.ToLower(strings.TrimSpace(user.Role))
@@ -44,7 +44,7 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 		allowedRole := strings.ToLower(strings.TrimSpace(role))
 
 		if userRole == allowedRole {
-			return true, nil
+			return nil
 		}
 	}
 
@@ -56,5 +56,5 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) (bool, 
 		Message: "user does not have the required role",
 	})
 
-	return false, ErrAccessDenied
+	return ErrAccessDenied
 }

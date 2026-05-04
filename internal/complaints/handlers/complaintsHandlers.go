@@ -24,7 +24,7 @@ func GetComplaintsHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		_, err := u.CheckUserRole(s, user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner), string(ratingModels.RoleHelper))
+		err := u.CheckUserRole(s, user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner), string(ratingModels.RoleHelper))
 		if err != nil {
 			if errors.Is(err, u.ErrAccessDenied) || errors.Is(err, u.ErrUserNotFound) {
 				c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})

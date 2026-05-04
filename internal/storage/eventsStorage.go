@@ -13,6 +13,50 @@ import (
 	userModels "cspirt/internal/users/models"
 )
 
+func (s *Storage) ActivateDueEvents() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+
+	_, err := s.db.Exec(`
+		UPDATE events
+		SET Status = 'active'
+		WHERE Status IN ('scheduled', 'pending')
+		AND StartedAt <= ?
+	`, now)
+
+	return err
+}
+
+func (s *Storage) GetEventByID(eventID int) (*models.Event, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "get_event_by_id",
+		Message: "Getting event by ID",
+	})
+
+	row := s.db.QueryRow(`
+		SELECT Id, Title, Status, RatingReward, Description, CreatedAt, StartedAt, Players, Classes
+		FROM events
+		WHERE Id = ?
+	`, eventID)
+
+	return scanEvent(row)
+}
+
+func scanEvent(row *sql.Row) (*models.Event, error) {
+	event := &models.Event{}
+	err := row.Scan(&event.ID, &event.Title, &event.Status, &event.RatingReward, &event.Description, &event.CreatedAt, &event.StartedAt, &event.Players, &event.Classes)
+	if err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
 func (s *Storage) GetEvents() ([]models.Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

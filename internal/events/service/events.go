@@ -86,6 +86,23 @@ func (s *EventsService) AddEvent(event models.Event) error {
 	return nil
 }
 
+func (s *EventsService) GetEventsByEventID(eventID int) (*models.Event, error) {
+	event, err := s.events.GetEventByID(eventID)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_events_by_event",
+			Message: "failed to get event by ID: " + err.Error(),
+		})
+		return nil, err
+	}
+	if event == nil {
+		return nil, nil
+	}
+
+	return event, nil
+}
+
 func (s *EventsService) DeleteEvent(eventID int) error {
 	if err := s.events.DeleteEvent(eventID); err != nil {
 		logger.WriteSafe(logger.LogEntry{

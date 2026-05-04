@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,8 +31,19 @@ func GetClassTeachersHandler(s *storage.Storage) gin.HandlerFunc {
 func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input classModels.ClassInput
+		err := checkInputClass(input)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		if err := checkInputClass(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -46,6 +58,16 @@ func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 
 		c.JSON(http.StatusCreated, gin.H{"message": "Class added"})
 	}
+}
+
+func checkInputClass(input classModels.ClassInput) error {
+	if input.Name == "" {
+		return errors.New("class name is required")
+	}
+	if input.TeacherLogin == "" {
+		return errors.New("class teacher login is required")
+	}
+	return nil
 }
 
 func DeleteClassHandler(s *storage.Storage) gin.HandlerFunc {
@@ -73,6 +95,29 @@ func GetClassesHandler(s *storage.Storage) gin.HandlerFunc {
 		classes, err := classService.GetAllClasses()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve classes"})
+			return
+		}
+
+		classId := c.Query("class_id")
+		if classId != "" {
+			classIdInt, err := strconv.Atoi(classId)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Class ID format"})
+				return
+			}
+
+			var filteredClasses []classModels.Class
+			for _, class := range classes {
+				if class.ID == classIdInt {
+					filteredClasses = append(filteredClasses, class)
+					break
+				}
+			}
+			classes = filteredClasses
+		}
+
+		if len(classes) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No classes found"})
 			return
 		}
 

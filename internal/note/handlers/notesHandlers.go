@@ -24,7 +24,7 @@ func GetNotesHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		_, err := u.CheckUserRole(
+		err := u.CheckUserRole(
 			s,
 			user.Login,
 			string(ratingModels.RoleAdmin),

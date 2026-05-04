@@ -71,7 +71,7 @@ func (s *Storage) initEventsStorage() error {
 	CREATE TABLE IF NOT EXISTS events (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		Title TEXT NOT NULL,
-		Status TEXT NOT NULL,
+		Status TEXT NOT NULL DEFAULT 'scheduled',
 		RatingReward INTEGER NOT NULL DEFAULT 0,
 		Description TEXT NOT NULL,
 		CreatedAt TEXT NOT NULL,

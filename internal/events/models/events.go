@@ -13,3 +13,9 @@ type Event struct {
 	Players      []int     `json:"Players"`
 	Classes      []int     `json:"Classes"`
 }
+
+const (
+	EventStatusScheduled   = "scheduled"
+	EventStatusActive    = "active"
+	EventStatusCompleted = "completed"
+)
