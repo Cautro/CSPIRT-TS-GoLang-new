@@ -1,15 +1,13 @@
 import type {EventType} from "../entities/events/types/events_types.ts";
 import {format} from "date-fns";
 import {ru} from "date-fns/locale";
-import {useNavigate} from "react-router-dom";
 
 interface Props {
     item: EventType
+    onClick?: () => void
 }
 
-export function EventCard({ item }: Props) {
-    const navigate = useNavigate();
-
+export function EventCard({ item, onClick }: Props) {
     function getStatusLabel(status: string): string {
         if (!status.trim()) {
             return "Статус не указан";
@@ -35,11 +33,9 @@ export function EventCard({ item }: Props) {
             className="class-flat-card"
             type="button"
             onClick={() => {
-                navigate("/event", {
-                    state: {
-                        eventId: item.ID
-                    }
-                })
+                if (onClick) {
+                    void onClick();
+                }
             }}
         >
             <div className="class-flat-card__main">

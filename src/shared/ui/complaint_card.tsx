@@ -1,15 +1,15 @@
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type {ComplaintType} from "../entities/complaints/types/complaints_types.ts";
-import {useAuthStore} from "../../features/auth/store/auth_store.ts";
+import type {UserRole} from "../entities/user/types/user_types.ts";
 
 interface Props {
     item: ComplaintType;
     onDelete?: () => void;
+    role: UserRole;
 }
 
-export function ComplaintCard({ item, onDelete }: Props) {
-    const role = useAuthStore((state) => state.user?.User.Role);
+export function ComplaintCard({ item, onDelete, role }: Props) {
     const date = format(new Date(item.CreatedAt), 'd MMMM yyyy, HH:mm', { locale: ru });
 
     const canDelete =

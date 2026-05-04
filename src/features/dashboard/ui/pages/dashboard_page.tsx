@@ -170,7 +170,7 @@ export function DashboardPage() {
                 {!isLoading && !error && selectedList === "events" && events.length > 0 && (
                     <div className="class-list">
                         {events.map((item) => (
-                            <EventCard key={item.ID} item={item} />
+                            <EventCard key={item.ID} item={item} onClick={() => navigate(`/event/${item.ID}`)} />
                         ))}
                     </div>
                 )}

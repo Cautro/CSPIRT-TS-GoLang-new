@@ -80,7 +80,7 @@ export function ClassDashboard() {
                             Список учеников
                         </button>
 
-                        {role === "Admin" || role === "Owner" || role === "Helper" && (
+                        {(role === "Admin" || role === "Owner" || role === "Helper") && (
                             <button
                                 className={"btn btn--secondary"}
                                 type={"button"}
@@ -139,7 +139,7 @@ export function ClassDashboard() {
                 {selectedList === "users" ? users.length > 0 ? (
                     <div className={"class-list"}>
                         {users.map((user) => (
-                            <UserCard user={user} key={user.Id}/>
+                            <UserCard user={user} key={user.Id} onClick={() => navigate(`/user/${user.Id}`)}/>
                         ))}
                     </div>
                 ) : (
@@ -156,12 +156,12 @@ export function ClassDashboard() {
                 {selectedList === "notes" && notes.length > 0 ? (
                     <div className={"class-list"}>
                         {notes.map((note) => (
-                            <NoteCard item={note} key={note.ID} onDelete={() => {
-                                deleteNote(note.ID);
+                            <NoteCard item={note} key={note.ID} onDelete={async () => {
+                                await deleteNote(note.ID);
                                 if (classId !== null) {
                                     getNotes(classId);
                                 }
-                            }} />
+                            }} role={role ?? "User"} />
                         ))}
                     </div>
                 ) :(
@@ -181,7 +181,7 @@ export function ClassDashboard() {
                                 if (classId !== null) {
                                     getComplaints(classId);
                                 }
-                            }} />
+                            }} role={role ?? "User"} />
                         ))}
                     </div>
                 ) :(

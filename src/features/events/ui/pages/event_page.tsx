@@ -1,15 +1,11 @@
 import {useEffect, useState} from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import {useNavigate, useParams} from "react-router-dom";
 import { format, isValid, parse } from "date-fns";
 import { ru } from "date-fns/locale";
 
 import { useEventStore } from "../../store/event_store.ts";
 import { ClassCard } from "../../../../shared/ui/class_card.tsx";
 import {useAuthStore} from "../../../auth/store/auth_store.ts";
-
-interface EventPageState {
-    eventId?: number;
-}
 
 function getStatusLabel(status: string): string {
     if (!status.trim()) {
@@ -43,9 +39,8 @@ function formatStartedAt(value: string): string {
 
 export function EventPage() {
     const navigate = useNavigate();
-    const location = useLocation();
 
-    const { eventId } = (location.state ?? {}) as EventPageState;
+    const { id } = useParams<{id: string}>();
 
     const classes = useEventStore((state) => state.classes);
     const event = useEventStore((state) => state.event);
@@ -63,15 +58,15 @@ export function EventPage() {
     const isLoading = status === "loading";
 
     useEffect(() => {
-        if (!eventId) {
+        if (!id) {
             return;
         }
 
-        void getEvent(eventId);
+        void getEvent(Number(id));
         void getClasses();
-    }, [eventId, getClasses, getEvent]);
+    }, [id, getClasses, getEvent]);
 
-    if (!eventId) {
+    if (!id) {
         return (
             <main className="main">
                 <section className="page">
@@ -141,7 +136,7 @@ export function EventPage() {
                         </h2>
 
                         <p className="empty-state__text">
-                            Не удалось найти мероприятие с ID {eventId}.
+                            Не удалось найти мероприятие с ID {id}.
                         </p>
 
                         <button

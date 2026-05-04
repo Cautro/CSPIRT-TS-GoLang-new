@@ -49,7 +49,7 @@ export const router = createBrowserRouter([
         element: withBoundary(<UserPage />, "пользователя"),
       },
       {
-        path: "/event",
+        path: "/event/:id",
         element: withBoundary(<EventPage />, "мероприятия"),
       },
       {

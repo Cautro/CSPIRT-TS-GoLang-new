@@ -1,19 +1,20 @@
 import {UserRoles, type UserType} from "../entities/user/types/user_types.ts";
-import {useNavigate} from "react-router-dom";
 
 interface Props {
-    user: UserType
+    user: UserType,
+    onClick?: () => void,
 }
 
-export function UserCard({user}: Props) {
-    const navigate = useNavigate();
+export function UserCard({user, onClick}: Props) {
     
     return (
         <button
             className={"class-flat-card"}
             key={user.Id}
             onClick={() => {
-                navigate(`/user/${user.Id}`);
+                if (onClick) {
+                    void onClick();
+                }
             }}
         >
             

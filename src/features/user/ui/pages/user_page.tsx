@@ -418,6 +418,7 @@ export function UserPage() {
                                                 await deleteComplaint(item.ID);
                                                 await refreshUser();
                                             }}
+                                            role={currentRole ?? "User"}
                                         />
                                     ))}
                                 </div>
@@ -477,6 +478,7 @@ export function UserPage() {
                                                     await deleteNote(note.ID);
                                                     await refreshUser();
                                                 }}
+                                                role={currentRole}
                                             />
                                         ))}
                                     </div>
@@ -504,7 +506,7 @@ export function UserPage() {
                                     </h2>
 
                                     <p className="modal__description">
-                                        Это действие удалит пользователя "${user.User.Name} ${user.User.LastName}". Отменить удаление будет нельзя.
+                                        Это действие удалит пользователя '{user.User.Name} {user.User.LastName}'. Отменить удаление будет нельзя.
                                     </p>
                                 </div>
 
