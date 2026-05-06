@@ -10,6 +10,7 @@ import (
 	nHandlers "cspirt/internal/note/handlers"
 	rHandlers "cspirt/internal/rating/handler"
 	rs "cspirt/internal/rating/service"
+	sHandlers "cspirt/internal/schedule/handlers"
 	"cspirt/internal/storage"
 	uHandlers "cspirt/internal/users/handlers"
 	utils "cspirt/internal/utils"
@@ -108,6 +109,10 @@ func main() {
 		auth.GET("/event/:eventId/players", eHandlers.GetEventPlayersHandler(s))            // Получить игроков события
 		auth.GET("/event/:eventId/players/count", eHandlers.GetEventPlayersCountHandler(s)) // Получить количество игроков события
 		auth.PATCH("/event/:eventId/complete", eHandlers.EventComplete(s))                  // Завершить событие
+
+		// Schedules handlers
+		auth.GET("/schedules", sHandlers.GetSchedulesHandler(s))             // Получить расписание, с возможностью фильтрации по классу Query параметром
+		auth.PATCH("/schedules/update", sHandlers.UpdateSchedulesHandler(s)) // Обновить расписание
 	}
 
 	addr := os.Getenv("PORT")

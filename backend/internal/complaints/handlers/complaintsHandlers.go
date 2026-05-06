@@ -7,7 +7,7 @@ import (
 	"cspirt/internal/logger"
 	ratingModels "cspirt/internal/rating/models"
 	"cspirt/internal/storage"
-	userModels "cspirt/internal/users/models"
+	"cspirt/internal/utils"
 	u "cspirt/internal/utils"
 	"errors"
 
@@ -132,18 +132,7 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
-		needUser := &userModels.SafeUser{
-			ID:       user.ID,
-			Name:     user.Name,
-			LastName: user.LastName,
-			FullName: user.FullName,
-			Login:    user.Login,
-			Rating:   user.Rating,
-			Role:     user.Role,
-			Class:    user.Class,
-			ClassID:  user.ClassID,
-		}
-
+		needUser := utils.UserToSafeUser(*user)
 		if err := complaintService.AddNewComplaint(login, &in, needUser); err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return

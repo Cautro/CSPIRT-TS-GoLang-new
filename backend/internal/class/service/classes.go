@@ -6,7 +6,7 @@ import (
 	userModels "cspirt/internal/users/models"
 )
 
-type ClassService struct {
+type ClassService struct { 
 	classes repo.ClassRepository
 }
 

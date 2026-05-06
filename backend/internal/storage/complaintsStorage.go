@@ -7,6 +7,7 @@ import (
 	utils "cspirt/internal/utils"
 	"errors"
 	"strings"
+	"time"
 )
 
 func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, user userModels.SafeUser) error {
@@ -62,14 +63,16 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
+	CreateAt := time.Now()
+	
 	_, err = s.db.Exec(
 		query,
 		complaint.TargetID,
-		complaint.TargetName,
-		complaint.AuthorID,
-		complaint.AuthorName,
+		targetUser.Name,
+		user.ID,
+		user.Name,
 		complaint.Content,
-		complaint.CreatedAt,
+		CreateAt,
 	)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{

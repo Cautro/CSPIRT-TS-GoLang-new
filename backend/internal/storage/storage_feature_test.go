@@ -11,6 +11,7 @@ import (
 	eventModels "cspirt/internal/events/models"
 	ratingModels "cspirt/internal/rating/models"
 	ratingService "cspirt/internal/rating/service"
+	scheduleModels "cspirt/internal/schedule/models"
 	"cspirt/internal/storage"
 	userModels "cspirt/internal/users/models"
 	"cspirt/internal/utils"
@@ -454,6 +455,96 @@ func TestEventsFeature(t *testing.T) {
 	}
 	if len(events) != 0 {
 		t.Fatalf("expected events to be deleted, got %+v", events)
+	}
+}
+
+func TestSchedulesFeature(t *testing.T) {
+	st := newTestStorage(t)
+	helper := addTestUser(t, st, "helper", string(ratingModels.RoleHelper), "10A", 1000)
+
+	base, err := st.UpsertBaseSchedule(scheduleModels.BaseSchedule{
+		ClassID:      helper.ClassID,
+		DayOfWeek:    "monday",
+		LessonNumber: 1,
+		WeekType:     "all",
+		Subject:      "Math",
+		TeacherID:    helper.ID,
+		Room:         101,
+		StartTime:    "08:30",
+		EndTime:      "09:15",
+		Description:  "base lesson",
+	})
+	if err != nil {
+		t.Fatalf("upsert base schedule returned error: %v", err)
+	}
+	if base == nil || base.ID <= 0 {
+		t.Fatalf("base schedule was not saved: %+v", base)
+	}
+
+	result, err := st.GetSchedules(scheduleModels.ScheduleFilter{
+		ClassID: helper.ClassID,
+		Day:     "monday",
+	})
+	if err != nil {
+		t.Fatalf("get base schedules returned error: %v", err)
+	}
+	if len(result.Schedules) != 1 || result.Schedules[0].Subject != "Math" {
+		t.Fatalf("unexpected base schedules: %+v", result.Schedules)
+	}
+
+	_, err = st.UpsertPlannedSchedule(scheduleModels.PlannedSchedule{
+		BaseScheduleID: &base.ID,
+		ClassID:        helper.ClassID,
+		Date:           "2026-05-14",
+		LessonNumber:   1,
+		Subject:        "Biology",
+		ChangeType:     scheduleModels.ChangeReplace,
+		TeacherID:      helper.ID,
+		Room:           202,
+		StartTime:      "08:30",
+		EndTime:        "09:15",
+		Description:    "planned replacement",
+		Reason:         "holiday schedule",
+	})
+	if err != nil {
+		t.Fatalf("upsert planned schedule returned error: %v", err)
+	}
+
+	result, err = st.GetSchedules(scheduleModels.ScheduleFilter{
+		ClassID: helper.ClassID,
+		Day:     "monday",
+		Date:    "2026-05-14",
+	})
+	if err != nil {
+		t.Fatalf("get planned schedules returned error: %v", err)
+	}
+	if len(result.Schedules) != 1 || result.Schedules[0].Source != scheduleModels.ScheduleSourcePlanned || result.Schedules[0].Subject != "Biology" {
+		t.Fatalf("planned schedule was not applied: %+v", result.Schedules)
+	}
+
+	exception, err := st.UpsertScheduleException(scheduleModels.ScheduleException{
+		ScheduleID: &base.ID,
+		Date:       "2026-05-14",
+		ChangeType: scheduleModels.ChangeCancel,
+		Reason:     "lesson cancelled",
+	})
+	if err != nil {
+		t.Fatalf("upsert schedule exception returned error: %v", err)
+	}
+	if exception == nil || exception.ClassID != helper.ClassID {
+		t.Fatalf("exception class was not resolved from base schedule: %+v", exception)
+	}
+
+	result, err = st.GetSchedules(scheduleModels.ScheduleFilter{
+		ClassID: helper.ClassID,
+		Day:     "monday",
+		Date:    "2026-05-14",
+	})
+	if err != nil {
+		t.Fatalf("get exception schedules returned error: %v", err)
+	}
+	if len(result.Schedules) != 1 || !result.Schedules[0].IsCancelled || result.Schedules[0].Source != scheduleModels.ScheduleSourceException {
+		t.Fatalf("exception was not applied over planned schedule: %+v", result.Schedules)
 	}
 }
 

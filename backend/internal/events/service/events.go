@@ -78,7 +78,7 @@ func (s *EventsService) GetEventsByClassID(classID int) ([]models.Event, error) 
 func (s *EventsService) AddEvent(event models.Event) error {
 	event.Status = strings.ToLower(strings.TrimSpace(event.Status))
 	if event.Status == "" {
-		event.Status = "planned"
+		event.Status = "scheduled"
 	}
 
 	if event.CreatedAt.IsZero() {

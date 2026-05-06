@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
-)
+) 
 
 func (s *Storage) initClassStorage() error {
 	s.mu.Lock()
@@ -75,11 +75,43 @@ func (s *Storage) DeleteClassByID(classID int, login string) error {
 		return errors.New("only owners can delete classes")
 	}
 
-	_, err = s.db.Exec(`
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+		DELETE FROM users
+		WHERE ClassID = ?
+		AND LOWER(Role) IN ('user', 'helper');
+
+		UPDATE users
+		SET ClassID = NULL,
+			Class = ''
+		WHERE ClassID = ?;
+	`, classID)
+	if err != nil {
+		return err
+	}
+
+	res, err := tx.Exec(`
 		DELETE FROM classes
 		WHERE Id = ?
 	`, classID)
 	if err != nil {
+		return err
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return errors.New("class not found")
+	}
+
+	if err := tx.Commit(); err != nil {
 		return err
 	}
 

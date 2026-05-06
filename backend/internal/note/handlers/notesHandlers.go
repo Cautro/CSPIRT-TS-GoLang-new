@@ -111,6 +111,12 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
+		err := u.CheckUserRole(s, login, string(ratingModels.RoleHelper), string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
+		if err != nil {
+			c.JSON(500, gin.H{"error": "You dont have permisions for that action"})
+			return 
+		}
+
 		notes := sr.NewNoteService(s, s.Secret)
 		user, err := s.GetUserByLogin(login)
 		if err != nil {

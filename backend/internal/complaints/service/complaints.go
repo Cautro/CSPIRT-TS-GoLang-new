@@ -70,7 +70,6 @@ func (s *ComplaintService) AddNewComplaint(login string, in *complaintModels.Add
 	err := s.complaints.AddComplaint(login, userModels.Complaint{
 		ID:        in.ID,
 		TargetID:  in.TargetID,
-		AuthorID:  in.AuthorID,
 		Content:   in.Content,
 		CreatedAt: time.Now(),
 	}, *user)
