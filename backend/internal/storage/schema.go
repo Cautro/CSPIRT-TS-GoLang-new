@@ -27,10 +27,13 @@ func (s *Storage) initSchema() error {
 	if err := s.initBaseSchedulesStorage(); err != nil {
 		return err
 	}
-	if err := s.initExceptionsSchedulesStorage(); err != nil {
+	if err := s.initCurrentSchedulesStorage(); err != nil {
 		return err
 	}
 	if err := s.initPlannedSchedulesStorage(); err != nil {
+		return err
+	}
+	if err := s.ensureCurrentSchedulesSeeded(); err != nil {
 		return err
 	}
 	return nil
@@ -82,57 +85,49 @@ func (s *Storage) initBaseSchedulesStorage() error {
 	return nil
 }
 
-func (s *Storage) initExceptionsSchedulesStorage() error {
+func (s *Storage) initCurrentSchedulesStorage() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	query := `
-	CREATE TABLE IF NOT EXISTS exceptions_schedules (
+	CREATE TABLE IF NOT EXISTS current_schedules (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
-		ScheduleID INTEGER,
 		ClassID INTEGER NOT NULL,
-		Date TEXT NOT NULL,
-		ChangeType TEXT NOT NULL CHECK (
-			ChangeType IN (
-				'cancel', 'replace', 'move', 'room_change', 
-				'teacher_change', 'update', 'add', 'day_off', 
-				'short_day', 'swap'
-			)
-		),
-		NewSubject TEXT,
-		Scope TEXT NOT NULL DEFAULT 'lesson',
-		NewLessonNumber INTEGER,
-		NewTeacherID INTEGER,
-		NewRoom INTEGER,
-		NewStartTime TEXT,
-		NewEndTime TEXT,
-		NewDescription TEXT,
-		Reason TEXT NOT NULL DEFAULT '',
-		CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (ScheduleID) REFERENCES schedules(Id) ON DELETE CASCADE,
+		DayOfWeek TEXT NOT NULL,
+		LessonNumber INTEGER NOT NULL,
+		WeekType TEXT NOT NULL DEFAULT 'all',
+		Subject TEXT NOT NULL,
+		TeacherID INTEGER NOT NULL,
+		Room INTEGER NOT NULL,
+		StartTime TEXT NOT NULL,
+		EndTime TEXT NOT NULL,
+		Description TEXT NOT NULL DEFAULT '',
 		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE,
-		FOREIGN KEY (NewTeacherID) REFERENCES users(Id) ON DELETE SET NULL
+		FOREIGN KEY (TeacherID) REFERENCES users(Id) ON DELETE CASCADE
 	);`
 
 	if _, err := s.db.Exec(query); err != nil {
 		return err
 	}
-	if err := s.ensureColumn("exceptions_schedules", "ClassID", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+	if err := s.ensureColumn("current_schedules", "WeekType", "TEXT NOT NULL DEFAULT 'all'"); err != nil {
 		return err
 	}
-	if err := s.ensureColumn("exceptions_schedules", "NewDescription", "TEXT"); err != nil {
+	if err := s.ensureColumn("current_schedules", "Description", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
-	if err := s.ensureColumn("exceptions_schedules", "CreatedAt", "TEXT NOT NULL DEFAULT ''"); err != nil {
+	if _, err := s.db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_current_schedules_unique_lesson
+		ON current_schedules(ClassID, DayOfWeek, LessonNumber, WeekType);
+	`); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_exceptions_schedules_class_id ON exceptions_schedules(ClassID);`); err != nil {
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_current_schedules_class_id ON current_schedules(ClassID);`); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_exceptions_schedules_date ON exceptions_schedules(Date);`); err != nil {
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_current_schedules_teacher_id ON current_schedules(TeacherID);`); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_exceptions_schedules_schedule_id ON exceptions_schedules(ScheduleID);`); err != nil {
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_current_schedules_day ON current_schedules(DayOfWeek);`); err != nil {
 		return err
 	}
 
@@ -148,10 +143,12 @@ func (s *Storage) initPlannedSchedulesStorage() error {
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		BaseScheduleID INTEGER,
 		ClassID INTEGER NOT NULL,
-		Date TEXT NOT NULL,
+		Date TEXT NOT NULL DEFAULT '',
+		DayOfWeek TEXT NOT NULL DEFAULT '',
 		LessonNumber INTEGER NOT NULL,
+		WeekType TEXT NOT NULL DEFAULT 'all',
 		Subject TEXT NOT NULL,
-		ChangeType TEXT NOT NULL CHECK (
+		ChangeType TEXT NOT NULL DEFAULT 'update' CHECK (
 			ChangeType IN (
 				'cancel', 'replace', 'move', 'room_change', 
 				'teacher_change', 'update', 'add', 'day_off', 
@@ -174,16 +171,40 @@ func (s *Storage) initPlannedSchedulesStorage() error {
 	if _, err := s.db.Exec(query); err != nil {
 		return err
 	}
+	if err := s.ensureColumn("planned_schedules", "DayOfWeek", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("planned_schedules", "WeekType", "TEXT NOT NULL DEFAULT 'all'"); err != nil {
+		return err
+	}
 	if err := s.ensureColumn("planned_schedules", "Scope", "TEXT NOT NULL DEFAULT 'lesson'"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("planned_schedules", "Date", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("planned_schedules", "ChangeType", "TEXT NOT NULL DEFAULT 'update'"); err != nil {
 		return err
 	}
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_planned_schedules_class_id ON planned_schedules(ClassID);`); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_planned_schedules_date ON planned_schedules(Date);`); err != nil {
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_planned_schedules_teacher_id ON planned_schedules(TeacherID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_planned_schedules_day ON planned_schedules(DayOfWeek);`); err != nil {
 		return err
 	}
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_planned_schedules_base_id ON planned_schedules(BaseScheduleID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`
+		UPDATE planned_schedules
+		SET DayOfWeek = COALESCE((SELECT DayOfWeek FROM schedules WHERE schedules.Id = planned_schedules.BaseScheduleID), DayOfWeek),
+			WeekType = COALESCE((SELECT WeekType FROM schedules WHERE schedules.Id = planned_schedules.BaseScheduleID), WeekType)
+		WHERE TRIM(DayOfWeek) = ''
+			AND BaseScheduleID IS NOT NULL;
+	`); err != nil {
 		return err
 	}
 

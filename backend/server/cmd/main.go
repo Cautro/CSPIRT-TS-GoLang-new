@@ -111,6 +111,9 @@ func main() {
 		auth.PATCH("/event/:eventId/complete", eHandlers.EventComplete(s))                  // Завершить событие
 
 		// Schedules handlers
+		auth.GET("/schedules/teacher/current", sHandlers.GetTeacherCurrentScheduleHandler(s))
+		auth.PATCH("/schedules/rollover", sHandlers.RolloverSchedulesHandler(s))
+		auth.PATCH("/schedules/planned/reset", sHandlers.ResetPlannedSchedulesHandler(s))
 		auth.GET("/schedules", sHandlers.GetSchedulesHandler(s))             // Получить расписание, с возможностью фильтрации по классу Query параметром
 		auth.PATCH("/schedules/update", sHandlers.UpdateSchedulesHandler(s)) // Обновить расписание
 	}

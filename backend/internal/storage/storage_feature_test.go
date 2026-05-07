@@ -482,69 +482,105 @@ func TestSchedulesFeature(t *testing.T) {
 	}
 
 	result, err := st.GetSchedules(scheduleModels.ScheduleFilter{
+		Type:    scheduleModels.ScheduleTypeBase,
 		ClassID: helper.ClassID,
 		Day:     "monday",
 	})
 	if err != nil {
 		t.Fatalf("get base schedules returned error: %v", err)
 	}
-	if len(result.Schedules) != 1 || result.Schedules[0].Subject != "Math" {
-		t.Fatalf("unexpected base schedules: %+v", result.Schedules)
+	if len(result.Base) != 1 || result.Base[0].Subject != "Math" || result.Base[0].Teacher == nil {
+		t.Fatalf("unexpected base schedules: %+v", result.Base)
 	}
 
-	_, err = st.UpsertPlannedSchedule(scheduleModels.PlannedSchedule{
+	rollover, err := st.RolloverSchedules(helper.ClassID)
+	if err != nil {
+		t.Fatalf("rollover schedules from base returned error: %v", err)
+	}
+	if rollover.Source != scheduleModels.ScheduleTypeBase || rollover.CurrentCount != 1 {
+		t.Fatalf("unexpected base rollover result: %+v", rollover)
+	}
+
+	result, err = st.GetSchedules(scheduleModels.ScheduleFilter{
+		Type:    scheduleModels.ScheduleTypeCurrent,
+		ClassID: helper.ClassID,
+		Day:     "monday",
+	})
+	if err != nil {
+		t.Fatalf("get current schedules returned error: %v", err)
+	}
+	if len(result.Current) != 1 || result.Current[0].Subject != "Math" {
+		t.Fatalf("unexpected current schedules: %+v", result.Current)
+	}
+
+	reset, err := st.ResetPlannedSchedules(helper.ClassID)
+	if err != nil {
+		t.Fatalf("reset planned schedules returned error: %v", err)
+	}
+	if reset.PlannedCount != 1 {
+		t.Fatalf("unexpected planned reset result: %+v", reset)
+	}
+
+	planned, err := st.UpsertPlannedSchedule(scheduleModels.PlannedSchedule{
 		BaseScheduleID: &base.ID,
 		ClassID:        helper.ClassID,
-		Date:           "2026-05-14",
+		DayOfWeek:      "monday",
 		LessonNumber:   1,
+		WeekType:       "all",
 		Subject:        "Biology",
-		ChangeType:     scheduleModels.ChangeReplace,
 		TeacherID:      helper.ID,
 		Room:           202,
 		StartTime:      "08:30",
 		EndTime:        "09:15",
 		Description:    "planned replacement",
-		Reason:         "holiday schedule",
 	})
 	if err != nil {
 		t.Fatalf("upsert planned schedule returned error: %v", err)
 	}
+	if planned == nil || planned.ID <= 0 || planned.Subject != "Biology" {
+		t.Fatalf("planned schedule was not saved: %+v", planned)
+	}
 
 	result, err = st.GetSchedules(scheduleModels.ScheduleFilter{
+		Type:    scheduleModels.ScheduleTypePlanned,
 		ClassID: helper.ClassID,
 		Day:     "monday",
-		Date:    "2026-05-14",
 	})
 	if err != nil {
 		t.Fatalf("get planned schedules returned error: %v", err)
 	}
-	if len(result.Schedules) != 1 || result.Schedules[0].Source != scheduleModels.ScheduleSourcePlanned || result.Schedules[0].Subject != "Biology" {
-		t.Fatalf("planned schedule was not applied: %+v", result.Schedules)
+	if len(result.Planned) != 1 || result.Planned[0].Subject != "Biology" {
+		t.Fatalf("unexpected planned schedules: %+v", result.Planned)
 	}
 
-	exception, err := st.UpsertScheduleException(scheduleModels.ScheduleException{
-		ScheduleID: &base.ID,
-		Date:       "2026-05-14",
-		ChangeType: scheduleModels.ChangeCancel,
-		Reason:     "lesson cancelled",
-	})
+	rollover, err = st.RolloverSchedules(helper.ClassID)
 	if err != nil {
-		t.Fatalf("upsert schedule exception returned error: %v", err)
+		t.Fatalf("rollover schedules from planned returned error: %v", err)
 	}
-	if exception == nil || exception.ClassID != helper.ClassID {
-		t.Fatalf("exception class was not resolved from base schedule: %+v", exception)
+	if rollover.Source != scheduleModels.ScheduleTypePlanned || rollover.CurrentCount != 1 || rollover.PlannedCleared != 1 {
+		t.Fatalf("unexpected planned rollover result: %+v", rollover)
 	}
 
 	result, err = st.GetSchedules(scheduleModels.ScheduleFilter{
+		Type:    scheduleModels.ScheduleTypeCurrent,
 		ClassID: helper.ClassID,
 		Day:     "monday",
-		Date:    "2026-05-14",
 	})
 	if err != nil {
-		t.Fatalf("get exception schedules returned error: %v", err)
+		t.Fatalf("get current schedules after planned rollover returned error: %v", err)
 	}
-	if len(result.Schedules) != 1 || !result.Schedules[0].IsCancelled || result.Schedules[0].Source != scheduleModels.ScheduleSourceException {
-		t.Fatalf("exception was not applied over planned schedule: %+v", result.Schedules)
+	if len(result.Current) != 1 || result.Current[0].Subject != "Biology" || result.Current[0].Room != 202 {
+		t.Fatalf("planned schedule was not promoted to current: %+v", result.Current)
+	}
+
+	teacherLessons, err := st.GetCurrentScheduleForTeacher(helper.ID, scheduleModels.ScheduleFilter{
+		Day: "monday",
+	})
+	if err != nil {
+		t.Fatalf("get teacher current schedule returned error: %v", err)
+	}
+	if len(teacherLessons) != 1 || teacherLessons[0].ClassID != helper.ClassID || teacherLessons[0].Subject != "Biology" {
+		t.Fatalf("unexpected teacher current schedule: %+v", teacherLessons)
 	}
 }
 
