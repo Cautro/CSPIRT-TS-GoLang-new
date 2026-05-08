@@ -20,7 +20,7 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 
 
 	complaint.Content = strings.TrimSpace(complaint.Content)
-	if complaint.TargetID <= 0 || complaint.AuthorID <= 0 {
+	if complaint.TargetID <= 0 {
 		return errors.New("target and author are required")
 	}
 	if complaint.Content == "" {
@@ -47,7 +47,7 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 		Message: "adding new complaint",
 	})
 
-	if targetUser.Login == login {
+	if targetUser.Login == login { 
 		return errors.New("users cannot complain about themselves")
 	}
 	if complaint.TargetID == complaint.AuthorID {

@@ -1,434 +1,314 @@
 package handlers
 
 import (
-	"cspirt/internal/events/models"
-	sr "cspirt/internal/events/service"
-	"cspirt/internal/logger"
-	"cspirt/internal/storage"
-	"strconv"
-	"cspirt/internal/utils"
+	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"cspirt/internal/logger"
+	ratingModels "cspirt/internal/rating/models"
+	scheduleModels "cspirt/internal/schedule/models"
+	scheduleService "cspirt/internal/schedule/service"
+	"cspirt/internal/storage"
+	"cspirt/internal/utils"
 )
 
-func GetEventsHandler(s *storage.Storage) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
-		if err := s.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
-			return
-		}
-
-		eventService := sr.NewEventsService(s, s.Secret)
-		userIdStr := ctx.Query("user_id")
-		classIdStr := ctx.Query("class_id")
-		if classIdStr == "" {
-			classIdStr = ctx.Query("class")
-		}
-
-		if userIdStr != "" {
-			userID, err := strconv.Atoi(userIdStr)
-			if err != nil {
-				logger.WriteSafe(logger.LogEntry{
-					Level:   "info",
-					Action:  "get_events",
-					Login:   ctx.GetString("Login"),
-					Message: "invalid user id: " + err.Error(),
-				})
-				ctx.JSON(400, gin.H{"error": "Invalid user ID"})
-				return
-			}
-			events, err := eventService.GetEventsByUserID(userID)
-			if err != nil {
-				ctx.JSON(500, gin.H{"error": "Failed to get events"})
-				return
-			}
-			ctx.JSON(200, events)
-			return
-		}
-		if classIdStr != "" {
-			classID, err := strconv.Atoi(classIdStr)
-			if err != nil {
-				logger.WriteSafe(logger.LogEntry{
-					Level:   "info",
-					Action:  "get_events",
-					Login:   ctx.GetString("Login"),
-					Message: "invalid class id: " + err.Error(),
-				})
-				ctx.JSON(400, gin.H{"error": "Invalid class ID"})
-				return
-			}
-			events, err := eventService.GetEventsByClassID(classID)
-			if err != nil {
-				ctx.JSON(500, gin.H{"error": "Failed to get events"})
-				return
-			}
-			ctx.JSON(200, events)
-			return
-		}
-
-		eventId := ctx.Query("event_id")
-		if eventId != "" {
-			eventIdInt, err := strconv.Atoi(eventId)
-			if err != nil {
-				ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Event ID format"})
-				return
-			}
-
-			event, err := eventService.GetEventsByEventID(eventIdInt)
-			if err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event"})
-				return
-			}
-            
-            if event == nil {
-                ctx.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
-                return
-            }
-
-			ctx.JSON(http.StatusOK, event)
-			return 
-		}
-
-		events, err := eventService.GetEvents()
-		if err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to get events"})
-			return
-		}
-		ctx.JSON(200, events)
-	}
-}
-
-func AddEventHandler(s *storage.Storage) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
-		if err := s.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
-			return
-		}
-
-		err := utils.CheckUserRole(s, ctx.GetString("Login"), "owner")
-		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "add_event",
-				Login:   ctx.GetString("Login"),
-				Message: "failed to check user role: " + err.Error(),
-			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
-			return
-		}
-
-		eventService := sr.NewEventsService(s, s.Secret)
-		var event models.Event
-		if err := ctx.BindJSON(&event); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "add_event",
-				Login:   ctx.GetString("Login"),
-				Message: "invalid request body: " + err.Error(),
-			})
-			ctx.JSON(400, gin.H{"error": "Invalid request body"})
-			return
-		}
-
-		if err := eventService.AddEvent(event); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to add event"})
-			return
-		}
-
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_event",
-			Login:   ctx.GetString("Login"),
-			Message: "event added successfully",
-		})
-		ctx.JSON(200, gin.H{"message": "Event added successfully"})
-	}
-}
-
-func DeleteEventHandler(s *storage.Storage) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
-		if err := s.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
-			return
-		}
-
-		err := utils.CheckUserRole(s, ctx.GetString("Login"), "owner")
-		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "delete_event",
-				Login:   ctx.GetString("Login"),
-				Message: "failed to check user role: " + err.Error(),
-			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
-			return
-		}
-
-		eventService := sr.NewEventsService(s, s.Secret)
-		eventID, err := strconv.Atoi(ctx.Param("id"))
-		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "delete_event",
-				Login:   ctx.GetString("Login"),
-				Message: "invalid event id: " + err.Error(),
-			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
-			return
-		}
-
-		if err := eventService.DeleteEvent(eventID); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to delete event"})
-			return
-		}
-
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "info",
-			Action:  "delete_event",
-			Login:   ctx.GetString("Login"),
-			Message: "event deleted successfully",
-		})
-		ctx.JSON(200, gin.H{"message": "Event deleted successfully"})
-	}
-}
-
-func AddPlayersToEvent(s *storage.Storage) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
-		if err := s.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
-			return
-		}
-
-		err := utils.CheckUserRole(s, ctx.GetString("Login"), "owner")
-		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "add_event_players",
-				Login:   ctx.GetString("Login"),
-				Message: "failed to check user role: " + err.Error(),
-			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
-			return
-		}
-
-		eventService := sr.NewEventsService(s, s.Secret)
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
-		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "add_event_players",
-				Login:   ctx.GetString("Login"),
-				Message: "invalid event id: " + err.Error(),
-			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
-			return
-		}
-
-		var req struct {
-			PlayerIDs []int `json:"playerIds"`
-		}
-
-		if err := ctx.BindJSON(&req); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "add_event_players",
-				Login:   ctx.GetString("Login"),
-				Message: "invalid request body: " + err.Error(),
-			})
-			ctx.JSON(400, gin.H{"error": "Invalid request body"})
-			return
-		}
-
-		if err := eventService.AddPlayersToEvent(eventID, req.PlayerIDs); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to add players to event"})
-			return
-		}
-
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_event_players",
-			Login:   ctx.GetString("Login"),
-			Message: "players added to event successfully",
-		})
-		ctx.JSON(200, gin.H{"message": "Players added to event successfully"})
-	}
-}
-
-func DeletePlayersFromEvent(s *storage.Storage) func(ctx *gin.Context) {
+func GetSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := s.ActivateDueEvents(); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to activate due events"})
+		user, ok := utils.AuthenticatedUser(c, s, "get_schedules")
+		if !ok {
 			return
 		}
 
-		err := utils.CheckUserRole(s, c.GetString("Login"), "owner")
+		scheduleType, err := scheduleTypeFromQuery(c, true)
 		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "delete_event_players",
-				Login:   c.GetString("Login"),
-				Message: "failed to check user role: " + err.Error(),
-			})
-			c.JSON(500, gin.H{"error": "Failed to check user role"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule type"})
 			return
 		}
 
-		eventService := sr.NewEventsService(s, s.Secret)
-		eventID, err := strconv.Atoi(c.Param("eventId"))
+		classID, err := optionalIntQuery(c, "class_id", "classID", "class")
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
-				Action:  "delete_event_players",
-				Login:   c.GetString("Login"),
-				Message: "invalid event id: " + err.Error(),
+				Action:  "get_schedules",
+				Login:   user.Login,
+				Message: "invalid class id: " + err.Error(),
 			})
-			c.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
 			return
 		}
 
-		var req struct {
-			PlayerIDs []int `json:"playerIds"`
+		if classID <= 0 && !isTeacherScheduleViewer(user.Role) {
+			classID = user.ClassID
 		}
-		if err := c.BindJSON(&req); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "delete_event_players",
-				Login:   c.GetString("Login"),
-				Message: "invalid request body: " + err.Error(),
-			})
-			c.JSON(400, gin.H{"error": "Invalid request body"})
+		if scheduleType == scheduleModels.ScheduleTypeAll && classID <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Class ID is required for all schedule types"})
+			return
+		}
+		if classID > 0 {
+			class, err := s.GetClassByID(classID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
+				return
+			}
+			if class == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
+				return
+			}
+		}
+
+		if status, message := authorizeScheduleRead(user.Role, user.ClassID, classID, scheduleType); status != http.StatusOK {
+			c.JSON(status, gin.H{"error": message})
 			return
 		}
 
-		if err := eventService.DeletePlayersFromEvent(eventID, req.PlayerIDs); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to delete players from event"})
+		service := scheduleService.NewScheduleService(s, s.Secret)
+		result, err := service.GetSchedules(scheduleModels.ScheduleFilter{
+			Type:     scheduleType,
+			ClassID:  classID,
+			Day:      c.Query("day"),
+			WeekType: c.DefaultQuery("week_type", "all"),
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve schedules"})
 			return
 		}
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
-			Action:  "delete_event_players",
-			Login:   c.GetString("Login"),
-			Message: "players deleted from event successfully",
+			Action:  "get_schedules",
+			Login:   user.Login,
+			Role:    user.Role,
+			Class:   user.Class,
+			Message: "schedules retrieved",
 		})
-		c.JSON(200, gin.H{"message": "Players deleted from event successfully"})
+		c.JSON(http.StatusOK, result)
 	}
 }
 
-func GetEventPlayersHandler(s *storage.Storage) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
-		if err := s.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+func GetTeacherCurrentScheduleHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, ok := utils.AuthenticatedUser(c, s, "get_teacher_current_schedule")
+		if !ok {
+			return
+		}
+		if !isTeacherScheduleViewer(user.Role) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
 			return
 		}
 
-		eventService := sr.NewEventsService(s, s.Secret)
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		teacherID, err := optionalIntQuery(c, "teacher_id", "teacherID", "id")
 		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "get_event_players",
-				Login:   ctx.GetString("Login"),
-				Message: "invalid event id: " + err.Error(),
-			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher ID"})
+			return
+		}
+		if teacherID <= 0 {
+			teacherID = user.ID
+		}
+		if !isOwner(user.Role) && teacherID != user.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Teachers can retrieve only their own current schedule"})
 			return
 		}
 
-		players, err := eventService.GetEventPlayers(eventID)
+		service := scheduleService.NewScheduleService(s, s.Secret)
+		lessons, err := service.GetCurrentScheduleForTeacher(teacherID, scheduleModels.ScheduleFilter{
+			Day:      c.Query("day"),
+			WeekType: c.DefaultQuery("week_type", "all"),
+		})
 		if err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to get event players"})
+			status := http.StatusBadRequest
+			if strings.Contains(strings.ToLower(err.Error()), "failed") {
+				status = http.StatusInternalServerError
+			}
+			c.JSON(status, gin.H{"error": err.Error()})
 			return
 		}
 
-		ctx.JSON(200, players)
+		c.JSON(http.StatusOK, gin.H{"Schedules": lessons})
 	}
 }
 
-func GetEventPlayersCountHandler(s *storage.Storage) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
-		if err := s.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+func UpdateSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, ok := utils.AuthenticatedUser(c, s, "update_schedules")
+		if !ok {
+			return
+		}
+		if !canManageSchedules(user.Role) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
 			return
 		}
 
-		eventService := sr.NewEventsService(s, s.Secret)
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		var input scheduleModels.UpdateSchedulesInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "update_schedules",
+				Login:   user.Login,
+				Role:    user.Role,
+				Message: "invalid input: " + err.Error(),
+			})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+			return
+		}
+
+		service := scheduleService.NewScheduleService(s, s.Secret)
+		result, err := service.UpdateSchedules(input)
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
-				Action:  "get_event_players_count",
-				Login:   ctx.GetString("Login"),
-				Message: "invalid event id: " + err.Error(),
+				Action:  "update_schedules",
+				Login:   user.Login,
+				Role:    user.Role,
+				Class:   user.Class,
+				Message: "failed to update schedules: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
-			return
-		}
-
-		count, err := eventService.GetEventPlayersCount(eventID)
-		if err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to get event players count"})
-			return
-		}
-
-		ctx.JSON(200, gin.H{"count": count})
-	}
-}
-
-func EventComplete(s *storage.Storage) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
-
-		err := utils.CheckUserRole(s, ctx.GetString("Login"), "owner")
-		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "complete_event",
-				Login:   ctx.GetString("Login"),
-				Message: "failed to check user role: " + err.Error(),
-			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
-			return
-		}
-
-		eventService := sr.NewEventsService(s, s.Secret)
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
-		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "complete_event",
-				Login:   ctx.GetString("Login"),
-				Message: "invalid event id: " + err.Error(),
-			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
-			return
-		}
-
-		var req struct {
-			RatingReward int `json:"ratingReward"`
-		}
-		if err := ctx.BindJSON(&req); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "complete_event",
-				Login:   ctx.GetString("Login"),
-				Message: "invalid request body: " + err.Error(),
-			})
-			ctx.JSON(400, gin.H{"error": "Invalid request body"})
-			return
-		}
-
-		if err := eventService.EventComplete(eventID, req.RatingReward); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to complete event"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
-			Action:  "complete_event",
-			Login:   ctx.GetString("Login"),
-			Message: "event completed successfully",
+			Action:  "update_schedules",
+			Login:   user.Login,
+			Role:    user.Role,
+			Class:   user.Class,
+			Message: "schedules updated",
 		})
-		ctx.JSON(200, gin.H{"message": "Event completed successfully"})
+		c.JSON(http.StatusOK, result)
 	}
 }
+
+func RolloverSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, ok := utils.AuthenticatedUser(c, s, "rollover_schedules")
+		if !ok {
+			return
+		}
+		if !canManageSchedules(user.Role) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
+			return
+		}
+
+		classID, err := optionalIntQuery(c, "class_id", "classID", "class")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
+			return
+		}
+
+		service := scheduleService.NewScheduleService(s, s.Secret)
+		result, err := service.RolloverSchedules(classID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func ResetPlannedSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, ok := utils.AuthenticatedUser(c, s, "reset_planned_schedules")
+		if !ok {
+			return
+		}
+		if !canManageSchedules(user.Role) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
+			return
+		}
+
+		classID, err := optionalIntQuery(c, "class_id", "classID", "class")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid class ID"})
+			return
+		}
+
+		service := scheduleService.NewScheduleService(s, s.Secret)
+		result, err := service.ResetPlannedSchedules(classID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func optionalIntQuery(c *gin.Context, names ...string) (int, error) {
+	for _, name := range names {
+		value := strings.TrimSpace(c.Query(name))
+		if value == "" {
+			continue
+		}
+
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed <= 0 {
+			return 0, errors.New("invalid integer")
+		}
+		return parsed, nil
+	}
+
+	return 0, nil
+}
+
+func scheduleTypeFromQuery(c *gin.Context, allowAll bool) (string, error) {
+	value := strings.ToLower(strings.TrimSpace(c.Query("type")))
+	if value == "" {
+		value = strings.ToLower(strings.TrimSpace(c.Query("target")))
+	}
+	if value == "" {
+		value = scheduleModels.ScheduleTypeCurrent
+	}
+
+	switch value {
+	case scheduleModels.ScheduleTypeBase,
+		scheduleModels.ScheduleTypeCurrent,
+		scheduleModels.ScheduleTypePlanned:
+		return value, nil
+	case scheduleModels.ScheduleTypeAll:
+		if allowAll {
+			return value, nil
+		}
+	}
+
+	return "", errors.New("invalid schedule type")
+}
+
+func authorizeScheduleRead(role string, userClassID int, classID int, scheduleType string) (int, string) {
+	if isOwner(role) {
+		return http.StatusOK, ""
+	}
+
+	if scheduleType == scheduleModels.ScheduleTypeBase || scheduleType == scheduleModels.ScheduleTypeAll {
+		return http.StatusForbidden, "Only owner can view base schedule"
+	}
+
+	if isTeacherScheduleViewer(role) {
+		return http.StatusOK, ""
+	}
+
+	if scheduleType != scheduleModels.ScheduleTypeCurrent {
+		return http.StatusForbidden, "Students can view only current schedule"
+	}
+
+	return http.StatusOK, ""
+}
+
+func canManageSchedules(role string) bool {
+	return isOwner(role)
+}
+
+func isOwner(role string) bool {
+	return strings.EqualFold(role, string(ratingModels.RoleOwner))
+}
+
+func isTeacherScheduleViewer(role string) bool {
+	return strings.EqualFold(role, string(ratingModels.RoleHelper)) ||
+		strings.EqualFold(role, string(ratingModels.RoleAdmin)) ||
+		strings.EqualFold(role, string(ratingModels.RoleOwner))
+}
+
