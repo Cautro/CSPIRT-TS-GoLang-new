@@ -76,6 +76,7 @@ func main() {
 		auth.PATCH("/user/add", uHandlers.AddUserHandler(s))            // Добавление нового пользователя
 		auth.DELETE("/user/delete/:id", uHandlers.DeleteUserHandler(s)) // Удаление пользователя по ID
 		auth.GET("/me", uHandlers.GetMeHandler(s))                      // Получить информацию о текущем пользователе
+		auth.PATCH("/user/logout", uHandlers.LogoutHandler(s))			// Выход из аккаунта
 
 		// Class handlers
 		auth.GET("/classes", clHandlers.GetClassesHandler(s))                          // Получить все классы

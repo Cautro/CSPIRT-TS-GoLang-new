@@ -6,13 +6,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const AccessTokenTTL = 72 * time.Hour
+
 func GenerateToken(login, jwtSecret string) (string, error) {
 	now := time.Now()
 
 	claims := Claims{
 		Login: login,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(now.Add(72 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(AccessTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
 		},

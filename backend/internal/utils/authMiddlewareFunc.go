@@ -17,31 +17,18 @@ type Claims struct {
 
 func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		auth := c.GetHeader("Authorization")
-		if auth == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
+		tokenString, errMessage := accessTokenFromRequest(c)
+		if errMessage != "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": errMessage})
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "auth_middleware",
-				Message: "authorization header missing",
+				Message: strings.ToLower(errMessage),
 			})
 			c.Abort()
 			return
 		}
 
-		parts := strings.Fields(auth)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header"})
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "auth_middleware",
-				Message: "invalid authorization header",
-			})
-			c.Abort()
-			return
-		}
-
-		tokenString := parts[1]
 		claims := &Claims{}
 
 		tok, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
@@ -84,4 +71,23 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		c.Set("Login", claims.Login)
 		c.Next()
 	}
+}
+
+func accessTokenFromRequest(c *gin.Context) (string, string) {
+	auth := c.GetHeader("Authorization")
+	if auth != "" {
+		parts := strings.Fields(auth)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			return "", "Invalid Authorization header"
+		}
+
+		return parts[1], ""
+	}
+
+	tokenString, err := c.Cookie(AccessTokenCookieName)
+	if err != nil || strings.TrimSpace(tokenString) == "" {
+		return "", "Authorization header or access token cookie missing"
+	}
+
+	return tokenString, ""
 }

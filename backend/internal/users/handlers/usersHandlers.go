@@ -104,6 +104,55 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+func LogoutHandler(s *storage.Storage) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Имя куки зафиксируйте под то, которое вы используете при Login/Refresh
+        cookieName := "refresh_token" 
+
+        // Получаем токен из Cookie
+        token, err := c.Cookie(cookieName)
+        if err != nil {
+            // Если куки уже нет, значит пользователь и так не авторизован
+            logger.WriteSafe(logger.LogEntry{
+                Level:   "info",
+                Action:  "logout", 
+                Message: "cookie not found or already deleted",
+            })
+            c.JSON(http.StatusBadRequest, gin.H{"error": "No active session found"})
+            return
+        }
+
+        // Удаляем токен из базы данных SQLite
+        if err := s.DeleteRefreshToken(token); err != nil {
+            logger.WriteSafe(logger.LogEntry{
+                Level:   "error",
+                Action:  "logout",
+                Message: "failed to delete token from db: " + err.Error(),
+            })
+            // Продолжаем дальше, чтобы в любом случае сбросить куку у пользователя
+        }
+
+        // Затираем HttpOnly куку в браузере клиента
+        c.SetCookie(
+            cookieName, 
+            "", 
+            -1, 
+            "/", 
+            "",    // Укажите ваш домен, если проверяете не на localhost (например, "example.com")
+            false, // true, если используете HTTPS (в продакшене обязательно true)
+            true,  // httpOnly = true
+        )
+
+        logger.WriteSafe(logger.LogEntry{
+            Level:   "info",
+            Action:  "logout",
+            Message: "user logged out successfully",
+        })
+
+        c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+    }
+}
+
 func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
