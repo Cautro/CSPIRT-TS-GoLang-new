@@ -106,6 +106,61 @@ func (s *EventsService) AddEvent(event models.Event) error {
 	return nil
 }
 
+func (s *EventsService) GetEventParams(eventID int) (*models.EventParams, error) {
+	if eventID <= 0 {
+		return nil, errors.New("invalid event id")
+	}
+
+	return s.events.GetEventParams(eventID)
+}
+
+func (s *EventsService) AddEventParams(EventId int, params *models.EventParams) error {
+	if EventId <= 0 {
+		return errors.New("invalid event id")
+	}
+	if params == nil {
+		return errors.New("invalid event params")
+	}
+
+	if err := s.events.AddEventParams(EventId, params); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_params",
+			Message: "failed to add event params: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "add_event_params",
+		Message: "event params added",
+	})
+	return nil
+}
+
+func (s *EventsService) DeleteEventParams(eventID int) error {
+	if eventID <= 0 {
+		return errors.New("invalid event id")
+	}
+
+	if err := s.events.DeleteEventParams(eventID); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_params",
+			Message: "failed to delete event params: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "delete_event_params",
+		Message: "event params deleted",
+	})
+	return nil
+}
+
 func (s *EventsService) GetEventsByEventID(eventID int) (*models.Event, error) {
 	if eventID <= 0 {
 		return nil, errors.New("invalid event id")

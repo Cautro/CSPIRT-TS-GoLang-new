@@ -368,7 +368,7 @@ func TestEventsFeature(t *testing.T) {
 		StartedAt:    "2026-05-03T10:00:00Z",
 		Players:      []int{helper.ID},
 		Classes:      []int{helper.ClassID, other.ClassID},
-		RatingReward: 100,
+		BaseRatingReward: 100,
 	}); err != nil {
 		t.Fatalf("add event returned error: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestEventsFeature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get events after complete returned error: %v", err)
 	}
-	if events[0].Status != "completed" || events[0].RatingReward != 100 {
+	if events[0].Status != "completed" || events[0].BaseRatingReward != 100 {
 		t.Fatalf("event was not completed correctly: %+v", events[0])
 	}
 

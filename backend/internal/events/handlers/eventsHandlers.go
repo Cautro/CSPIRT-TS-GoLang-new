@@ -146,6 +146,122 @@ func AddEventHandler(s *storage.Storage) func(ctx *gin.Context) {
 	}
 }
 
+func GetEventParamsHandler(s *storage.Storage) func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
+		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		if err != nil {
+			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			return
+		}
+
+		params, err := s.GetEventParams(eventID)
+		if err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to get event params"})
+			return
+		}
+
+		ctx.JSON(200, params)
+	}
+}
+
+func AddEventParams(s *storage.Storage) func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
+		if err := s.ActivateDueEvents(); err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			return
+		}
+
+		err := utils.CheckUserRole(s, ctx.GetString("Login"), "owner")
+		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "add_event_params",
+				Login:   ctx.GetString("Login"),
+				Message: "failed to check user role: " + err.Error(),
+			})
+			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
+			return
+		}
+
+		eventService := sr.NewEventsService(s, s.Secret)
+		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "add_event_params",
+				Login:   ctx.GetString("Login"),
+				Message: "invalid event id: " + err.Error(),
+			})
+			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			return
+		}
+
+		var params models.EventParams
+		if err := ctx.BindJSON(&params); err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "add_event_params",
+				Login:   ctx.GetString("Login"),
+				Message: "invalid request body: " + err.Error(),
+			})
+			ctx.JSON(400, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		if err := eventService.AddEventParams(eventID, &params); err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to add event params"})
+			return
+		}
+	}
+}
+
+func DeleteEventParamsHandler(s *storage.Storage) func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
+		if err := s.ActivateDueEvents(); err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			return
+		}
+
+		err := utils.CheckUserRole(s, ctx.GetString("Login"), "owner")
+		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "delete_event_params",
+				Login:   ctx.GetString("Login"),
+				Message: "failed to check user role: " + err.Error(),
+			})
+			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
+			return
+		}
+
+		eventService := sr.NewEventsService(s, s.Secret)
+		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "delete_event_params",
+				Login:   ctx.GetString("Login"),
+				Message: "invalid event id: " + err.Error(),
+			})
+			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			return
+		}
+
+		if err := eventService.DeleteEventParams(eventID); err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to delete event params"})
+			return
+		}
+
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "delete_event_params",
+			Login:   ctx.GetString("Login"),
+			Message: "event params deleted successfully",
+		})
+		ctx.JSON(200, gin.H{"message": "Event params deleted successfully"})
+	}
+}
+
 func DeleteEventHandler(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {

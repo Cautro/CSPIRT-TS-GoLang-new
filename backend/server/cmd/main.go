@@ -110,6 +110,9 @@ func main() {
 		auth.GET("/event/:eventId/players", eHandlers.GetEventPlayersHandler(s))            // Получить игроков события
 		auth.GET("/event/:eventId/players/count", eHandlers.GetEventPlayersCountHandler(s)) // Получить количество игроков события
 		auth.PATCH("/event/:eventId/complete", eHandlers.EventComplete(s))                  // Завершить событие
+		auth.PATCH("/event/:eventId/params/add", eHandlers.AddEventParams(s))               // Добавить параметры к событию
+		auth.GET("/event/:eventId/params", eHandlers.GetEventParamsHandler(s))              // Получить параметры события
+		auth.DELETE("/event/:eventId/params/delete", eHandlers.DeleteEventParamsHandler(s)) // Удалить параметры события
 
 		// Schedules handlers
 		auth.GET("/schedules/teacher/current", sHandlers.GetTeacherCurrentScheduleHandler(s))

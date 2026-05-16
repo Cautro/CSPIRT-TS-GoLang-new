@@ -24,6 +24,9 @@ func (s *Storage) initSchema() error {
 	if err := s.initEventsStorage(); err != nil {
 		return err
 	}
+	if err := s.initParamsForEventsStorage(); err != nil {
+		return err
+	}
 	if err := s.initBaseSchedulesStorage(); err != nil {
 		return err
 	}
@@ -302,6 +305,34 @@ func (s *Storage) initEventsStorage() error {
 		return err
 	}
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_classes_class_id ON event_classes(class_id);`); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Storage) initParamsForEventsStorage() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `
+	CREATE TABLE IF NOT EXISTS event_params (
+	Id INTEGER PRIMARY KEY AUTOINCREMENT,
+	EventID INTEGER NOT NULL,
+	ClassID INTEGER NOT NULL,
+	ExtraRating INTEGER NOT NULL DEFAULT 0,
+	Reason TEXT NOT NULL DEFAULT '',
+	FOREIGN KEY (EventID) REFERENCES events(Id) ON DELETE CASCADE,
+	FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE
+	);`
+	
+	if _, err := s.db.Exec(query); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_params_event_id ON event_params(EventID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_params_class_id ON event_params(ClassID);`); err != nil {
 		return err
 	}
 

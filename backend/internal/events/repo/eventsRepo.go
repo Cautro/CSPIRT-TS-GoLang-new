@@ -17,4 +17,7 @@ type EventsRepository interface {
 	GetEventPlayers(eventID int) ([]userModels.SafeUser, error)
 	GetEventPlayersCount(eventID int) (int, error)
 	EventComplete(eventID int, ratingReward int) error
+	AddEventParams(eventID int, params *eventModels.EventParams) error
+	GetEventParams(eventID int) (*eventModels.EventParams, error)
+	DeleteEventParams(eventID int) error
 }

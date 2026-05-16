@@ -44,7 +44,7 @@ func TestAddEventHandlerAddsEvent(t *testing.T) {
 		StartedAt:    "2999-01-01 10:00:00",
 		Players:      []int{users.Student.ID},
 		Classes:      []int{users.Student.ClassID},
-		RatingReward: 100,
+		BaseRatingReward: 100,
 	}
 	recorder := handlertest.Perform(router, handlertest.JSONRequest(t, http.MethodPatch, "/api/event/add", body))
 
@@ -210,7 +210,7 @@ func seedEvent(t *testing.T, st *storage.Storage, players []int, classes []int) 
 		StartedAt:    "2999-01-01 10:00:00",
 		Players:      players,
 		Classes:      classes,
-		RatingReward: 50,
+		BaseRatingReward: 50,
 	}); err != nil {
 		t.Fatalf("seed event returned error: %v", err)
 	}

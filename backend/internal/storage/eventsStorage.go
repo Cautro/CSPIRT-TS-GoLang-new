@@ -62,7 +62,7 @@ func (s *Storage) GetEventsByID(eventID int) (*models.Event, error) {
 
 func scanEvent(row *sql.Row) (*models.Event, error) {
 	event := &models.Event{}
-	err := row.Scan(&event.ID, &event.Title, &event.Status, &event.RatingReward, &event.Description, &event.CreatedAt, &event.StartedAt, &event.Players, &event.Classes)
+	err := row.Scan(&event.ID, &event.Title, &event.Status, &event.BaseRatingReward, &event.Description, &event.CreatedAt, &event.StartedAt, &event.Players, &event.Classes)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (s *Storage) AddEvent(event models.Event) error {
 	result, err := tx.Exec(`
 		INSERT INTO events (Title, Status, RatingReward, Description, CreatedAt, StartedAt, Players, Classes)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, event.Title, event.Status, event.RatingReward, event.Description, createdAt, event.StartedAt, playersJSON, classesJSON)
+	`, event.Title, event.Status, event.BaseRatingReward, event.Description, createdAt, event.StartedAt, playersJSON, classesJSON)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -211,6 +211,128 @@ func (s *Storage) AddEvent(event models.Event) error {
 		Level:   "info",
 		Action:  "add_event",
 		Message: "event inserted",
+	})
+	return nil
+}
+
+func (s *Storage) GetEventParams(eventID int) (*models.EventParams, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if eventID <= 0 {
+		return nil, errors.New("invalid event id")
+	}
+
+	var params models.EventParams
+	if err := s.db.QueryRow(`
+		SELECT EventID, ExtraRatingReward, Reason, ClassID
+		FROM event_params
+		WHERE EventID = ?
+	`, eventID).Scan(&params.EventID, &params.ExtraRatingReward, &params.Reason, &params.ClassID); err != nil {
+		return nil, err
+	}
+
+	return &params, nil
+}
+
+func (s *Storage) DeleteEventParams(eventID int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if eventID <= 0 {
+		return errors.New("invalid event id")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_params",
+			Message: "failed to start transaction: " + err.Error(),
+		})
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+		DELETE FROM event_params ExtraRatingReward, Reason
+		WHERE EventID = ?
+	`, eventID)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_params",
+			Message: "failed to delete event params: " + err.Error(),
+		})
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "delete_event_params",
+			Message: "failed to commit event params deletion: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "delete_event_params",
+		Message: "event params deleted",
+	})
+	return nil
+}
+
+func (s *Storage) AddEventParams(eventID int, params *models.EventParams) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if eventID <= 0 {
+		return errors.New("invalid event id")
+	}
+
+	if params == nil {
+		return errors.New("invalid event params")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_params",
+			Message: "failed to start transaction: " + err.Error(),
+		})
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+		INSERT INTO event_params (EventID, ExtraRatingReward, Reason, ClassID)
+		VALUES (?, ?, ?, ?)
+	`, eventID, params.ExtraRatingReward, params.Reason, params.ClassID)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_params",
+			Message: "failed to insert event params: " + err.Error(),
+		})
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "add_event_params",
+			Message: "failed to commit event params: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "add_event_params",
+		Message: "event params inserted",
 	})
 	return nil
 }
@@ -306,11 +428,6 @@ func (s *Storage) EventComplete(eventID int, ratingReward int) error {
 		WHERE Id = ? AND Status != 'completed'
 	`, ratingReward, eventID)
 	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "complete_event",
-			Message: "failed to update event status: " + err.Error(),
-		})
 		return err
 	}
 
@@ -319,77 +436,72 @@ func (s *Storage) EventComplete(eventID int, ratingReward int) error {
 		return err
 	}
 	if affected == 0 {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "info",
-			Action:  "complete_event",
-			Message: "event not found or already completed",
-		})
 		return errors.New("event not found or already completed")
 	}
 
-	rows, err := tx.Query(`
-		SELECT player_id
-		FROM event_players
-		WHERE event_id = ?
-	`, eventID)
-	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "complete_event",
-			Message: "failed to query event players: " + err.Error(),
-		})
-		return err
-	}
-
-	players := make([]int, 0)
-
-	for rows.Next() {
-		var playerID int
-		if err := rows.Scan(&playerID); err != nil {
+	for _, classID := range classIDs {
+		var totalClassStudents int
+		err = tx.QueryRow(`
+			SELECT COUNT(Id) 
+			FROM users 
+			WHERE classID = ?
+		`, classID).Scan(&totalClassStudents)
+		if err != nil {
 			return err
 		}
-		players = append(players, playerID)
-	}
 
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
+		if totalClassStudents == 0 {
+			continue 
+		}
 
-	for _, playerID := range players {
-		if _, err := tx.Exec(`
-			UPDATE users
-			SET Rating = MAX(0, MIN(5000, Rating + ?))
-			WHERE Id = ?
-		`, ratingReward, playerID); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "complete_event",
-				Message: "failed to update player rating: " + err.Error(),
-			})
+		classTotalReward := ratingReward * totalClassStudents
+
+		rows, err := tx.Query(`
+			SELECT ep.player_id 
+			FROM event_players ep
+			JOIN users u ON ep.player_id = u.Id
+			WHERE ep.event_id = ? AND u.classID = ?
+		`, eventID, classID)
+		if err != nil {
 			return err
+		}
+
+		var participantIDs []int
+		for rows.Next() {
+			var pID int
+			if err := rows.Scan(&pID); err != nil {
+				rows.Close()
+				return err
+			}
+			participantIDs = append(participantIDs, pID)
+		}
+		rows.Close()
+
+		participantsCount := len(participantIDs)
+		if participantsCount == 0 {
+			continue
+		}
+
+		finalRewardPerPlayer := classTotalReward / participantsCount
+
+		for _, playerID := range participantIDs {
+			_, err := tx.Exec(`
+				UPDATE users
+				SET Rating = MAX(0, MIN(5000, Rating + ?))
+				WHERE Id = ?
+			`, finalRewardPerPlayer, playerID)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "complete_event",
-			Message: "failed to commit event completion: " + err.Error(),
-		})
 		return err
 	}
 
 	for _, classID := range classIDs {
 		if err := s.syncClassByIDLocked(classID); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "complete_event",
-				Message: "failed to sync class rating: " + err.Error(),
-			})
 			return err
 		}
 	}
@@ -846,7 +958,7 @@ func scanEvents(rows *sql.Rows) ([]models.Event, error) {
 			&event.ID,
 			&event.Title,
 			&event.Status,
-			&event.RatingReward,
+			&event.BaseRatingReward,
 			&event.Description,
 			&createdAt,
 			&event.StartedAt,
