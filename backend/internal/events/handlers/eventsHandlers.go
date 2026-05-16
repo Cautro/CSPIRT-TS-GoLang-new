@@ -522,6 +522,7 @@ func EventComplete(s *storage.Storage) func(ctx *gin.Context) {
 
 		var req struct {
 			RatingReward int `json:"ratingReward"`
+			ClassReward  int `json:"classReward"`
 		}
 		if err := ctx.BindJSON(&req); err != nil {
 			logger.WriteSafe(logger.LogEntry{
@@ -534,7 +535,7 @@ func EventComplete(s *storage.Storage) func(ctx *gin.Context) {
 			return
 		}
 
-		if err := eventService.EventComplete(eventID, req.RatingReward); err != nil {
+		if err := eventService.EventComplete(eventID, req.RatingReward, req.ClassReward); err != nil {
 			ctx.JSON(500, gin.H{"error": "Failed to complete event"})
 			return
 		}

@@ -255,8 +255,10 @@ func (s *Storage) DeleteEventParams(eventID int) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`
-		DELETE FROM event_params ExtraRatingReward, Reason
-		WHERE EventID = ?
+		UPDATE event_params
+		SET ExtraRatingReward = 0,
+			Reason = '',
+		WHERE EventID = ?;
 	`, eventID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -387,7 +389,7 @@ func (s *Storage) GetEventPlayersCount(eventID int) (int, error) {
 	return len(players), nil
 }
 
-func (s *Storage) EventComplete(eventID int, ratingReward int) error {
+func (s *Storage) EventComplete(eventID int, ratingReward int, classReward int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -493,6 +495,15 @@ func (s *Storage) EventComplete(eventID int, ratingReward int) error {
 			if err != nil {
 				return err
 			}
+		}
+
+		_, err = tx.Exec(`
+			UPDATE classes
+			SET ClassTotalRating = ClassTotalRating + ?
+			WHERE Id = ?
+		`, classReward, classID)
+		if err != nil {
+			return err
 		}
 	}
 

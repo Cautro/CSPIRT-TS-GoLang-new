@@ -254,8 +254,8 @@ func (s *EventsService) GetEventPlayersCount(eventID int) (int, error) {
 	return count, nil
 }
 
-func (s *EventsService) EventComplete(eventID int, ratingReward int) error {
-	if err := s.events.EventComplete(eventID, ratingReward); err != nil {
+func (s *EventsService) EventComplete(eventID int, ratingReward int, classReward int) error {
+	if err := s.events.EventComplete(eventID, ratingReward, classReward); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "complete_event",

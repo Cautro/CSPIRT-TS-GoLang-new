@@ -119,8 +119,11 @@ func TestUsersAndClassesFeature(t *testing.T) {
 	if class.Name != "10A" {
 		t.Fatalf("class name was not normalized: %q", class.Name)
 	}
-	if class.TotalRating != 400 {
-		t.Fatalf("expected class average rating 400, got %d", class.TotalRating)
+	if class.UserTotalRating != 400 {
+		t.Fatalf("expected class average rating 400, got %d", class.UserTotalRating)
+	}
+	if class.ClassTotalRating != 800 {
+		t.Fatalf("expected class total rating 800, got %d", class.ClassTotalRating)
 	}
 	if len(class.Members) != 2 {
 		t.Fatalf("expected class members to be synced, got %d", len(class.Members))
@@ -428,7 +431,7 @@ func TestEventsFeature(t *testing.T) {
 		t.Fatalf("expected helper events to be empty after removal, got %+v", helperEvents)
 	}
 
-	if err := st.EventComplete(events[0].ID, 100); err != nil {
+	if err := st.EventComplete(events[0].ID, 100, 200); err != nil {
 		t.Fatalf("complete event returned error: %v", err)
 	}
 	student, err = st.GetUserByLogin(student.Login)

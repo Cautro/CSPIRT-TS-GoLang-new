@@ -22,7 +22,8 @@ func (s *Storage) initClassStorage() error {
 		Name TEXT NOT NULL UNIQUE,
 		TeacherLogin TEXT,
 		Members TEXT NOT NULL DEFAULT '[]',
-		TotalRating INTEGER NOT NULL DEFAULT 0,
+		UserTotalRating INTEGER NOT NULL DEFAULT 0,
+		ClassTotalRating INTEGER NOT NULL DEFAULT 0,
 		FOREIGN KEY (TeacherLogin) REFERENCES users(Login) ON DELETE SET NULL
 	);`
 
@@ -87,7 +88,7 @@ func (s *Storage) DeleteClassByID(classID int, login string) error {
 		AND LOWER(Role) IN ('user', 'helper');
 
 		UPDATE users
-		SET ClassID = NULL,
+		SET ClassID = 0,
 			Class = ''
 		WHERE ClassID = ?;
 	`, classID)
@@ -263,7 +264,7 @@ func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 	defer s.mu.Unlock()
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, TeacherLogin, Members, TotalRating
+		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating
 		FROM classes
 		ORDER BY Name
 	`)
@@ -500,14 +501,14 @@ func (s *Storage) syncClassByIDLocked(classID int) error {
 		return err
 	}
 
-	totalRating := 0
+	userTotalRating := 0
 
 	if len(members) > 0 {
 		for _, member := range members {
-			totalRating += member.Rating
+			userTotalRating += member.Rating
 		}
 
-		totalRating = totalRating / len(members)
+		userTotalRating = userTotalRating / len(members)
 	}
 
 	membersJSON, err := json.Marshal(members)
@@ -550,9 +551,19 @@ func (s *Storage) syncClassByIDLocked(classID int) error {
 
 	_, err = s.db.Exec(`
 		UPDATE classes
-		SET Members = ?, TotalRating = ?, TeacherLogin = ?
+		SET Members = ?, UserTotalRating = ?, TeacherLogin = ?
 		WHERE Id = ?
-	`, string(membersJSON), totalRating, teacherLogin, classID)
+	`, string(membersJSON), userTotalRating, teacherLogin, classID)
+	return err
+}
+
+func (s *Storage) AddClassRating(classID int, points int) error {
+	_, err := s.db.Exec(`
+		UPDATE classes
+		SET ClassTotalRating = ClassTotalRating + ?
+		WHERE Id = ?
+	`, points, classID)
+
 	return err
 }
 
@@ -584,7 +595,7 @@ func (s *Storage) classExistsLocked(name string) (bool, error) {
 
 func (s *Storage) getClassByNameLocked(name string) (*classModels.Class, error) {
 	row := s.db.QueryRow(`
-		SELECT Id, Name, TeacherLogin, Members, TotalRating
+		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating
 		FROM classes
 		WHERE Name = ?
 	`, name)
@@ -602,7 +613,7 @@ func (s *Storage) getClassByNameLocked(name string) (*classModels.Class, error) 
 
 func (s *Storage) getClassByIDLocked(id int) (*classModels.Class, error) {
 	row := s.db.QueryRow(`
-		SELECT Id, Name, TeacherLogin, Members, TotalRating
+		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating
 		FROM classes
 		WHERE Id = ?
 	`, id)
@@ -660,7 +671,8 @@ func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool)
 		&class.Name,
 		&teacherLogin,
 		&membersJSON,
-		&class.TotalRating,
+		&class.UserTotalRating,
+		&class.ClassTotalRating,
 	); err != nil {
 		return classModels.Class{}, err
 	}

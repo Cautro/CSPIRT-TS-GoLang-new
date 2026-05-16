@@ -8,7 +8,8 @@ type Class struct {
 	TeacherLogin string     `json:"TeacherLogin,omitempty"`
 	Teacher      *models.SafeUser  `json:"Teacher,omitempty"` 
 	Members      []models.SafeUser `json:"Members"`
-	TotalRating  int        `json:"TotalRating"`
+	UserTotalRating  int        `json:"UserTotalRating"`
+	ClassTotalRating  int        `json:"ClassTotalRating"`
 }
 
 type ClassTeacherInput struct {
