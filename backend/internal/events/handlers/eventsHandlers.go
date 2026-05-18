@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"cspirt/internal/utils"
 	"net/http"
+	"database/sql"
 	"errors"
 
 	"github.com/gin-gonic/gin"
