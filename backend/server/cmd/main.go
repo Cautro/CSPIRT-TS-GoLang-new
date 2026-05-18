@@ -1,29 +1,18 @@
 package main
 
 import (
-	aHandlers "cspirt/internal/auth/handlers"
-	clHandlers "cspirt/internal/class/handlers"
-	cmHandlers "cspirt/internal/complaints/handlers"
-	eHandlers "cspirt/internal/events/handlers"
-	hHandlers "cspirt/internal/health/handlers"
+	"cspirt/internal/app"
 	"cspirt/internal/logger"
-	nHandlers "cspirt/internal/note/handlers"
-	rHandlers "cspirt/internal/rating/handler"
-	rs "cspirt/internal/rating/service"
-	sHandlers "cspirt/internal/schedule/handlers"
 	"cspirt/internal/storage"
-	uHandlers "cspirt/internal/users/handlers"
-	utils "cspirt/internal/utils"
 	"log/slog"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		slog.Error("No .env file found")
+		slog.Info("No .env file found")
 	}
 	defer func() {
 		if err := logger.Sync(); err != nil {
@@ -37,97 +26,38 @@ func main() {
 		return
 	}
 
-	if _, err := os.Stat("data"); os.IsNotExist(err) {
-		if err := os.Mkdir("data", 0o755); err != nil {
-			slog.Error("create data dir", "error", err)
-		}
+	if err := os.MkdirAll("data", 0o755); err != nil {
+		slog.Error("create data dir", "error", err)
+		return
 	}
 
-	DB_PATH := os.Getenv("DB_PATH")
-	if DB_PATH == "" {
-		DB_PATH = "data/storage.db"
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "data/storage.db"
 	}
 
-	s, err := storage.NewUserStorage(DB_PATH, jwtSecret)
+	store, err := storage.NewUserStorage(dbPath, jwtSecret)
 	if err != nil {
 		slog.Error("open sqlite storage", "error", err)
 		return
 	}
-	defer s.Close()
+	defer store.Close()
 
 	if os.Getenv("SEED_TEST_USERS") == "1" {
-		if err := s.SeedTestUsers(); err != nil {
+		if err := store.SeedTestUsers(); err != nil {
 			slog.Error("failed to seed test users", "error", err)
 			return
 		}
-	}
-
-	// Gin logic here
-	r := gin.Default()
-	r.GET("/health", hHandlers.HealthHandler)           // Endpoint для проверки работоспособности сервера
-	r.POST("/login", aHandlers.LoginHandler(s))         // Endpoint для входа и получения JWT
-	r.POST("/api/refresh", aHandlers.RefreshHandler(s)) // Endpoint для обновления токена
-
-	auth := r.Group("/api", utils.AuthMiddleware(jwtSecret))
-	{
-		// user handlers
-		auth.GET("/users", uHandlers.GetUsersHandler(s))                // Получить всех пользователей или конкретного пользователя по ID (через Query параметр)
-		auth.GET("/users/get/staff", uHandlers.GetStaffHandler(s))      // Получить всех сотрудников (учителей, руководителей)
-		auth.PATCH("/user/add", uHandlers.AddUserHandler(s))            // Добавление нового пользователя
-		auth.DELETE("/user/delete/:id", uHandlers.DeleteUserHandler(s)) // Удаление пользователя по ID
-		auth.GET("/me", uHandlers.GetMeHandler(s))                      // Получить информацию о текущем пользователе
-		auth.PATCH("/user/logout", uHandlers.LogoutHandler(s))			// Выход из аккаунта
-
-		// Class handlers
-		auth.GET("/classes", clHandlers.GetClassesHandler(s))                          // Получить все классы
-		auth.GET("/classes/teacher", clHandlers.GetClassTeachersHandler(s))            // Получить всех классных руководителей
-		auth.PATCH("/classes/add", clHandlers.AddClassHandler(s))                      // Добавить класс
-		auth.DELETE("/classes/delete/:id", clHandlers.DeleteClassHandler(s))           // Удалить класс по ID
-		auth.GET("/classes/:class_id/users", clHandlers.GetClassUsersHandler(s))       // Получить всех пользователей класса
-		auth.GET("/classes/:class_id/teacher", clHandlers.GetClassTeacherHandler(s))   // Получить учителя
-		auth.PATCH("/classes/:class_id/teacher", clHandlers.SetClassTeacherHandler(s)) // Установить учителя
-
-		// Rating handlers
-		auth.GET("/rating", rHandlers.GetRatingsHandler(s))                                                              // Получить рейтинг
-		auth.PATCH("/rating/update", rHandlers.UpdateRatingsHandler(rs.NewRatingsService(s.RatingRepo, s, s.Secret), s)) // Обновить рейтинг
-
-		// Notes handlers
-		auth.GET("/notes", nHandlers.GetNotesHandler(s))                // Получить заметки, с возможностью фильтрации по классу Query параметром
-		auth.PATCH("/note/add", nHandlers.AddNoteHandler(s))            // Добавить заметку
-		auth.DELETE("/note/delete/:id", nHandlers.DeleteNoteHandler(s)) // Удалить заметку
-
-		// Complaints handlers
-		auth.GET("/complaints", cmHandlers.GetComplaintsHandler(s))                // Получить жалобы, с возможностью фильтрации по классу Query параметром
-		auth.PATCH("/complaint/add", cmHandlers.AddcomplaintHandler(s))            // Добавить жалобу
-		auth.DELETE("/complaint/delete/:id", cmHandlers.DeletecomplaintHandler(s)) // Удалить жалобу
-
-		// Events handlers
-		auth.GET("/events", eHandlers.GetEventsHandler(s))                                  // Получить события, с возможностью фильтрации по классу Query параметром
-		auth.PATCH("/event/add", eHandlers.AddEventHandler(s))                              // Добавить событие
-		auth.DELETE("/event/delete/:id", eHandlers.DeleteEventHandler(s))                   // Удалить событие
-		auth.PATCH("/event/:eventId/players/add", eHandlers.AddPlayersToEvent(s))           // Добавить игроков к событию
-		auth.DELETE("/event/:eventId/players/delete", eHandlers.DeletePlayersFromEvent(s))  // Удалить игроков из события
-		auth.GET("/event/:eventId/players", eHandlers.GetEventPlayersHandler(s))            // Получить игроков события
-		auth.GET("/event/:eventId/players/count", eHandlers.GetEventPlayersCountHandler(s)) // Получить количество игроков события
-		auth.PATCH("/event/:eventId/complete", eHandlers.EventComplete(s))                  // Завершить событие
-		auth.PATCH("/event/:eventId/params/add", eHandlers.AddEventParams(s))               // Добавить параметры к событию
-		auth.GET("/event/:eventId/params", eHandlers.GetEventParamsHandler(s))              // Получить параметры события
-		auth.DELETE("/event/:eventId/params/delete", eHandlers.DeleteEventParamsHandler(s)) // Удалить параметры события
-
-		// Schedules handlers
-		auth.GET("/schedules/teacher/current", sHandlers.GetTeacherCurrentScheduleHandler(s))
-		auth.PATCH("/schedules/rollover", sHandlers.RolloverSchedulesHandler(s))
-		auth.PATCH("/schedules/planned/reset", sHandlers.ResetPlannedSchedulesHandler(s))
-		auth.GET("/schedules", sHandlers.GetSchedulesHandler(s))                            // Получить расписание, с возможностью фильтрации по классу Query параметром
-		auth.PATCH("/schedules/update", sHandlers.UpdateSchedulesHandler(s))                // Обновить расписание
 	}
 
 	addr := os.Getenv("PORT")
 	if addr == "" {
 		addr = ":8080"
 	}
+
+	router := app.NewRouter(store, jwtSecret)
 	slog.Info("server listening", "addr", addr)
-	if err := r.Run(addr); err != nil {
+	if err := router.Run(addr); err != nil {
 		slog.Error("server failed", "error", err)
 	}
 }
