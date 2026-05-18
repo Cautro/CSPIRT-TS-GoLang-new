@@ -215,12 +215,12 @@ func (s *Storage) AddEvent(event models.Event) error {
 	return nil
 }
 
-func (s *Storage) GetEventParams(eventID int) (*models.EventParams, error) {
+func (s *Storage) GetEventParams(eventID int) (models.EventParams, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if eventID <= 0 {
-		return nil, errors.New("invalid event id")
+		return models.EventParams{}, errors.New("invalid event id")
 	}
 
 	var params models.EventParams
@@ -229,10 +229,10 @@ func (s *Storage) GetEventParams(eventID int) (*models.EventParams, error) {
 		FROM event_params
 		WHERE EventID = ?
 	`, eventID).Scan(&params.EventID, &params.ExtraRatingReward, &params.Reason, &params.ClassID); err != nil {
-		return nil, err
+		return models.EventParams{}, err
 	}
 
-	return &params, nil
+	return params, nil
 }
 
 func (s *Storage) DeleteEventParams(eventID int) error {

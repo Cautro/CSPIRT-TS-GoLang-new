@@ -106,12 +106,22 @@ func (s *EventsService) AddEvent(event models.Event) error {
 	return nil
 }
 
-func (s *EventsService) GetEventParams(eventID int) (*models.EventParams, error) {
+func (s *EventsService) GetEventParams(eventID int) (models.EventParams, error) {
 	if eventID <= 0 {
-		return nil, errors.New("invalid event id")
+		return models.EventParams{}, errors.New("invalid event id")
 	}
 
-	return s.events.GetEventParams(eventID)
+	result, err := s.events.GetEventParams(eventID)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_event_params",
+			Message: "failed to get event params: " + err.Error(),
+		})
+		return models.EventParams{}, err
+	}
+
+	return result, nil
 }
 
 func (s *EventsService) AddEventParams(EventId int, params *models.EventParams) error {

@@ -18,6 +18,6 @@ type EventsRepository interface {
 	GetEventPlayersCount(eventID int) (int, error)
 	EventComplete(eventID int, ratingReward int, classReward int) error
 	AddEventParams(eventID int, params *eventModels.EventParams) error
-	GetEventParams(eventID int) (*eventModels.EventParams, error)
+	GetEventParams(eventID int) (eventModels.EventParams, error)
 	DeleteEventParams(eventID int) error
 }

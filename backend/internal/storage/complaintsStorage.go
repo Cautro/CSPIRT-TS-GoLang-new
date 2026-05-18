@@ -18,7 +18,6 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 		return errors.New("invalid login or token")
 	}
 
-
 	complaint.Content = strings.TrimSpace(complaint.Content)
 	if complaint.TargetID <= 0 {
 		return errors.New("target and author are required")

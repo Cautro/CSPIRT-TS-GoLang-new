@@ -58,3 +58,28 @@ func CheckUserRole(provider UserProvider, login string, roles ...string) error {
 
 	return ErrAccessDenied
 }
+
+func CheckPublicRole(provider UserProvider, login string) error {
+	user, err := provider.GetUserByLogin(login)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "check_public_role",
+			Login:   login,
+			Message: "failed to retrieve user: " + err.Error(),
+		})
+		return err
+	}
+
+	if user == nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "check_public_role",
+			Login:   login,
+			Message: "user not found",
+		})
+		return ErrUserNotFound
+	}
+
+	return nil
+}

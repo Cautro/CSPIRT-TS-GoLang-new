@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"cspirt/internal/utils"
 	"net/http"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -156,7 +157,11 @@ func GetEventParamsHandler(s *storage.Storage) func(ctx *gin.Context) {
 
 		params, err := s.GetEventParams(eventID)
 		if err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to get event params"})
+			if errors.Is(err, sql.ErrNoRows) {
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "event params not found"})
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event params"})
 			return
 		}
 
@@ -212,6 +217,15 @@ func AddEventParams(s *storage.Storage) func(ctx *gin.Context) {
 			ctx.JSON(500, gin.H{"error": "Failed to add event params"})
 			return
 		}
+
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "add_event_params",
+			Login:   ctx.GetString("Login"),
+			Message: "event params added successfully",
+		})
+
+		ctx.JSON(200, gin.H{"message": "Event params added successfully"})
 	}
 }
 

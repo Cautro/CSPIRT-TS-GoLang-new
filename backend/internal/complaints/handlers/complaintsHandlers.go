@@ -105,6 +105,16 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			return
 		}
 
+		check := u.CheckPublicRole(s, login)
+		if check != nil {
+			if errors.Is(check, u.ErrAccessDenied) || errors.Is(check, u.ErrUserNotFound) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+			return
+		}
+
 		complaintService := complaintsservice.NewComplaintsService(s, s.Secret)
 		user, err := s.GetUserByLogin(login)
 		if err != nil {
@@ -159,6 +169,17 @@ func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
 			return
 		}
+
+		check := u.CheckPublicRole(s, login)
+		if check != nil {
+			if errors.Is(check, u.ErrAccessDenied) || errors.Is(check, u.ErrUserNotFound) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+			return
+		}
+
 
 		foundUser, err := s.GetUserByLogin(login)
 		if err != nil {

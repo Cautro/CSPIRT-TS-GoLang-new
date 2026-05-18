@@ -312,27 +312,59 @@ func (s *Storage) initEventsStorage() error {
 }
 
 func (s *Storage) initParamsForEventsStorage() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+    s.mu.Lock()
+    defer s.mu.Unlock()
 
-	query := `
-	CREATE TABLE IF NOT EXISTS event_params (
-	Id INTEGER PRIMARY KEY AUTOINCREMENT,
-	EventID INTEGER NOT NULL,
-	ClassID INTEGER NOT NULL,
-	ExtraRating INTEGER NOT NULL DEFAULT 0,
-	Reason TEXT NOT NULL DEFAULT '',
-	FOREIGN KEY (EventID) REFERENCES events(Id) ON DELETE CASCADE,
-	FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE
+    query := `
+    CREATE TABLE IF NOT EXISTS event_params (
+        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+        EventID INTEGER NOT NULL,
+		ClassID INTEGER NOT NULL,
+		ExtraRatingReward INTEGER NOT NULL DEFAULT 0,
+		Reason TEXT NOT NULL DEFAULT '',
+		FOREIGN KEY (EventID) REFERENCES events(Id) ON DELETE CASCADE,
+		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE
 	);`
-	
-	if _, err := s.db.Exec(query); err != nil {
+
+    if _, err := s.db.Exec(query); err != nil {
+        return err
+	}
+
+	if err := s.ensureColumn(
+		"event_params",
+		"ExtraRatingReward",
+		"INTEGER NOT NULL DEFAULT 0",
+	); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_params_event_id ON event_params(EventID);`); err != nil {
+
+	if err := s.ensureColumn(
+		"event_params",
+		"Reason",
+		"TEXT NOT NULL DEFAULT ''",
+	); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_params_class_id ON event_params(ClassID);`); err != nil {
+
+	if err := s.ensureColumn(
+		"event_params",
+		"ClassID",
+		"INTEGER NOT NULL DEFAULT 0",
+	); err != nil {
+		return err
+	}
+
+	if _, err := s.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_event_params_event_id
+		ON event_params(EventID);
+	`); err != nil {
+		return err
+	}
+
+	if _, err := s.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_event_params_class_id
+		ON event_params(ClassID);
+	`); err != nil {
 		return err
 	}
 
