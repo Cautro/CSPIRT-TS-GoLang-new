@@ -122,8 +122,8 @@ func TestUsersAndClassesFeature(t *testing.T) {
 	if class.UserTotalRating != 400 {
 		t.Fatalf("expected class average rating 400, got %d", class.UserTotalRating)
 	}
-	if class.ClassTotalRating != 800 {
-		t.Fatalf("expected class total rating 800, got %d", class.ClassTotalRating)
+	if class.ClassTotalRating != 0 {
+		t.Fatalf("expected class total rating 0 before class rewards, got %d", class.ClassTotalRating)
 	}
 	if len(class.Members) != 2 {
 		t.Fatalf("expected class members to be synced, got %d", len(class.Members))
@@ -364,13 +364,13 @@ func TestEventsFeature(t *testing.T) {
 	other := addTestUser(t, st, "other", string(ratingModels.RoleUser), "11B", 400)
 
 	if err := st.AddEvent(eventModels.Event{
-		Title:        "Tournament",
-		Status:       "planned",
-		Description:  "Class tournament",
-		CreatedAt:    time.Now().UTC().Truncate(time.Second),
-		StartedAt:    "2026-05-03T10:00:00Z",
-		Players:      []int{helper.ID},
-		Classes:      []int{helper.ClassID, other.ClassID},
+		Title:            "Tournament",
+		Status:           "planned",
+		Description:      "Class tournament",
+		CreatedAt:        time.Now().UTC().Truncate(time.Second),
+		StartedAt:        "2026-05-03T10:00:00Z",
+		Players:          []int{helper.ID},
+		Classes:          []int{helper.ClassID, other.ClassID},
 		BaseRatingReward: 100,
 	}); err != nil {
 		t.Fatalf("add event returned error: %v", err)
@@ -431,6 +431,21 @@ func TestEventsFeature(t *testing.T) {
 		t.Fatalf("expected helper events to be empty after removal, got %+v", helperEvents)
 	}
 
+	if err := st.AddEventParams(events[0].ID, &eventModels.EventParams{
+		ExtraRatingReward: 3500,
+		Reason:            "Class reward",
+		ClassID:           student.ClassID,
+	}); err != nil {
+		t.Fatalf("add event params for student class returned error: %v", err)
+	}
+	if err := st.AddEventParams(events[0].ID, &eventModels.EventParams{
+		ExtraRatingReward: 750,
+		Reason:            "Class reward",
+		ClassID:           other.ClassID,
+	}); err != nil {
+		t.Fatalf("add event params for other class returned error: %v", err)
+	}
+
 	if err := st.EventComplete(events[0].ID, 100, 200); err != nil {
 		t.Fatalf("complete event returned error: %v", err)
 	}
@@ -440,6 +455,20 @@ func TestEventsFeature(t *testing.T) {
 	}
 	if student.Rating != 600 {
 		t.Fatalf("expected student rating 600 after event reward, got %d", student.Rating)
+	}
+	studentClass, err := st.GetClassByID(student.ClassID)
+	if err != nil {
+		t.Fatalf("get student class after event complete returned error: %v", err)
+	}
+	if studentClass == nil || studentClass.ClassTotalRating != 3500 {
+		t.Fatalf("expected student class extra rating 3500, got %+v", studentClass)
+	}
+	otherClass, err := st.GetClassByID(other.ClassID)
+	if err != nil {
+		t.Fatalf("get other class after event complete returned error: %v", err)
+	}
+	if otherClass == nil || otherClass.ClassTotalRating != 750 {
+		t.Fatalf("expected other class extra rating 750, got %+v", otherClass)
 	}
 	events, err = st.GetEvents()
 	if err != nil {

@@ -401,7 +401,7 @@ func (s *Storage) GetEventPlayersCount(eventID int) (int, error) {
 	return len(players), nil
 }
 
-func (s *Storage) EventComplete(eventID int, ratingReward int, classReward int) error {
+func (s *Storage) EventComplete(eventID int, ratingReward int, _ int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -453,23 +453,12 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, classReward int) 
 		return errors.New("event not found or already completed")
 	}
 
+	classRewards, rewardClassIDs, err := getEventClassRewardsTx(tx, eventID)
+	if err != nil {
+		return err
+	}
+
 	for _, classID := range classIDs {
-		var totalClassStudents int
-		err = tx.QueryRow(`
-			SELECT COUNT(Id) 
-			FROM users 
-			WHERE classID = ?
-		`, classID).Scan(&totalClassStudents)
-		if err != nil {
-			return err
-		}
-
-		if totalClassStudents == 0 {
-			continue
-		}
-
-		classTotalReward := ratingReward * totalClassStudents
-
 		rows, err := tx.Query(`
 			SELECT ep.player_id 
 			FROM event_players ep
@@ -496,24 +485,24 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, classReward int) 
 			continue
 		}
 
-		finalRewardPerPlayer := classTotalReward / participantsCount
-
 		for _, playerID := range participantIDs {
 			_, err := tx.Exec(`
 				UPDATE users
 				SET Rating = MAX(0, MIN(5000, Rating + ?))
 				WHERE Id = ?
-			`, finalRewardPerPlayer, playerID)
+			`, ratingReward, playerID)
 			if err != nil {
 				return err
 			}
 		}
+	}
 
+	for classID, extraRatingReward := range classRewards {
 		_, err = tx.Exec(`
 			UPDATE classes
 			SET ClassTotalRating = ClassTotalRating + ?
 			WHERE Id = ?
-		`, classReward, classID)
+		`, extraRatingReward, classID)
 		if err != nil {
 			return err
 		}
@@ -523,7 +512,7 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, classReward int) 
 		return err
 	}
 
-	for _, classID := range classIDs {
+	for _, classID := range appendUniqueIDs(classIDs, rewardClassIDs) {
 		if err := s.syncClassByIDLocked(classID); err != nil {
 			return err
 		}
@@ -535,6 +524,39 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, classReward int) 
 		Message: "event completed",
 	})
 	return nil
+}
+
+func getEventClassRewardsTx(tx *sql.Tx, eventID int) (map[int]int, []int, error) {
+	rows, err := tx.Query(`
+		SELECT ClassID, SUM(ExtraRatingReward)
+		FROM event_params
+		WHERE EventID = ? AND ClassID > 0
+		GROUP BY ClassID
+	`, eventID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	rewards := make(map[int]int)
+	classIDs := make([]int, 0)
+	for rows.Next() {
+		var classID int
+		var reward int
+		if err := rows.Scan(&classID, &reward); err != nil {
+			return nil, nil, err
+		}
+		if reward == 0 {
+			continue
+		}
+		rewards[classID] += reward
+		classIDs = appendUniqueIDs(classIDs, []int{classID})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	return rewards, classIDs, nil
 }
 
 func (s *Storage) GetEventsByUserID(userID int) ([]models.Event, error) {

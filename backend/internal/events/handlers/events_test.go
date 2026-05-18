@@ -215,6 +215,13 @@ func TestEventCompleteCompletesEvent(t *testing.T) {
 	st := handlertest.NewStorage(t)
 	users := handlertest.SeedUsers(t, st)
 	event := seedEvent(t, st, []int{users.Student.ID}, []int{users.Student.ClassID})
+	if err := st.AddEventParams(event.ID, &models.EventParams{
+		ExtraRatingReward: 3500,
+		Reason:            "Class reward",
+		ClassID:           users.Student.ClassID,
+	}); err != nil {
+		t.Fatalf("add event params returned error: %v", err)
+	}
 
 	router := handlertest.NewRouter(users.Owner.Login)
 	router.PATCH("/api/event/:eventId/complete", EventComplete(st))
@@ -239,6 +246,14 @@ func TestEventCompleteCompletesEvent(t *testing.T) {
 	}
 	if student == nil || student.Rating != users.Student.Rating+100 {
 		t.Fatalf("student rating was not updated: %+v", student)
+	}
+
+	class, err := st.GetClassByID(users.Student.ClassID)
+	if err != nil {
+		t.Fatalf("get class returned error: %v", err)
+	}
+	if class == nil || class.ClassTotalRating != 3500 {
+		t.Fatalf("class extra rating was not updated: %+v", class)
 	}
 }
 
