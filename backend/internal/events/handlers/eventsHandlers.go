@@ -5,11 +5,9 @@ import (
 	sr "cspirt/internal/events/service"
 	"cspirt/internal/logger"
 	"cspirt/internal/storage"
-	"strconv"
 	"cspirt/internal/utils"
 	"net/http"
-	"database/sql"
-	"errors"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -82,14 +80,14 @@ func GetEventsHandler(s *storage.Storage) func(ctx *gin.Context) {
 				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event"})
 				return
 			}
-            
-            if event == nil {
-                ctx.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
-                return
-            }
+
+			if event == nil {
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+				return
+			}
 
 			ctx.JSON(http.StatusOK, event)
-			return 
+			return
 		}
 
 		events, err := eventService.GetEvents()
@@ -156,12 +154,9 @@ func GetEventParamsHandler(s *storage.Storage) func(ctx *gin.Context) {
 			return
 		}
 
-		params, err := s.GetEventParams(eventID)
+		eventService := sr.NewEventsService(s, s.Secret)
+		params, err := eventService.GetEventParams(eventID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				ctx.JSON(http.StatusNotFound, gin.H{"error": "event params not found"})
-				return
-			}
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event params"})
 			return
 		}

@@ -38,12 +38,12 @@ func TestAddEventHandlerAddsEvent(t *testing.T) {
 	router.PATCH("/api/event/add", AddEventHandler(st))
 
 	body := models.Event{
-		Title:        "Tournament",
-		Status:       models.EventStatusScheduled,
-		Description:  "Class tournament",
-		StartedAt:    "2999-01-01 10:00:00",
-		Players:      []int{users.Student.ID},
-		Classes:      []int{users.Student.ClassID},
+		Title:            "Tournament",
+		Status:           models.EventStatusScheduled,
+		Description:      "Class tournament",
+		StartedAt:        "2999-01-01 10:00:00",
+		Players:          []int{users.Student.ID},
+		Classes:          []int{users.Student.ClassID},
 		BaseRatingReward: 100,
 	}
 	recorder := handlertest.Perform(router, handlertest.JSONRequest(t, http.MethodPatch, "/api/event/add", body))
@@ -78,6 +78,48 @@ func TestDeleteEventHandlerDeletesEvent(t *testing.T) {
 	}
 	if len(events) != 0 {
 		t.Fatalf("expected event to be deleted, got %d events", len(events))
+	}
+}
+
+func TestEventParamsHandlersReturnAllParams(t *testing.T) {
+	st := handlertest.NewStorage(t)
+	users := handlertest.SeedUsers(t, st)
+	event := seedEvent(t, st, []int{users.Student.ID}, []int{users.Student.ClassID, users.OtherStudent.ClassID})
+
+	router := handlertest.NewRouter(users.Owner.Login)
+	router.PATCH("/api/event/:eventId/params/add", AddEventParams(st))
+	router.GET("/api/event/:eventId/params", GetEventParamsHandler(st))
+
+	target := "/api/event/" + strconv.Itoa(event.ID) + "/params"
+	first := models.EventParams{
+		ExtraRatingReward: 560,
+		Reason:            "Event win",
+		ClassID:           users.Student.ClassID,
+	}
+	second := models.EventParams{
+		ExtraRatingReward: 120,
+		Reason:            "Active participation",
+		ClassID:           users.OtherStudent.ClassID,
+	}
+
+	recorder := handlertest.Perform(router, handlertest.JSONRequest(t, http.MethodPatch, target+"/add", first))
+	handlertest.RequireStatus(t, recorder, http.StatusOK)
+	recorder = handlertest.Perform(router, handlertest.JSONRequest(t, http.MethodPatch, target+"/add", second))
+	handlertest.RequireStatus(t, recorder, http.StatusOK)
+
+	recorder = handlertest.Perform(router, handlertest.JSONRequest(t, http.MethodGet, target, nil))
+	handlertest.RequireStatus(t, recorder, http.StatusOK)
+
+	var response []models.EventParams
+	handlertest.DecodeJSON(t, recorder, &response)
+	if len(response) != 2 {
+		t.Fatalf("expected 2 event params, got %d: %+v", len(response), response)
+	}
+	if response[0].EventID != event.ID || response[0].ExtraRatingReward != 560 || response[0].Reason != first.Reason || response[0].ClassID != users.Student.ClassID {
+		t.Fatalf("unexpected first event params: %+v", response[0])
+	}
+	if response[1].EventID != event.ID || response[1].ExtraRatingReward != 120 || response[1].Reason != second.Reason || response[1].ClassID != users.OtherStudent.ClassID {
+		t.Fatalf("unexpected second event params: %+v", response[1])
 	}
 }
 
@@ -204,12 +246,12 @@ func seedEvent(t *testing.T, st *storage.Storage, players []int, classes []int) 
 	t.Helper()
 
 	if err := st.AddEvent(models.Event{
-		Title:        "Seed event",
-		Status:       models.EventStatusScheduled,
-		Description:  "Seeded event",
-		StartedAt:    "2999-01-01 10:00:00",
-		Players:      players,
-		Classes:      classes,
+		Title:            "Seed event",
+		Status:           models.EventStatusScheduled,
+		Description:      "Seeded event",
+		StartedAt:        "2999-01-01 10:00:00",
+		Players:          players,
+		Classes:          classes,
 		BaseRatingReward: 50,
 	}); err != nil {
 		t.Fatalf("seed event returned error: %v", err)

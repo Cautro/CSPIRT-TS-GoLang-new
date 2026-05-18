@@ -4,10 +4,10 @@ import (
 	"cspirt/internal/events/models"
 	"cspirt/internal/events/repo"
 	"cspirt/internal/logger"
-	"errors"
-	"time"
-	"strings"
 	userModels "cspirt/internal/users/models"
+	"errors"
+	"strings"
+	"time"
 )
 
 type EventsService struct {
@@ -106,9 +106,9 @@ func (s *EventsService) AddEvent(event models.Event) error {
 	return nil
 }
 
-func (s *EventsService) GetEventParams(eventID int) (models.EventParams, error) {
+func (s *EventsService) GetEventParams(eventID int) ([]models.EventParams, error) {
 	if eventID <= 0 {
-		return models.EventParams{}, errors.New("invalid event id")
+		return nil, errors.New("invalid event id")
 	}
 
 	result, err := s.events.GetEventParams(eventID)
@@ -118,7 +118,10 @@ func (s *EventsService) GetEventParams(eventID int) (models.EventParams, error) 
 			Action:  "get_event_params",
 			Message: "failed to get event params: " + err.Error(),
 		})
-		return models.EventParams{}, err
+		return nil, err
+	}
+	if result == nil {
+		return []models.EventParams{}, nil
 	}
 
 	return result, nil

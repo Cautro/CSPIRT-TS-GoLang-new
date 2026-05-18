@@ -215,21 +215,35 @@ func (s *Storage) AddEvent(event models.Event) error {
 	return nil
 }
 
-func (s *Storage) GetEventParams(eventID int) (models.EventParams, error) {
+func (s *Storage) GetEventParams(eventID int) ([]models.EventParams, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if eventID <= 0 {
-		return models.EventParams{}, errors.New("invalid event id")
+		return nil, errors.New("invalid event id")
 	}
 
-	var params models.EventParams
-	if err := s.db.QueryRow(`
+	rows, err := s.db.Query(`
 		SELECT EventID, ExtraRatingReward, Reason, ClassID
 		FROM event_params
 		WHERE EventID = ?
-	`, eventID).Scan(&params.EventID, &params.ExtraRatingReward, &params.Reason, &params.ClassID); err != nil {
-		return models.EventParams{}, err
+		ORDER BY Id
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	params := make([]models.EventParams, 0)
+	for rows.Next() {
+		var param models.EventParams
+		if err := rows.Scan(&param.EventID, &param.ExtraRatingReward, &param.Reason, &param.ClassID); err != nil {
+			return nil, err
+		}
+		params = append(params, param)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return params, nil
@@ -255,10 +269,8 @@ func (s *Storage) DeleteEventParams(eventID int) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`
-		UPDATE event_params
-		SET ExtraRatingReward = 0,
-			Reason = '',
-		WHERE EventID = ?;
+		DELETE FROM event_params
+		WHERE EventID = ?
 	`, eventID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -453,7 +465,7 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, classReward int) 
 		}
 
 		if totalClassStudents == 0 {
-			continue 
+			continue
 		}
 
 		classTotalReward := ratingReward * totalClassStudents
