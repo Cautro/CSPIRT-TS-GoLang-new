@@ -200,8 +200,8 @@ func (s *EventsService) DeleteEvent(eventID int) error {
 	return nil
 }
 
-func (s *EventsService) AddPlayersToEvent(eventID int, playerIDs []int) error {
-	if err := s.events.AddPlayersToEvent(eventID, playerIDs); err != nil {
+func (s *EventsService) AddPlayersToEvent(eventID int, playerIDs []int, login string) error {
+	if err := s.events.AddPlayersToEvent(eventID, playerIDs, login); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_event_players",

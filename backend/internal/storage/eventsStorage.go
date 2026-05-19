@@ -11,6 +11,7 @@ import (
 	"cspirt/internal/events/models"
 	"cspirt/internal/logger"
 	userModels "cspirt/internal/users/models"
+	ratingModels "cspirt/internal/rating/models"
 )
 
 func (s *Storage) ActivateDueEvents() error {
@@ -670,119 +671,102 @@ func (s *Storage) DeleteEvent(eventID int) error {
 	return nil
 }
 
-func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int) error {
+func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	logger.WriteSafe(logger.LogEntry{
-		Level:   "info",
-		Action:  "add_event_players",
+		Level:  "info",
+		Action: "add_event_players",
 		Message: "adding players to event",
 	})
 
+	user, err := s.getUserByLoginLocked(login)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	if user.ClassID <= 0 {
+		return errors.New("user has no class")
+	}
+
+	class, err := s.getClassByIDLocked(user.ClassID)
+	if err != nil {
+		return err
+	}
+	if class == nil {
+		return errors.New("class not found")
+	}
+
+	if class.TeacherLogin != user.Login || user.Role != string(ratingModels.RoleOwner) {
+		return errors.New("only class teacher can add players to this event")
+	}
+
+	playerIDs = normalizePositiveIDs(playerIDs)
+	if len(playerIDs) == 0 {
+		return nil
+	}
+
+	for _, playerID := range playerIDs {
+		player, err := s.getUserByIDLocked(playerID)
+		if err != nil {
+			return err
+		}
+		if player == nil {
+			return errors.New("player not found")
+		}
+		if player.ClassID != class.ID {
+			return errors.New("all players must belong to teacher's class")
+		}
+	}
+
 	currentPlayers, err := s.getEventPlayersLocked(eventID)
 	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to get current event players: " + err.Error(),
-		})
 		return err
 	}
 
 	currentClasses, err := s.getEventClassesLocked(eventID)
 	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to get current event classes: " + err.Error(),
-		})
-		return err
-	}
-	addedClasses, err := s.getClassIDsByPlayerIDsLocked(playerIDs)
-	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to resolve player classes: " + err.Error(),
-		})
 		return err
 	}
 
-	playerIDs = normalizePositiveIDs(playerIDs)
 	players := appendUniquePlayerIDs(currentPlayers, playerIDs)
 	playersJSON, err := marshalPlayerIDs(players)
 	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to marshal event players: " + err.Error(),
-		})
 		return err
 	}
-	classes := appendUniqueIDs(currentClasses, addedClasses)
+
+	classes := appendUniqueIDs(currentClasses, []int{class.ID})
 	classesJSON, err := marshalClassIDs(classes)
 	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to marshal event classes: " + err.Error(),
-		})
 		return err
 	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to start transaction: " + err.Error(),
-		})
 		return err
 	}
 	defer tx.Rollback()
 
 	if err := insertEventPlayers(tx, eventID, playerIDs); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to insert event players: " + err.Error(),
-		})
-		return err
-	}
-	if err := insertEventClasses(tx, eventID, addedClasses); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to insert event classes: " + err.Error(),
-		})
 		return err
 	}
 
-	if _, err := tx.Exec(`UPDATE events SET Players = ?, Classes = ? WHERE Id = ?`, playersJSON, classesJSON, eventID); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to update event players: " + err.Error(),
-		})
+	if err := insertEventClasses(tx, eventID, []int{class.ID}); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event_players",
-			Message: "failed to commit event players: " + err.Error(),
-		})
+	if _, err := tx.Exec(
+		`UPDATE events SET Players = ?, Classes = ? WHERE Id = ?`,
+		playersJSON, classesJSON, eventID,
+	); err != nil {
 		return err
 	}
 
-	logger.WriteSafe(logger.LogEntry{
-		Level:   "info",
-		Action:  "add_event_players",
-		Message: "players added to event",
-	})
-	return nil
+	return tx.Commit()
 }
 
 func (s *Storage) DeletePlayersFromEvent(eventID int, playerIDs []int) error {

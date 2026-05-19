@@ -366,7 +366,7 @@ func AddPlayersToEvent(s *storage.Storage) func(ctx *gin.Context) {
 			return
 		}
 
-		if err := eventService.AddPlayersToEvent(eventID, req.PlayerIDs); err != nil {
+		if err := eventService.AddPlayersToEvent(eventID, req.PlayerIDs, ctx.GetString("Login")); err != nil {
 			ctx.JSON(500, gin.H{"error": "Failed to add players to event"})
 			return
 		}

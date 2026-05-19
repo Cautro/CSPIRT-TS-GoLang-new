@@ -12,7 +12,7 @@ type EventsRepository interface {
 	GetEventsByID(eventID int) (*eventModels.Event, error)
 	DeleteEvent(eventID int) error
 	GetEvents() ([]eventModels.Event, error)
-	AddPlayersToEvent(eventID int, playerIDs []int) error
+	AddPlayersToEvent(eventID int, playerIDs []int, login string) error
 	DeletePlayersFromEvent(eventID int, playerIDs []int) error
 	GetEventPlayers(eventID int) ([]userModels.SafeUser, error)
 	GetEventPlayersCount(eventID int) (int, error)

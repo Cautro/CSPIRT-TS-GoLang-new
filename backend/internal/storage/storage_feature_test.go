@@ -406,7 +406,7 @@ func TestEventsFeature(t *testing.T) {
 		t.Fatalf("expected other class to have 1 event, got %d", len(classEvents))
 	}
 
-	if err := st.AddPlayersToEvent(events[0].ID, []int{student.ID, helper.ID}); err != nil {
+	if err := st.AddPlayersToEvent(events[0].ID, []int{student.ID, helper.ID, other.ID}, helper.Login); err != nil {
 		t.Fatalf("add players to event returned error: %v", err)
 	}
 	studentEvents, err := st.GetEventsByUserID(student.ID)

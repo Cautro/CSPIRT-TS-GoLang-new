@@ -427,9 +427,6 @@ func validateNewUser(user *models.User) error {
 	if user.Rating < 0 {
 		return errors.New("rating must be non-negative")
 	}
-	if user.Rating > 5000 {
-		return errors.New("rating must be less than or equal to 5000")
-	}
 	if user.Rating == 0 {
 		user.Rating = 500
 	}
@@ -449,9 +446,6 @@ func validateNewUser(user *models.User) error {
 func clampRating(rating int) int {
 	if rating < 0 {
 		return 0
-	}
-	if rating > 5000 {
-		return 5000
 	}
 	return rating
 }
