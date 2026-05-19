@@ -21,6 +21,7 @@ data/*.log
 
 node_modules/
 backend/
+dist/
 
 # Зависимости
 vendor/

@@ -1,16 +1,6 @@
-import {ApiClient} from "../../../../core/api/api_client.ts";
-import {EventSchema, type EventType} from "../types/events_types.ts";
+import {type AddEventFormType, EventSchema, type EventType} from "../types/events_types.ts";
 import {z} from "zod";
-
-const client = new ApiClient();
-
-export const addEventSchema = z.object({
-    Title: z.string(),
-    Description: z.string(),
-    StartedAt: z.string(),
-    Classes: z.array(z.number().int().positive()),
-    RatingReward: z.number().int().positive(),
-});
+import {apiClient} from "../../../../core/api/client.ts";
 
 export const addEventPlayersSchema = z.object({
    playerIds: z.array(z.number().int().positive()).min(1), 
@@ -18,12 +8,9 @@ export const addEventPlayersSchema = z.object({
 
 export type AddEventPlayersType = z.infer<typeof addEventPlayersSchema>;
 
-
-export type addEventType = z.infer<typeof addEventSchema>;
-
 export const EventsApi = {
     async getEvents(): Promise<EventType[]> {
-        const response = await client.get('/api/events', true);
+        const response = await apiClient.get('/api/events', true);
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении списка мероприятий");
@@ -35,11 +22,11 @@ export const EventsApi = {
             throw new Error("Некорректный ответ сервера");
         } 
         
-        return parsed.data as EventType[];
+        return parsed.data;
     },
     
     async getEventById(id: number): Promise<EventType> {
-        const response = await client.get(`/api/events?event_id=${id}`, true);
+        const response = await apiClient.get(`/api/events?event_id=${id}`, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении мероприятия");
@@ -54,8 +41,8 @@ export const EventsApi = {
         return parsed.data;
     },
     
-    async addEvent(dto: addEventType): Promise<boolean> {
-        const response = await client.patch('/api/event/add', dto,true);
+    async addEvent(dto: AddEventFormType): Promise<boolean> {
+        const response = await apiClient.patch('/api/event/add', dto,true);
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при создании мероприятия");
@@ -65,7 +52,7 @@ export const EventsApi = {
     },
 
     async addPlayersToEvent(id: number, dto: AddEventPlayersType): Promise<boolean> {
-        const response = await client.patch(`/api/event/${id}/players/add`, dto, true);
+        const response = await apiClient.patch(`/api/event/${id}/players/add`, dto, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при добавлении участников мероприятия");
@@ -75,17 +62,17 @@ export const EventsApi = {
     },
     
     async removePlayersFromEvent(id: number, dto: AddEventPlayersType): Promise<boolean> {
-        const response = await client.delete(`/api/event/${id}/players/delete`, dto, true);
+        const response = await apiClient.delete(`/api/event/${id}/players/delete`, dto, true);
 
         if (!response.checkStatus()) {
-            throw new Error("Ошибка при добавлении участников мероприятия");
+            throw new Error("Ошибка при удалении участников мероприятия");
         }
 
         return true;
     },
     
     async completeEvent(item: EventType): Promise<boolean> {
-        const response = await client.patch(`/api/event/${item.ID}/complete`, {
+        const response = await apiClient.patch(`/api/event/${item.ID}/complete`, {
             ratingReward: item.RatingReward
         }, true);
         
@@ -97,7 +84,7 @@ export const EventsApi = {
     },
     
     async deleteEvent(id: number): Promise<boolean> {
-        const response = await client.delete(`/api/event/delete/${id}`,{}, true);
+        const response = await apiClient.delete(`/api/event/delete/${id}`,{}, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при попытке удаления мероприятия");

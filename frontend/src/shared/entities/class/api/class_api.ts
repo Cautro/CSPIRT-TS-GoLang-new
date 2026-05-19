@@ -1,7 +1,7 @@
 import {z} from 'zod'
-import {ApiClient} from "../../../../core/api/api_client.ts";
-import {classSchema, type ClassType} from "../types/class_types.ts";
+import {type addClassFormType, classSchema, type ClassType} from "../types/class_types.ts";
 import {userSchema, type UserType} from "../../user/types/user_types.ts";
+import {apiClient} from "../../../../core/api/client.ts";
 
 const classesResponseSchema = z.object({
     Classes: z.array(classSchema)
@@ -11,28 +11,13 @@ const classUsersResponseSchema = z.object({
     Users: z.array(userSchema),
 });
 
-export const changeClassTeacherDto = z.object({
-    TeacherLogin: z.string()
-});
-
-export type changeClassTeacherType = z.infer<typeof changeClassTeacherDto>
-
 export const classTeacherResponseSchema = z.object({
     Teacher: userSchema
 });
 
-export const addClassDto = z.object({
-    Name: z.string(),
-    TeacherLogin: z.string(),
-});
-
-export type addClassType = z.infer<typeof addClassDto>
-
-const client = new ApiClient();
-
 export const classApi = {
     async getClasses(): Promise<ClassType[]> {
-        const response = await client.get("/api/classes", true);
+        const response = await apiClient.get("/api/classes", true);
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении списка классов");
@@ -48,7 +33,7 @@ export const classApi = {
     },
     
     async getClassById(id: number): Promise<ClassType> {
-        const response = await client.get(`/api/classes/?class_id=${id}`, true);
+        const response = await apiClient.get(`/api/classes/?class_id=${id}`, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении класса");
@@ -59,12 +44,16 @@ export const classApi = {
         if (!parsed.success) {
             throw new Error("Некорректный формат классов");
         }
+        
+        if (parsed.data.Classes.length === 0) {
+            throw new Error("Класс не найден");
+        }
 
         return parsed.data.Classes[0];
     },
     
     async getUsersByClass(id: number): Promise<UserType[]> {
-        const response = await client.get(`/api/classes/${id}/users`, true);    
+        const response = await apiClient.get(`/api/classes/${id}/users`, true);    
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении списка учениокв");
@@ -79,8 +68,10 @@ export const classApi = {
         return parsed.data.Users;
     },
     
-    async changeClassTeacher(id: number, dto: changeClassTeacherType): Promise<boolean> {
-        const response = await client.patch(`/api/classes/${id}/teacher`, dto, true);
+    async changeClassTeacher(id: number, teacher: string): Promise<boolean> {
+        const response = await apiClient.patch(`/api/classes/${id}/teacher`, {
+            TeacherLogin: teacher
+        }, true);
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при изменении классного руководителя");
@@ -90,7 +81,7 @@ export const classApi = {
     },
     
     async getClassTeacher(classId: number): Promise<UserType> {
-        const response = await client.get(`/api/classes/${classId}/teacher`, true);
+        const response = await apiClient.get(`/api/classes/${classId}/teacher`, true);
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении классного руководителя");
@@ -104,8 +95,8 @@ export const classApi = {
         return parsed.data.Teacher;
     },
     
-    async addClass(dto: addClassType): Promise<boolean> {
-        const response = await client.patch(`/api/classes/add`, dto, true);
+    async addClass(dto: addClassFormType): Promise<boolean> {
+        const response = await apiClient.patch(`/api/classes/add`, dto, true);
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при добавлении класса");
@@ -115,7 +106,7 @@ export const classApi = {
     },
     
     async deleteClass(id: number): Promise<boolean> {
-        const response = await client.delete(`/api/classes/delete/${id}`, {}, true);
+        const response = await apiClient.delete(`/api/classes/delete/${id}`, {}, true);
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при попытке удаления класса");

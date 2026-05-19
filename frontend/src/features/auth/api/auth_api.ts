@@ -1,10 +1,10 @@
 import {z} from "zod";
-import { ApiClient } from "../../../core/api/api_client";
 import { userSchema } from "../../../shared/entities/user/types/user_types.ts";
 import { LOGIN_REGEX, SECURITY_LIMITS } from "../../../core/security/security_limits.ts";
 import {noteSchema} from "../../../shared/entities/notes/types/notes_types.ts";
 import {complaintSchema} from "../../../shared/entities/complaints/types/complaints_types.ts";
 import {EventSchema} from "../../../shared/entities/events/types/events_types.ts";
+import {apiClient} from "../../../core/api/client.ts";
 
 export interface AuthDto {
     login: string;
@@ -46,7 +46,6 @@ const errorResponseSchema = z.object({
     message: z.string().optional(),
 }).passthrough();
 
-const client = new ApiClient();
 
 function getSafeAuthError(data: unknown): string {
     const parsed = errorResponseSchema.safeParse(data);
@@ -66,7 +65,7 @@ export const authApi = {
             throw new Error("Некорректный логин или пароль");
         }
 
-        const response = await client.post<unknown>("/login", {
+        const response = await apiClient.post<unknown>("/login", {
             Login: parsedDto.data.login,
             Password: parsedDto.data.password,
         });
@@ -85,7 +84,7 @@ export const authApi = {
     },
     
     async refresh(): Promise<string> {
-        const response = await client.post<unknown>("api/refresh");
+        const response = await apiClient.post<unknown>("/api/refresh");
         
         if (!response.checkStatus()) {
             throw new Error("Не удалось обновить сессию");
@@ -101,7 +100,7 @@ export const authApi = {
     },
 
     async checkAuth(): Promise<meType> {
-        const response = await client.get<unknown>("/api/me", true);
+        const response = await apiClient.get<unknown>("/api/me", true);
 
         if (!response.checkStatus()) {
             throw new Error("Сессия недействительна");

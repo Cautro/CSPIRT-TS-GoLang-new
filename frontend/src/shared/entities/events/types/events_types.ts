@@ -1,4 +1,4 @@
-import {z} from "zod"
+import {z} from "zod";
 
 export const EventSchema = z.object({
     ID: z.number().int().positive(),
@@ -13,3 +13,11 @@ export const EventSchema = z.object({
 });
 
 export type EventType = z.infer<typeof EventSchema>;
+
+export type AddEventFormType = {
+    Title: string;
+    Description: string;
+    StartedAt: string;
+    Classes: number[];
+    RatingReward: number;
+}

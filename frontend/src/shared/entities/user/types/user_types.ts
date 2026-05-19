@@ -37,3 +37,17 @@ export const UserRoles: Record<UserRole, string> = {
     Owner: "Руководство",
     Helper: "Староста",
 };
+
+export type addUserFormType = {
+    Name: string;
+    LastName: string;
+    FullName: Array<{
+        Name: string;
+        LastName: string;
+    }>
+    Password: string;
+    ClassID: number;
+    Login: string;
+    Role: UserRole;
+    Rating: number;
+}

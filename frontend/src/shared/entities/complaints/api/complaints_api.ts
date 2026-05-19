@@ -1,6 +1,6 @@
 import {z} from "zod";
-import {ApiClient} from "../../../../core/api/api_client.ts";
 import {complaintSchema, type ComplaintType} from "../types/complaints_types.ts";
+import {apiClient} from "../../../../core/api/client.ts";
 
 export const complaintAddDto = z.object({
     AuthorID: z.number().int().nonnegative(),
@@ -17,11 +17,9 @@ const complaintsResponseShema = z.object({
     Complaints: z.array(complaintSchema),
 });
 
-const client = new ApiClient();
-
 export const ComplaintsApi = {
     async getComplaints(id: number): Promise<ComplaintType[]> {
-        const response = await client.get(`/api/complaints?class=${id}`, true);
+        const response = await apiClient.get(`/api/complaints?class=${id}`, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении списка жалоб");
@@ -37,7 +35,7 @@ export const ComplaintsApi = {
     },
 
     async addComplaint(dto: complaintAddType): Promise<boolean> {
-        const response = await client.patch("/api/complaint/add", dto, true);
+        const response = await apiClient.patch("/api/complaint/add", dto, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при добавлении жалобы");
@@ -47,7 +45,7 @@ export const ComplaintsApi = {
     },
 
     async deleteComplaint(id: number): Promise<boolean> {
-        const response = await client.delete(`/api/complaint/delete/${id}`, {}, true);
+        const response = await apiClient.delete(`/api/complaint/delete/${id}`, {}, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при удалении жалобы");

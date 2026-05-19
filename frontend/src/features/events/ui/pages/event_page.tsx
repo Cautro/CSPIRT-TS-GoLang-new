@@ -4,8 +4,11 @@ import { format, isValid, parse } from "date-fns";
 import { ru } from "date-fns/locale";
 
 import { useEventStore } from "../../store/event_store.ts";
-import { ClassCard } from "../../../../shared/ui/class_card.tsx";
+import { ClassCard } from "../../../../shared/ui/cards/class_card.tsx";
 import {useAuthStore} from "../../../auth/store/auth_store.ts";
+import {ConfirmModal} from "../../../../shared/ui/modals/confirm_modal.tsx";
+import {useClassStore} from "../../../class/store/class_store.ts";
+import {BurgerDrawerMenu, type BurgerDrawerMenuItem} from "../../../../shared/ui/other/burger_menu.tsx";
 
 function getStatusLabel(status: string): string {
     if (!status.trim()) {
@@ -15,7 +18,7 @@ function getStatusLabel(status: string): string {
     const statusMap: Record<string, string> = {
         active: "Активно",
         completed: "Завершено",
-        planned: "Запланировано",
+        scheduled: "Запланировано",
     };
 
     return statusMap[status] ?? status;
@@ -42,9 +45,9 @@ export function EventPage() {
 
     const { id } = useParams<{id: string}>();
 
-    const classes = useEventStore((state) => state.classes);
+    const classes = useClassStore((state) => state.classes);
     const event = useEventStore((state) => state.event);
-    const getClasses = useEventStore((state) => state.getClasses);
+    const getClasses = useClassStore((state) => state.getClasses);
     const getEvent = useEventStore((state) => state.getEventById);
     const completeEvent = useEventStore((state) => state.completeEvent);
     const deleteEvent = useEventStore((state) => state.deleteEvent);
@@ -56,6 +59,25 @@ export function EventPage() {
     const [isCompleteConfirmOpen, setIsCompleteConfirmOpen] = useState(false);
     
     const isLoading = status === "loading";
+    
+    const menuItems: BurgerDrawerMenuItem[] = [
+        {
+          label: "Завершить мероприятие",
+          primary: true,
+          hidden: (role !== "Owner"),
+          onClick: () => setIsCompleteConfirmOpen(true),  
+        },
+        {
+            label: "Удалить мероприятие",
+            danger: true,
+            hidden: (role !== "Owner"),
+            onClick: () => setIsDeleteConfirmOpen(true),
+        },
+        {
+            label: "Назад",
+            onClick: () => navigate(-1)
+        }
+    ]
 
     useEffect(() => {
         if (!id) {
@@ -153,7 +175,7 @@ export function EventPage() {
     }
 
     const eventClassIds = new Set(event.Classes ?? []);
-    const eventClasses = classes.filter((item) => eventClassIds.has(item.Id));
+    const eventClasses = classes?.filter((item) => eventClassIds.has(item.Id));
 
 
     const statusLabel = getStatusLabel(event.Status);
@@ -180,37 +202,8 @@ export function EventPage() {
                         
                         <div className="btn-group">
 
-                            {role === "Owner" && (
-                                <div className="btn-group">
-                                    <button
-                                        className="btn btn--danger"
-                                        type="button"
-                                        onClick={() => setIsDeleteConfirmOpen(true)}
-                                        disabled={isLoading}
-                                    >
-                                        Удалить мероприятие
-                                    </button>
-
-                                    {event.Status !== "completed" && (
-                                        <button
-                                            className="btn btn--primary"
-                                            type="button"
-                                            onClick={() => setIsCompleteConfirmOpen(true)}
-                                            disabled={isLoading}
-                                        >
-                                            Завершить мероприятие
-                                    </button>
-                                        )}
-                                </div>
-                        )}
-    
-                            <button
-                                className="btn btn--secondary"
-                                type="button"
-                                onClick={() => navigate(-1)}
-                            >
-                                Назад
-                            </button>
+                            <BurgerDrawerMenu items={menuItems} title={"Меню"} />
+                            
                         </div>
 
                     </div>
@@ -263,9 +256,9 @@ export function EventPage() {
                         </div>
                     )}
 
-                    {!isLoading && !error && eventClasses.length > 0 && role === "Owner" && (
+                    {!isLoading && !error && eventClasses?.length > 0 && role === "Owner" && (
                         <div className="class-list">
-                            {eventClasses.map((item) => (
+                            {eventClasses?.map((item) => (
                                 <ClassCard
                                     key={item.Id}
                                     item={item}
@@ -285,7 +278,7 @@ export function EventPage() {
                         </div>
                     )}
 
-                    {!isLoading && !error && eventClasses.length === 0 && (
+                    {!isLoading && !error && eventClasses?.length === 0 && (
                         <div className="empty-state">
                             <h2 className="empty-state__title">
                                 Классы не найдены
@@ -298,122 +291,37 @@ export function EventPage() {
                     )}
                 </div>
 
+
                 {isDeleteConfirmOpen && (
-                    <div className="modal-backdrop" onMouseDown={() => setIsDeleteConfirmOpen(false)}>
-                        <section
-                            className="modal modal--confirm"
-                            role="dialog"
-                            aria-modal="true"
-                            aria-labelledby="delete-event-title"
-                            onMouseDown={(event) => event.stopPropagation()}
-                        >
-                            <div className="modal__header">
-                                <div>
-                                    <h2 className="modal__title" id="delete-event-title">
-                                        Удалить мероприятие?
-                                    </h2>
-
-                                    <p className="modal__description">
-                                        Это действие удалит мероприятие «{event.Title}». Отменить удаление будет нельзя.
-                                    </p>
-                                </div>
-
-                                <button
-                                    className="modal__close"
-                                    type="button"
-                                    onClick={() => setIsDeleteConfirmOpen(false)}
-                                    aria-label="Закрыть окно подтверждения"
-                                    disabled={isLoading}
-                                >
-                                    ×
-                                </button>
-                            </div>
-
-                            <div className="modal__footer">
-                                <button
-                                    className="btn btn--secondary"
-                                    type="button"
-                                    onClick={() => setIsDeleteConfirmOpen(false)}
-                                    disabled={isLoading}
-                                >
-                                    Отмена
-                                </button>
-
-                                <button
-                                    className="btn btn--danger"
-                                    type="button"
-                                    disabled={isLoading}
-                                    onClick={async () => {
-                                        await deleteEvent(event.ID);
-                                        setIsDeleteConfirmOpen(false);
-                                        navigate(-1);
-                                    }}
-                                >
-                                    {isLoading ? "Удаление..." : "Удалить"}
-                                </button>
-                            </div>
-                        </section>
-                    </div>
+                    <ConfirmModal
+                        title={"Удалить мероприятие?"}
+                        content={`Это действие удалит мероприятие "${event.Title}". Отменить удаление будет нельзя.`}
+                        onConfirm={async () => {
+                            await deleteEvent(event.ID);
+                            setIsDeleteConfirmOpen(false);
+                            navigate(-1);
+                        }}
+                        isOpen={isDeleteConfirmOpen}
+                        onClose={() => setIsDeleteConfirmOpen(false)}
+                        buttonContent={"Удалить"}
+                        isDanger={true}
+                    />
                 )}
 
+                
                 {isCompleteConfirmOpen && (
-                    <div className="modal-backdrop" onMouseDown={() => setIsCompleteConfirmOpen(false)}>
-                        <section
-                            className="modal modal--confirm"
-                            role="dialog"
-                            aria-modal="true"
-                            aria-labelledby="complete-event-title"
-                            onMouseDown={(event) => event.stopPropagation()}
-                        >
-                            <div className="modal__header">
-                                <div>
-                                    <h2 className="modal__title" id="complete-event-title">
-                                        Завершить мероприятие?
-                                    </h2>
-
-                                    <p className="modal__description">
-                                        После завершения участникам мероприятия «{event.Title}» будет начислена награда:
-                                        {" "}
-                                        +{event.RatingReward} рейтинга.
-                                    </p>
-                                </div>
-
-                                <button
-                                    className="modal__close"
-                                    type="button"
-                                    onClick={() => setIsCompleteConfirmOpen(false)}
-                                    aria-label="Закрыть окно подтверждения"
-                                    disabled={isLoading}
-                                >
-                                    ×
-                                </button>
-                            </div>
-
-                            <div className="modal__footer">
-                                <button
-                                    className="btn btn--secondary"
-                                    type="button"
-                                    onClick={() => setIsCompleteConfirmOpen(false)}
-                                    disabled={isLoading}
-                                >
-                                    Отмена
-                                </button>
-
-                                <button
-                                    className="btn btn--primary"
-                                    type="button"
-                                    disabled={isLoading}
-                                    onClick={async () => {
-                                        await completeEvent(event);
-                                        setIsCompleteConfirmOpen(false);
-                                        navigate(-1);
-                                    }}
-                                >
-                                    {isLoading ? "Завершение..." : "Завершить"}
-                                </button>
-                            </div>
-                        </section>
-                    </div>
+                    <ConfirmModal 
+                        title={"Завершить мероприятие?"}
+                        content={`После завершения участникам мероприятия "${event.Title}" будет начислена награда: +${event.RatingReward} рейтинга.`}
+                        onConfirm={async () => {
+                            await completeEvent(event);
+                            setIsCompleteConfirmOpen(false);
+                            navigate(-1);
+                        }}
+                        isOpen={isCompleteConfirmOpen}
+                        onClose={() => setIsCompleteConfirmOpen(false)}
+                        buttonContent={"Завершить"}
+                    />
                 )}
                 
             </section>

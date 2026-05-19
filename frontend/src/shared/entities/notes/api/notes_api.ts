@@ -1,6 +1,6 @@
 import {z} from "zod";
 import {noteSchema, type NoteType} from "../types/notes_types.ts";
-import {ApiClient} from "../../../../core/api/api_client.ts";
+import {apiClient} from "../../../../core/api/client.ts";
 
 export const noteAddDto = z.object({
     AuthorID: z.number().int().nonnegative(),
@@ -17,11 +17,9 @@ const notesResponseShema = z.object({
     Notes: z.array(noteSchema),
 });
 
-const client = new ApiClient();
-
 export const NotesApi = {
     async getNotes(id: number): Promise<NoteType[]> {
-      const response = await client.get(`/api/notes?class=${id}`, true);
+      const response = await apiClient.get(`/api/notes?class=${id}`, true);
       
       if (!response.checkStatus()) {
           throw new Error("Ошибка при получении списка заметок");
@@ -37,7 +35,7 @@ export const NotesApi = {
     },
     
     async addNote(dto: noteAddType): Promise<boolean> {
-        const response = await client.patch("/api/note/add", dto, true);
+        const response = await apiClient.patch("/api/note/add", dto, true);
         
         if (!response.checkStatus()) {
             throw new Error("Ошибка при добавлении заметки");
@@ -47,7 +45,7 @@ export const NotesApi = {
     },
     
     async deleteNote(id: number): Promise<boolean> {
-        const response = await client.delete(`/api/note/delete/${id}`, {}, true);
+        const response = await apiClient.delete(`/api/note/delete/${id}`, {}, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при удалении заметки");

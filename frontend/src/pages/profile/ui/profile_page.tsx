@@ -1,0 +1,278 @@
+import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { useAuthStore } from "../../../features/auth/store/auth_store.ts";
+import { UserRoles } from "../../../shared/entities/user/types/user_types.ts";
+import { NoteCard } from "../../../shared/ui/cards/note_card.tsx";
+import { ComplaintCard } from "../../../shared/ui/cards/complaint_card.tsx";
+import {TeacherScheduleWidget} from "../../../features/schedule/ui/components/teacher_schedule_widget.tsx";
+import {BurgerDrawerMenu, type BurgerDrawerMenuItem} from "../../../shared/ui/other/burger_menu.tsx";
+
+export function ProfilePage() {
+    const navigate = useNavigate();
+
+    const profile = useAuthStore((state) => state.user);
+    const getProfile = useAuthStore((state) => state.checkAuth);
+    const logout = useAuthStore((state) => state.logout);
+    const status = useAuthStore((state) => state.status);
+    const error = useAuthStore((state) => state.error);
+
+    const isLoading = status === "loading";
+
+    async function handleLogout() {
+        await logout();
+        navigate("/login", { replace: true });
+    }
+    
+    const menuItems: BurgerDrawerMenuItem[] = [
+        {
+            label: "Назад",
+            onClick: () => navigate(-1),
+        },
+        {
+            label: "Выйти",
+            onClick: () => logout(),
+            danger: true
+        }
+    ]
+
+    if (!profile) {
+        return (
+            <main className="main">
+                <section className="page">
+                    {isLoading && (
+                        <div className="profile-loading">
+                            <div className="skeleton" style={{ height: 120 }} />
+                            <div className="skeleton" style={{ height: 240 }} />
+                        </div>
+                    )}
+
+                    {!isLoading && error && (
+                        <div className="alert alert--danger">{error}</div>
+                    )}
+
+                    {!isLoading && !error && (
+                        <div className="empty-state">
+                            <h2 className="empty-state__title">Профиль не загружен</h2>
+                            <p className="empty-state__text">
+                                Данные пользователя отсутствуют или сессия недействительна.
+                            </p>
+                        </div>
+                    )}
+                </section>
+            </main>
+        );
+    }
+
+    const user = profile.User;
+    const notes = profile.Notes ?? [];
+    const complaints = profile.Complaints ?? [];
+
+    const fullName = `${user.Name ?? ""} ${user.LastName ?? ""}`.trim();
+    const initials = `${user.Name?.[0] ?? ""}${user.LastName?.[0] ?? ""}` || "?";
+
+    const isStudentLikeUser = user.Role === "User" || user.Role === "Helper";
+
+    const rating = user.Rating ?? 0;
+    const ratingPercent = Math.min(Math.max((rating / 5000) * 100, 0), 100);
+
+    const ratingLevel =
+        rating < 1500 ? "low" : rating < 3500 ? "medium" : "high";
+
+    return (
+        <main className="main">
+            <section className="page user-page">
+                <div className="user-hero">
+                    <div className="user-hero__main">
+                        <div className="profile-avatar">{initials}</div>
+
+                        <div className="user-hero__content">
+                            <h1 className="profile-hero__name">
+                                {fullName || "Без имени"}
+                            </h1>
+
+                            <div className="profile-hero__meta">
+                                <span className="badge badge--info">
+                                    {UserRoles[user.Role] ?? user.Role}
+                                </span>
+
+                                {isStudentLikeUser && (
+                                    <span className="badge badge--neutral">
+                                        Класс {user.Class}
+                                    </span>
+                                )}
+
+                                <span className="profile-login">@{user.Login}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="profile-actions">
+                        <BurgerDrawerMenu items={menuItems} title={"Меню"} />
+                    </div>
+                </div>
+
+                {isLoading && <div className="profile-progress" />}
+
+                {error && <div className="alert alert--danger">{error}</div>}
+
+                <div
+                    className={
+                        isStudentLikeUser
+                            ? "user-main-grid"
+                            : "user-main-grid user-main-grid--single"
+                    }
+                >
+                    <section className="card card--padded">
+                        <div className="section-head">
+                            <h2 className="section-title">Основная информация</h2>
+                            <p className="section-description">
+                                Базовые данные текущего пользователя системы.
+                            </p>
+                        </div>
+
+                        <div className="info-list">
+                            <InfoRow label="ID пользователя" value={user.Id} />
+                            <InfoRow label="Имя" value={user.Name} />
+                            <InfoRow label="Фамилия" value={user.LastName} />
+                            <InfoRow label="Полное имя" value={fullName || "Не указано"} />
+                            <InfoRow label="Логин" value={user.Login} />
+
+                            {isStudentLikeUser && (
+                                <InfoRow label="Класс" value={user.Class} />
+                            )}
+
+                            <InfoRow
+                                label="Роль"
+                                value={UserRoles[user.Role] ?? user.Role}
+                            />
+                        </div>
+                    </section>
+
+                    {(user.Role === "Admin" || user.Role === "Owner") && (
+                        <section className="card card--padded">
+                            <div className="section-head">
+                                <h2 className="section-title">Расписание учителя</h2>
+                                <p className="section-description">
+                                    Подробные данные о вашем расписании как учителя на текущую неделю.
+                                </p>
+                            </div>
+
+                            <TeacherScheduleWidget name={`${user.Name} ${user.LastName}`} id={user.Id}/>
+
+                        </section>
+                    )}
+
+                    {isStudentLikeUser && (
+                        <section className="card card--padded user-rating-card">
+                            <div className="section-head">
+                                <h2 className="section-title">Рейтинг</h2>
+                                <p className="section-description">
+                                    Текущий социальный рейтинг пользователя.
+                                </p>
+                            </div>
+
+                            <div className="user-rating-summary">
+                                <div>
+                                    <div
+                                        className={`profile-rating-value profile-rating-value--${ratingLevel}`}
+                                    >
+                                        {rating}
+                                    </div>
+
+                                    <div className="text-muted">из 5000</div>
+                                </div>
+
+                                <span className={`badge badge--${ratingLevel}`}>
+                                    {Math.round(ratingPercent)}%
+                                </span>
+                            </div>
+
+                            <div className="rating">
+                                <div className="rating__bar">
+                                    <div
+                                        className={`rating__fill rating__fill--${ratingLevel}`}
+                                        style={{ width: `${ratingPercent}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </section>
+                    )}
+                </div>
+
+                {isStudentLikeUser && (
+                    <div className="user-content-grid">
+                        <section className="card card--padded user-section-card">
+                            <div className="section-head section-head--row">
+                                <div>
+                                    <h2 className="section-title">Жалобы</h2>
+                                    <p className="section-description">
+                                        Жалобы, связанные с текущим пользователем.
+                                    </p>
+                                </div>
+
+                                <span
+                                    className={
+                                        complaints.length > 0
+                                            ? "badge badge--danger"
+                                            : "badge badge--neutral"
+                                    }
+                                >
+                                    {complaints.length}
+                                </span>
+                            </div>
+
+                            {complaints.length > 0 ? (
+                                <div className="feed">
+                                    {complaints.map((item) => (
+                                        <ComplaintCard key={item.ID} item={item} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-inline">Жалоб нет</div>
+                            )}
+                        </section>
+
+                        <section className="card card--padded user-section-card">
+                            <div className="section-head section-head--row">
+                                <div>
+                                    <h2 className="section-title">Заметки</h2>
+                                    <p className="section-description">
+                                        Поведенческие заметки, оставленные ответственными
+                                        пользователями.
+                                    </p>
+                                </div>
+
+                                <span className="badge badge--neutral">{notes.length}</span>
+                            </div>
+
+                            {notes.length > 0 ? (
+                                <div className="feed">
+                                    {notes.map((note) => (
+                                        <NoteCard key={note.ID} item={note} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-inline">Заметок нет</div>
+                            )}
+                        </section>
+                    </div>
+                )}
+            </section>
+        </main>
+    );
+}
+
+interface InfoRowProps {
+    label: string;
+    value: ReactNode;
+}
+
+function InfoRow({ label, value }: InfoRowProps) {
+    return (
+        <div className="info-row">
+            <span className="info-row__label">{label}</span>
+            <span className="info-row__value">{value || "Не указано"}</span>
+        </div>
+    );
+}

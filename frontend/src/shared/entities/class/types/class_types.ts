@@ -11,3 +11,8 @@ export const classSchema = z.object({
 });
 
 export type ClassType = z.infer<typeof classSchema>;
+
+export type addClassFormType = {
+    Name: string;
+    TeacherLogin: string;
+}

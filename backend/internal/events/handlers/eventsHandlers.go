@@ -326,7 +326,7 @@ func AddPlayersToEvent(s *storage.Storage) func(ctx *gin.Context) {
 			return
 		}
 
-		err := utils.CheckUserRole(s, ctx.GetString("Login"), "owner")
+		err := utils.CheckUserRole(s, ctx.GetString("Login"), "owner", "admin")
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",

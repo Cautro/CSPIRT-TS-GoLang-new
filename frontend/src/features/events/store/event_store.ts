@@ -1,11 +1,10 @@
-import type { ClassType } from "../../../shared/entities/class/types/class_types.ts";
 import { create } from "zustand";
-import { classApi } from "../../../shared/entities/class/api/class_api.ts";
 import {
     type AddEventPlayersType,
     EventsApi,
 } from "../../../shared/entities/events/api/events_api.ts";
 import type { EventType } from "../../../shared/entities/events/types/events_types.ts";
+import {type addEventFormValues, addEventUsecase} from "../models/add_event_usecase.ts";
 
 export type Status = "loading" | "error" | "idle";
 
@@ -13,49 +12,55 @@ interface State {
     status: Status;
     error: string | null;
     message: string | null;
-    classes: ClassType[];
     event: EventType | null;
-    class: ClassType | null;
+    events: EventType[] | null;
 
-    getClasses: () => Promise<void>;
+    getEvents: () => Promise<void>
+    addEvent: (form: addEventFormValues) => Promise<boolean>
     removePlayersFromEvent : (id: number, dto: AddEventPlayersType) => Promise<void>; 
-    addPlayersToEvent: (
-        eventId: number,
-        dto: AddEventPlayersType
-    ) => Promise<void>;
+    addPlayersToEvent: (eventId: number, dto: AddEventPlayersType) => Promise<void>;
     getEventById: (id: number) => Promise<void>;
     completeEvent: (item: EventType) => Promise<void>;
     deleteEvent: (id: number) => Promise<void>;
-    getClassById: (id: number) => Promise<void>;
 }
 
 export const useEventStore = create<State>()((set) => ({
     error: null,
     status: "idle",
     message: null,
-    class: null,
-    classes: [],
     event: null,
+    events: null,
 
-    getClasses: async () => {
-        set({
-            status: "loading",
-            error: null,
-        });
+    getEvents: async () => {
+        set({status: "loading"});
 
         try {
-            const response = await classApi.getClasses();
-
-            set({
-                status: "idle",
-                classes: response,
-                error: null,
-            });
+            const response = await EventsApi.getEvents();
+            set({status: "idle", events: response, error: null});
         } catch (e) {
             set({
                 error: e instanceof Error ? e.message : "Неизвестная ошибка",
                 status: "error",
             });
+        }
+    },
+
+    addEvent: async (form: addEventFormValues) => {
+        set({status: "loading", error: null});
+
+        try {
+            const response = await addEventUsecase(form);
+            if (response) {
+                set({status: "idle", error: null});
+                return true;
+            }
+            return false;
+        } catch (e) {
+            set({
+                error: e instanceof Error ? e.message : "Неизвестная ошибка",
+                status: "error",
+            });
+            return false
         }
     },
 
@@ -136,19 +141,4 @@ export const useEventStore = create<State>()((set) => ({
             });
         }
     },
-    
-    getClassById: async (id: number) => {
-        set({status: "loading", error: null,});
-
-        try {
-            const response = await classApi.getClassById(id);
-            set({status: "idle", error: null, class: response });
-        } catch (e) {
-            set({
-                error: e instanceof Error ? e.message : "Неизвестная ошибка",
-                status: "error",
-                event: null,
-            });
-        }
-    }
 }));
