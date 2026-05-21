@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"log"
 
 	"cspirt/internal/events/models"
 	"cspirt/internal/logger"
