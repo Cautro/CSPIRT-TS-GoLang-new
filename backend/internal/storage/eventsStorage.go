@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"log"
 
 	"cspirt/internal/events/models"
 	"cspirt/internal/logger"
 	userModels "cspirt/internal/users/models"
-	ratingModels "cspirt/internal/rating/models"
 )
 
 func (s *Storage) ActivateDueEvents() error {
@@ -702,10 +702,6 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) 
 		return errors.New("class not found")
 	}
 
-	if class.TeacherLogin != user.Login || user.Role != string(ratingModels.RoleOwner) {
-		return errors.New("only class teacher can add players to this event")
-	}
-
 	playerIDs = normalizePositiveIDs(playerIDs)
 	if len(playerIDs) == 0 {
 		return nil
@@ -720,6 +716,7 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) 
 			return errors.New("player not found")
 		}
 		if player.ClassID != class.ID {
+			log.Printf("DEBUG ERROR: PlayerID %d has ClassID %d, but expected %d", playerID, player.ClassID, class.ID)
 			return errors.New("all players must belong to teacher's class")
 		}
 	}
