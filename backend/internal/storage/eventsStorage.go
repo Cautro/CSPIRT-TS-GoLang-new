@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"log"
 
 	"cspirt/internal/events/models"
 	"cspirt/internal/logger"
@@ -697,6 +698,7 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) 
 	if err != nil {
 		return err
 	}
+
 	if class == nil {
 		return errors.New("class not found")
 	}

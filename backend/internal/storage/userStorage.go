@@ -65,12 +65,6 @@ func (s *Storage) AddUser(user models.User) error {
 		return errors.New("invalid role")
 	}
 
-	if utils.IsSystemRole(user.Role) {
-		user.Class = ""
-		user.ClassID = 0
-		user.Rating = 0
-	}
-
 	if err := validateNewUser(&user); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
