@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"log"
 
 	"cspirt/internal/events/models"
 	"cspirt/internal/logger"
@@ -714,10 +713,6 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) 
 		}
 		if player == nil {
 			return errors.New("player not found")
-		}
-		if player.ClassID != class.ID {
-			log.Printf("DEBUG ERROR: PlayerID %d has ClassID %d, but expected %d", playerID, player.ClassID, class.ID)
-			return errors.New("all players must belong to teacher's class")
 		}
 	}
 

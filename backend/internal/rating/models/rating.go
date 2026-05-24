@@ -3,6 +3,7 @@ package models
 type Role string
 
 const (
+    RolePublic Role = "public"
     RoleUser   Role = "User"
     RoleHelper Role = "Helper"
     RoleAdmin  Role = "Admin"

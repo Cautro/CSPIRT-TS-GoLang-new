@@ -25,6 +25,8 @@ func normalizeRole(role string) (string, error) {
 		return string(ratingModels.RoleHelper), nil
 	case strings.ToLower(string(ratingModels.RoleOwner)):
 		return string(ratingModels.RoleOwner), nil
+	case strings.ToLower(string(ratingModels.RolePublic)):
+		return string(ratingModels.RolePublic), nil
 	default:
 		return "", errors.New("invalid role")
 	}

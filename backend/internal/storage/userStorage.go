@@ -48,23 +48,6 @@ func (s *Storage) AddUser(user models.User) error {
 	}
 	user.Role = role
 
-	switch user.Role {
-	case "admin", "owner", "helper", "user":
-		// valid roles, do nothing
-	case "Admin", "Owner", "Helper", "User":
-		user.Role = strings.ToLower(user.Role)
-	default:
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_user",
-			Login:   user.Login,
-			Role:    user.Role,
-			Class:   user.Class,
-			Message: "invalid role",
-		})
-		return errors.New("invalid role")
-	}
-
 	if err := validateNewUser(&user); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
