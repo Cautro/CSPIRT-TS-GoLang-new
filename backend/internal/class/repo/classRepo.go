@@ -15,4 +15,10 @@ type ClassRepository interface {
 	DeleteClassByID(classID int, login string) error
 	GetAllClassTeachers() ([]models.SafeUser, error)
 	AddClass(input classModels.ClassInput, login string) error
+
+	// Parallel classes methods
+	AddParallel(name string, classesIDs []int) error
+	GetParallelClasses() ([]classModels.ParallelClass, error)
+	DeleteParallelClassByID(parallelClassID int, login string) error
+	QuarterComplete(parallelClassID int) ([]*classModels.Class, error)
 }

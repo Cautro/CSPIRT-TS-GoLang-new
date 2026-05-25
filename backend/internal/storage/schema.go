@@ -453,6 +453,37 @@ func (s *Storage) initComplaintStorage() error {
 	return nil
 }
 
+func (s *Storage) initParallelsStorage() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	query := `
+	CREATE TABLE IF NOT EXISTS parallels (
+		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Name TEXT NOT NULL,
+		Rating INTEGER NOT NULL DEFAULT 0,
+		BestClassID INTEGER NOT NULL,
+		ClassID INTEGER NOT NULL,
+		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE,
+		FOREIGN KEY (ParallelClassID) REFERENCES classes(Id) ON DELETE CASCADE
+	);`
+	
+	if _, err := s.db.Exec(query); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_parallels_class_pair ON parallels(ClassID, ParallelClassID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_parallels_class_id ON parallels(ClassID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_parallels_parallel_class_id ON parallels(ParallelClassID);`); err != nil {
+		return err
+	}
+	
+	return nil
+}
+
 func (s *Storage) ensureColumn(table string, column string, definition string) error {
 	rows, err := s.db.Query(`PRAGMA table_info(` + table + `)`)
 	if err != nil {

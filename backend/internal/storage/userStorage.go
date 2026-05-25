@@ -3,6 +3,7 @@ package storage
 import (
 	"cspirt/internal/logger"
 	"cspirt/internal/users/models"
+	ratMod "cspirt/internal/rating/models"
 	utils "cspirt/internal/utils"
 	"database/sql"
 	"encoding/json"
@@ -398,7 +399,7 @@ func validateNewUser(user *models.User) error {
 	if user.Role == "" {
 		return errors.New("role is required")
 	}
-	if !utils.IsSystemRole(user.Role) && user.Class == "" && user.ClassID <= 0 {
+	if !utils.IsSystemRole(user.Role) && user.Class == "" && user.ClassID <= 0 && user.Role != string(ratMod.RolePublic) {
 		return errors.New("class is required")
 	}
 	if user.Rating < 0 {
@@ -440,7 +441,7 @@ func (s *Storage) resolveUserClassLocked(user *models.User) error {
 		return nil
 	}
 
-	if user.Class == "" {
+	if user.Class == "" && user.Role != string(ratMod.RolePublic) {
 		return errors.New("class is required")
 	}
 	if err := s.ensureClassLocked(user.Class); err != nil {
@@ -451,7 +452,7 @@ func (s *Storage) resolveUserClassLocked(user *models.User) error {
 	if err != nil {
 		return err
 	}
-	if classID == 0 {
+	if classID == 0 && user.Role != string(ratMod.RolePublic) {
 		return errors.New("class not found")
 	}
 
@@ -465,14 +466,14 @@ func (s *Storage) resolveSafeUserClassLocked(user *models.SafeUser) error {
 		if err != nil {
 			return err
 		}
-		if class == nil {
+		if class == nil && user.Role != string(ratMod.RolePublic) {
 			return errors.New("class not found")
 		}
 		user.Class = class.Name
 		return nil
 	}
 
-	if user.Class == "" {
+	if user.Class == "" && user.Role != string(ratMod.RolePublic) {
 		return errors.New("class is required")
 	}
 	if err := s.ensureClassLocked(user.Class); err != nil {
@@ -483,7 +484,7 @@ func (s *Storage) resolveSafeUserClassLocked(user *models.SafeUser) error {
 	if err != nil {
 		return err
 	}
-	if classID == 0 {
+	if classID == 0 && user.Role != string(ratMod.RolePublic) {
 		return errors.New("class not found")
 	}
 

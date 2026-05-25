@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"strconv"
+	"sort"
 ) 
 
 func (s *Storage) initClassStorage() error {
@@ -22,6 +24,11 @@ func (s *Storage) initClassStorage() error {
 		Name TEXT NOT NULL UNIQUE,
 		TeacherLogin TEXT,
 		Members TEXT NOT NULL DEFAULT '[]',
+		Parallel INTEGER NOT NULL,
+		FirstQuarterComplete INTEGER NOT NULL DEFAULT 0,
+		SecondQuarterComplete INTEGER NOT NULL DEFAULT 0,
+		ThirdQuarterComplete INTEGER NOT NULL DEFAULT 0,
+		QuarterComplete INTEGER NOT NULL DEFAULT 0,
 		UserTotalRating INTEGER NOT NULL DEFAULT 0,
 		ClassTotalRating INTEGER NOT NULL DEFAULT 0,
 		FOREIGN KEY (TeacherLogin) REFERENCES users(Login) ON DELETE SET NULL
@@ -58,6 +65,222 @@ func (s *Storage) EnsureClass(name string) error {
 	}
 
 	return s.syncClassLocked(name)
+}
+
+func (s *Storage) AddParallel(name string, classesIDs []int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	name = normalizeClassName(name)
+	if name == "" {
+		return errors.New("parallel class name is required")
+	}
+	if len(classesIDs) == 0 {
+		return errors.New("at least one class id is required")
+	}
+
+	classes := make([]classModels.Class, 0, len(classesIDs))
+	for _, classID := range classesIDs {
+		class, err := s.getClassByIDLocked(classID)
+		if err != nil {
+			return err
+		}
+		if class == nil {
+			return errors.New("class with id " + strconv.Itoa(classID) + " not found")
+		}
+		classes = append(classes, *class)
+	}
+
+	bestClassID := classesIDs[0]
+	maxRating := classes[0].ClassTotalRating
+	for i, class := range classes {
+		if class.ClassTotalRating > maxRating {
+			maxRating = class.ClassTotalRating
+			bestClassID = classesIDs[i]
+		}
+	}
+
+	classIDsJSON, err := json.Marshal(classesIDs)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(`
+		INSERT INTO parallels (Name, BestClassId, ClassesIds, ClassTotalRating)
+		VALUES (?, ?, ?, ?)
+	`, name, bestClassID, string(classIDsJSON), maxRating)
+	return err
+}
+
+func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT Id, Name, BestClassId, ClassesIds, ClassTotalRating
+		FROM parallels
+		ORDER BY Name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	parallelClasses := make([]classModels.ParallelClass, 0)
+	for rows.Next() {
+		var parallelClass classModels.ParallelClass
+		var classIDsJSON string
+
+		if err := rows.Scan(
+			&parallelClass.ID,
+			&parallelClass.Name,
+			&parallelClass.BestClassID,
+			&classIDsJSON,
+			&parallelClass.ClassTotalRating,
+		); err != nil {
+			return nil, err
+		}
+
+		if classIDsJSON != "" {
+			if err := json.Unmarshal([]byte(classIDsJSON), &parallelClass.ClassesIDs); err != nil {
+				return nil, err
+			}
+		}
+		if parallelClass.ClassesIDs == nil {
+			parallelClass.ClassesIDs = []int{}
+		}
+
+		parallelClasses = append(parallelClasses, parallelClass)
+	}
+
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+
+	return parallelClasses, nil
+}
+
+func (s *Storage) QuarterComplete(parallelClassID int) ([]*classModels.Class, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if parallelClassID <= 0 {
+		return nil, errors.New("parallel class id is required")
+	}
+
+	parallelClass, err := s.getParallelClassByIDLocked(parallelClassID)
+	if err != nil {
+		return nil, err
+	}
+	if parallelClass == nil {
+		return nil, errors.New("parallel class not found")
+	}
+
+	classes := make([]*classModels.Class, 0, len(parallelClass.ClassesIDs))
+	for _, classID := range parallelClass.ClassesIDs {
+		class, err := s.getClassByIDLocked(classID)
+		if err != nil {
+			return nil, err
+		}
+		if class == nil {
+			return nil, errors.New("class with id " + strconv.Itoa(classID) + " not found")
+		}
+		classes = append(classes, class)
+	}
+
+	sort.Slice(classes, func(i, j int) bool {
+		if classes[i].ClassTotalRating == classes[j].ClassTotalRating {
+			return classes[i].Name < classes[j].Name
+		}
+		return classes[i].ClassTotalRating > classes[j].ClassTotalRating
+	})
+
+	top3 := make([]*classModels.Class, 3)
+
+	if len(classes) > 0 {
+		classes[0].FirstQuarterComplete += 1
+		top3[0] = classes[0]
+	}
+	if len(classes) > 1 {
+		classes[1].SecondQuarterComplete += 1
+		top3[1] = classes[1]
+	}
+	if len(classes) > 2 {
+		classes[2].ThirdQuarterComplete += 1
+		top3[2] = classes[2]
+	}
+
+	for _, class := range top3 {
+		if class == nil {
+			continue
+		}
+		_, err := s.db.Exec(`
+			UPDATE classes
+			SET FirstQuarterComplete = ?, SecondQuarterComplete = ?, ThirdQuarterComplete = ?
+			WHERE Id = ?
+		`, class.FirstQuarterComplete, class.SecondQuarterComplete, class.ThirdQuarterComplete, class.ID)
+		if err != nil {
+			return nil, err
+		}
+	} 
+
+	return top3, nil
+}
+
+
+func (s *Storage) getParallelClassByIDLocked(parallelClassID int) (*classModels.ParallelClass, error) {
+	row := s.db.QueryRow(`
+		SELECT Id, Name, BestClassId, ClassesIds, ClassTotalRating
+		FROM parallels
+		WHERE Id = ?`, parallelClassID)
+	var parallelClass classModels.ParallelClass
+	var classIDsJSON string
+	if err := row.Scan(
+		&parallelClass.ID,
+		&parallelClass.Name,
+		&parallelClass.BestClassID,
+		&classIDsJSON,
+		&parallelClass.ClassTotalRating,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if classIDsJSON != "" {
+		if err := json.Unmarshal([]byte(classIDsJSON), &parallelClass.ClassesIDs); err != nil {
+			return nil, err
+		}
+	}
+	if parallelClass.ClassesIDs == nil {
+		parallelClass.ClassesIDs = []int{}
+	}
+	return &parallelClass, nil
+}
+
+func (s *Storage) DeleteParallelClassByID(parallelClassID int, login string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if parallelClassID <= 0 {
+		return errors.New("parallel class id is required")
+	}
+
+	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
+	if err != nil {
+		return err
+	}
+	if !check {
+		return errors.New("only owners can delete parallel classes")
+	}
+
+	_, err = s.db.Exec(`
+		DELETE FROM parallels
+		WHERE Id = ?
+	`, parallelClassID)
+	return err
 }
 
 func (s *Storage) DeleteClassByID(classID int, login string) error {
@@ -264,7 +487,8 @@ func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 	defer s.mu.Unlock()
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating
+		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
+        FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
 		FROM classes
 		ORDER BY Name
 	`)
@@ -613,7 +837,8 @@ func (s *Storage) getClassByNameLocked(name string) (*classModels.Class, error) 
 
 func (s *Storage) getClassByIDLocked(id int) (*classModels.Class, error) {
 	row := s.db.QueryRow(`
-		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating
+		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
+        FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
 		FROM classes
 		WHERE Id = ?
 	`, id)
@@ -673,6 +898,9 @@ func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool)
 		&membersJSON,
 		&class.UserTotalRating,
 		&class.ClassTotalRating,
+		&class.FirstQuarterComplete,
+		&class.SecondQuarterComplete,
+		&class.ThirdQuarterComplete,
 	); err != nil {
 		return classModels.Class{}, err
 	}

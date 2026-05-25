@@ -65,6 +65,13 @@ func registerClassRoutes(auth *gin.RouterGroup, s *storage.Storage) {
 	auth.GET("/classes/:class_id/users", classHandlers.GetClassUsersHandler(s))
 	auth.GET("/classes/:class_id/teacher", classHandlers.GetClassTeacherHandler(s))
 	auth.PATCH("/classes/:class_id/teacher", classHandlers.SetClassTeacherHandler(s))
+	auth.PATCH("/classes/parallel/add", classHandlers.AddParallelClassHandler(s))
+	auth.GET("/classes/parallel", classHandlers.GetParallelClassesHandler(s))
+	auth.DELETE("/classes/parallel/delete", classHandlers.DeleteParallelClassHandler(s))
+	auth.GET("/classes/parallel/:parallel_class_id", classHandlers.GetParallelClassByIDHandler(s))
+	auth.GET("/classes/parallel/:parallel_class_id/users", classHandlers.GetParallelClassUsersHandler(s))
+	auth.PATCH("/classes/quarter/complete", classHandlers.CompleteQuarterHandler(s))
+	auth.GET("/classes/parallel/:parallel_id/best", classHandlers.GetBestClassInParallelHandler(s))
 }
 
 func registerRatingRoutes(auth *gin.RouterGroup, s *storage.Storage) {

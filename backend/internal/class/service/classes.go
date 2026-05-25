@@ -18,6 +18,43 @@ func NewClassService(classes repo.ClassRepository, jwtSecret string) *ClassServi
 
 func (s *ClassService) GetAllClassTeachers() ([]userModels.SafeUser, error) {
 	return s.classes.GetAllClassTeachers()
+} 
+
+func (s *ClassService) AddParallelClass(name string, classesIDs []int, login string) error {
+	return s.classes.AddParallel(name, classesIDs)
+}
+
+func (s *ClassService) GetParallelClasses() ([]classModels.ParallelClass, error) {
+	parallelClasses, err := s.classes.GetParallelClasses()
+	if err != nil {
+		return nil, err
+	}
+	if parallelClasses == nil {
+		return []classModels.ParallelClass{}, nil
+	}
+
+	return parallelClasses, nil
+}
+
+func (s *ClassService) GetBestClassInParallel(parallelID int) (*classModels.Class, error) {
+	parallelClasses, err := s.classes.GetParallelClasses()
+	if err != nil {
+		return nil, err
+	}
+	for _, parallelClass := range parallelClasses {
+		if parallelClass.ID == parallelID {
+			return s.classes.GetClassByID(parallelClass.BestClassID)
+		}
+	}
+	return nil, nil
+}
+
+func (s *ClassService) CompleteQuarter(parallelClassId int) ([]*classModels.Class, error) {
+	return s.classes.QuarterComplete(parallelClassId)
+}
+
+func (s *ClassService) DeleteParallelClass(parallelClassID int, login string) error {
+	return s.classes.DeleteParallelClassByID(parallelClassID, login)
 }
 
 func (s *ClassService) AddClass(input classModels.ClassInput, login string) error {

@@ -28,6 +28,195 @@ func GetClassTeachersHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+func AddParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input classModels.ParallelClass
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		if input.Name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Parallel class name is required"})
+			return
+		}
+
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "add_parallel_class",
+			Login:   c.GetString("Login"),
+			Message: "Add parallel class input: " + input.Name,
+		})
+
+		classService := sr.NewClassService(s, s.Secret)
+
+		if err := classService.AddParallelClass(input.Name, input.ClassesIDs, c.GetString("Login")); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{"message": "Parallel class added"})
+	}
+}
+
+func GetParallelClassesHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		classService := sr.NewClassService(s, s.Secret)
+		parallelClasses, err := classService.GetParallelClasses()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"ParallelClasses": parallelClasses})
+	}
+}
+
+func DeleteParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parallelClassIdStr := c.Query("parallel_class_id")
+		parallelClassId, err := strconv.Atoi(parallelClassIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Parallel Class ID format"})
+			return
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
+		if err := classService.DeleteParallelClass(parallelClassId, c.GetString("Login")); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete parallel class"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Parallel class deleted"})
+	}
+}
+
+func GetParallelClassByIDHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parallelClassIdStr := c.Param("parallel_class_id")
+		parallelClassId, err := strconv.Atoi(parallelClassIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Parallel Class ID format"})
+			return
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
+		parallelClasses, err := classService.GetParallelClasses()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
+			return
+		}
+
+		var parallelClass *classModels.ParallelClass
+		for _, pc := range parallelClasses {
+			if pc.ID == parallelClassId {
+				parallelClass = &pc
+				break
+			}
+		}
+
+		if parallelClass == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Parallel class not found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"ParallelClass": parallelClass})
+	}
+}
+
+func GetParallelClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parallelClassIdStr := c.Param("parallel_class_id")
+		parallelClassId, err := strconv.Atoi(parallelClassIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Parallel Class ID format"})
+			return
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
+		parallelClasses, err := classService.GetParallelClasses()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
+			return
+		}
+
+		var parallelClass *classModels.ParallelClass
+		for _, pc := range parallelClasses {
+			if pc.ID == parallelClassId {
+				parallelClass = &pc
+				break
+			}
+		}
+
+		if parallelClass == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Parallel class not found"})
+			return
+		}
+
+		var allUsers []userModels.SafeUser
+		for _, classID := range parallelClass.ClassesIDs {
+			users, err := classService.GetUsersByClassID(classID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users for class ID " + strconv.Itoa(classID)})
+				return
+			}
+			allUsers = append(allUsers, users...)
+		}
+
+		c.JSON(http.StatusOK, gin.H{"Users": allUsers})
+	}
+}
+
+func CompleteQuarterHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parallelClassIdStr := c.Query("parallel_class_id")
+		if parallelClassIdStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing parallel_class_id"})
+			return
+		}
+		parallelClassId, err := strconv.Atoi(parallelClassIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Parallel Class ID format"})
+			return
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
+		classes, err := classService.CompleteQuarter(parallelClassId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete quarter"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Quarter completed", "1st": classes[0], "2nd": classes[1], "3rd": classes[2]})
+	}
+}
+
+func GetBestClassInParallelHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parallelClassIdStr := c.Param("parallel_id")
+		parallelClassId, err := strconv.Atoi(parallelClassIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Parallel Class ID format"})
+			return
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
+		bestClass, err := classService.GetBestClassInParallel(parallelClassId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve best class in parallel"})
+			return
+		}
+		if bestClass == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Best class in parallel not found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"BestClass": bestClass})
+	}
+}
+
 func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input classModels.ClassInput
@@ -129,11 +318,6 @@ func GetClassesHandler(s *storage.Storage) gin.HandlerFunc {
 
 func GetClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := authenticatedUser(c, s, "get_class_users")
-		if !ok {
-			return
-		}
-
 		classIdStr := c.Param("class_id")
 		classId, err := strconv.Atoi(classIdStr)
 
@@ -150,11 +334,6 @@ func GetClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 		if class == nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
-			return
-		}
-
-		if !canReadClass(user, classId) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this class"})
 			return
 		}
 
@@ -170,11 +349,6 @@ func GetClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
 
 func GetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := authenticatedUser(c, s, "get_class_teacher")
-		if !ok {
-			return
-		}
-
 		classIdStr := c.Param("class_id")
 		classId, err := strconv.Atoi(classIdStr)
 		if err != nil {
@@ -190,11 +364,6 @@ func GetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 		if class == nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Class not found"})
-			return
-		}
-
-		if !canReadClass(user, classId) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this class"})
 			return
 		}
 
@@ -283,12 +452,4 @@ func authenticatedUser(c *gin.Context, s *storage.Storage, action string) (*user
 func canManageClasses(role string) bool {
 	return strings.EqualFold(role, string(ratingModels.RoleAdmin)) ||
 		strings.EqualFold(role, string(ratingModels.RoleOwner))
-}
-
-func canReadClass(user *userModels.User, classID int) bool {
-	if canManageClasses(user.Role) {
-		return true
-	}
-
-	return user.ClassID == classID
 }

@@ -3,13 +3,26 @@ package models
 import "cspirt/internal/users/models"
 
 type Class struct {
+	ID                int               `json:"Id"`
+	Name              string            `json:"Name"`
+	TeacherLogin      string            `json:"TeacherLogin,omitempty"`
+	Teacher           *models.SafeUser  `json:"Teacher,omitempty"` 
+	FirstQuarterComplete int               `json:"FirstQuarterComplete"`
+	SecondQuarterComplete int               `json:"SecondQuarterComplete"`
+	ThirdQuarterComplete int               `json:"ThirdQuarterComplete"`
+	QuarterComplete int               `json:"QuarterComplete"`
+	Members           []models.SafeUser `json:"Members"`
+	Parallel          int	        	`json:"Parallel"`
+	UserTotalRating   int               `json:"UserTotalRating"`
+	ClassTotalRating  int               `json:"ClassTotalRating"`
+}
+
+type ParallelClass struct {
 	ID           int        `json:"Id"`
 	Name         string     `json:"Name"`
-	TeacherLogin string     `json:"TeacherLogin,omitempty"`
-	Teacher      *models.SafeUser  `json:"Teacher,omitempty"` 
-	Members      []models.SafeUser `json:"Members"`
-	UserTotalRating  int        `json:"UserTotalRating"`
-	ClassTotalRating  int        `json:"ClassTotalRating"`
+	BestClassID   int       `json:"BestClassId"`
+	ClassesIDs    []int     `json:"ClassesIds"`
+	ClassTotalRating  int   `json:"ClassTotalRating"`
 }
 
 type ClassTeacherInput struct {
