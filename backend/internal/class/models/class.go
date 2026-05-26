@@ -22,6 +22,7 @@ type ParallelClass struct {
 	Name         string     `json:"Name"`
 	BestClassID   int       `json:"BestClassId"`
 	ClassesIDs    []int     `json:"ClassesIds"`
+	ValidClasses  []int     `json:"ValidClasses"`
 	ClassTotalRating  int   `json:"ClassTotalRating"`
 }
 

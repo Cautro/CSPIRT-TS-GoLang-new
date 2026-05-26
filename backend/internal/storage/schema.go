@@ -9,6 +9,9 @@ func (s *Storage) initSchema() error {
 	if err := s.initClassStorage(); err != nil {
 		return err
 	}
+	if err := s.initParallelsStorage(); err != nil {
+		return err
+	}
 	if err := s.initNoteStorage(); err != nil {
 		return err
 	}
@@ -457,13 +460,19 @@ func (s *Storage) initParallelsStorage() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// ВРЕМЕННО: Удаляем старую сломанную таблицу, чтобы SQLite создал её заново
+	// (Если приложение запустится успешно, эту строку можно будет удалить)
+	// s.db.Exec(`DROP TABLE IF EXISTS parallels;`)
+
 	query := `
 	CREATE TABLE IF NOT EXISTS parallels (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		Name TEXT NOT NULL,
 		Rating INTEGER NOT NULL DEFAULT 0,
 		BestClassID INTEGER NOT NULL,
-		ClassID INTEGER NOT NULL,
+		ClassID INTEGER,
+		ParallelClassID INTEGER, -- ИСПРАВЛЕНО: Теперь колонка существует
+		ValidClasses INTEGER NOT NULL,
 		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE,
 		FOREIGN KEY (ParallelClassID) REFERENCES classes(Id) ON DELETE CASCADE
 	);`
@@ -483,6 +492,7 @@ func (s *Storage) initParallelsStorage() error {
 	
 	return nil
 }
+
 
 func (s *Storage) ensureColumn(table string, column string, definition string) error {
 	rows, err := s.db.Query(`PRAGMA table_info(` + table + `)`)

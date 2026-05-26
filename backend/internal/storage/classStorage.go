@@ -12,11 +12,18 @@ import (
 	"strings"
 	"strconv"
 	"sort"
+	"unicode"
 ) 
 
 func (s *Storage) initClassStorage() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.db.Exec(`ALTER TABLE classes ADD COLUMN Parallel INTEGER NOT NULL DEFAULT 0;`)
+	s.db.Exec(`ALTER TABLE classes ADD COLUMN FirstQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
+	s.db.Exec(`ALTER TABLE classes ADD COLUMN SecondQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
+	s.db.Exec(`ALTER TABLE classes ADD COLUMN ThirdQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
+	s.db.Exec(`ALTER TABLE classes ADD COLUMN QuarterComplete INTEGER NOT NULL DEFAULT 0;`)
 
 	query := `
 	CREATE TABLE IF NOT EXISTS classes (
@@ -369,6 +376,16 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 		return errors.New("class name is required")
 	}
 
+	num, _, ok := ParseClass(name)
+	if !ok {
+		return errors.New("invalid class name format")
+	}
+
+	parallelID, err := s.AddToParallelLocked(num)
+	if err != nil {
+		return errors.New("error adding class to parallel")
+	}
+
 	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
 	if err != nil {
 		return err
@@ -378,7 +395,6 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 	}
 
 	teacherLogin := normalizeLogin(input.TeacherLogin)
-
 	if teacherLogin != "" {
 		teacher, err := s.getUserByLoginLocked(teacherLogin)
 		if err != nil {
@@ -393,9 +409,9 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 	}
 
 	_, err = s.db.Exec(`
-		INSERT INTO classes (Name, TeacherLogin)
-		VALUES (?, ?)
-	`, name, nullableString(teacherLogin))
+		INSERT INTO classes (Name, TeacherLogin, Parallel)
+		VALUES (?, ?, ?)
+	`, name, nullableString(teacherLogin), parallelID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -406,6 +422,58 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 	}
 
 	return s.syncClassLocked(name)
+}
+
+func ParseClass(s string) (int, string, bool) {
+	var number int
+	var letter string
+
+	runes := []rune(s)
+	
+	for _, r := range runes {
+		if unicode.IsDigit(r) {
+			number = number*10 + int(r-'0')
+		} else if unicode.IsLetter(r) {
+			letter += string(r)
+		}
+	}
+
+	if number == 0 || letter == "" {
+		return 0, "", false
+	}
+
+	return number, letter, true
+}
+
+func (s *Storage) AddToParallelLocked(numberClass int) (int, error) {
+	var parallelID int
+
+	err := s.db.QueryRow(`
+		SELECT Id FROM parallels WHERE ValidClasses = ? LIMIT 1
+	`, numberClass).Scan(&parallelID)
+	
+	if err == sql.ErrNoRows {
+		name := strconv.Itoa(numberClass) + " параллель"
+		res, err := s.db.Exec(`
+			INSERT INTO parallels (Name, BestClassID, ValidClasses)
+			VALUES (?, 0, ?)
+		`, name, numberClass)
+		if err != nil {
+			return 0, err
+		}
+		
+		insertID, err := res.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+		return int(insertID), nil
+	}
+	
+	if err != nil {
+		return 0, err
+	}
+
+	return parallelID, nil
 }
 
 func nullableString(value string) interface{} {

@@ -195,7 +195,7 @@ func CompleteQuarterHandler(s *storage.Storage) gin.HandlerFunc {
 
 func GetBestClassInParallelHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		parallelClassIdStr := c.Param("parallel_id")
+		parallelClassIdStr := c.Param("parallel_class_id")
 		parallelClassId, err := strconv.Atoi(parallelClassIdStr)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Parallel Class ID format"})

@@ -17,10 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// NewRouter is the HTTP composition root for the backend.
-//
-// Keep route registration here instead of main.go so the executable only owns
-// process setup: config, storage, seeding, and server startup.
 func NewRouter(s *storage.Storage, jwtSecret string) *gin.Engine {
 	router := gin.Default()
 
@@ -71,7 +67,7 @@ func registerClassRoutes(auth *gin.RouterGroup, s *storage.Storage) {
 	auth.GET("/classes/parallel/:parallel_class_id", classHandlers.GetParallelClassByIDHandler(s))
 	auth.GET("/classes/parallel/:parallel_class_id/users", classHandlers.GetParallelClassUsersHandler(s))
 	auth.PATCH("/classes/quarter/complete", classHandlers.CompleteQuarterHandler(s))
-	auth.GET("/classes/parallel/:parallel_id/best", classHandlers.GetBestClassInParallelHandler(s))
+	auth.GET("/classes/parallel/:parallel_class_id/best", classHandlers.GetBestClassInParallelHandler(s))
 }
 
 func registerRatingRoutes(auth *gin.RouterGroup, s *storage.Storage) {
