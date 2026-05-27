@@ -217,6 +217,26 @@ func GetBestClassInParallelHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+func GetClassesInParallelHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parallelClassIdStr := c.Param("parallel_class_id")
+		parallelClassId, err := strconv.Atoi(parallelClassIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Parallel Class ID format"})
+			return
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
+		classes, err := classService.GetClassesInParallel(parallelClassId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve classes in parallel"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"Classes": classes})
+	}
+}
+
 func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input classModels.ClassInput

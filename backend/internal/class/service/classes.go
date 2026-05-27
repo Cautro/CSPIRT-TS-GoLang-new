@@ -36,6 +36,10 @@ func (s *ClassService) GetParallelClasses() ([]classModels.ParallelClass, error)
 	return parallelClasses, nil
 }
 
+func (s *ClassService) GetClassesInParallel(parallelID int) ([]classModels.Class, error) {
+	return s.classes.GetClassesInParallel(parallelID)
+}
+
 func (s *ClassService) GetBestClassInParallel(parallelID int) (*classModels.Class, error) {
 	parallelClasses, err := s.classes.GetParallelClasses()
 	if err != nil {

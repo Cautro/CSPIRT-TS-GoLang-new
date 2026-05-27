@@ -586,6 +586,54 @@ func (s *Storage) saveClassTeacherLocked(name string, teacherLogin string) error
 	return s.syncClassLocked(name)
 }
 
+func (s *Storage) GetClassesInParallel(id int) ([]classModels.Class, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT Id, Name, Grade, Letter, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
+		FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
+		FROM classes
+		WHERE ParallelId = ?
+		ORDER BY Name
+	`, id)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_classes_in_parallel",
+			Message: "failed to query classes in parallel: " + err.Error(),
+		})
+		return nil, err
+	}
+	defer rows.Close()
+
+	classes := make([]classModels.Class, 0)
+	for rows.Next() {
+		class, err := s.scanClassRowsLocked(rows)
+		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "get_classes_in_parallel",
+				Message: "failed to scan class: " + err.Error(),
+			})
+			return nil, err
+		}
+		classes = append(classes, class)
+	}
+
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+
+	if err := s.loadClassTeachersLocked(classes); err != nil {
+		return nil, err
+	}
+
+	return classes, nil
+}
+
 func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

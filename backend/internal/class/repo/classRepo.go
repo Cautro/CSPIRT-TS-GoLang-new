@@ -21,4 +21,5 @@ type ClassRepository interface {
 	GetParallelClasses() ([]classModels.ParallelClass, error)
 	DeleteParallelClassByID(parallelClassID int, login string) error
 	QuarterComplete(parallelClassID int) ([]*classModels.Class, error)
+	GetClassesInParallel(id int) ([]classModels.Class, error)
 }
