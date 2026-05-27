@@ -9,17 +9,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"strings"
-	"strconv"
 	"sort"
+	"strconv"
+	"strings"
 	"unicode"
-) 
+)
 
 func (s *Storage) initClassStorage() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.db.Exec(`ALTER TABLE classes ADD COLUMN Parallel INTEGER NOT NULL DEFAULT 0;`)
+	s.db.Exec(`ALTER TABLE classes ADD COLUMN Grade INTEGER NOT NULL DEFAULT 0;`)
+	s.db.Exec(`ALTER TABLE classes ADD COLUMN Letter TEXT NOT NULL DEFAULT '';`)
 	s.db.Exec(`ALTER TABLE classes ADD COLUMN FirstQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
 	s.db.Exec(`ALTER TABLE classes ADD COLUMN SecondQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
 	s.db.Exec(`ALTER TABLE classes ADD COLUMN ThirdQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
@@ -29,9 +30,10 @@ func (s *Storage) initClassStorage() error {
 	CREATE TABLE IF NOT EXISTS classes (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
 		Name TEXT NOT NULL UNIQUE,
+		Grade INTEGER NOT NULL DEFAULT 0,
+		Letter TEXT NOT NULL DEFAULT '',
 		TeacherLogin TEXT,
 		Members TEXT NOT NULL DEFAULT '[]',
-		Parallel INTEGER NOT NULL,
 		FirstQuarterComplete INTEGER NOT NULL DEFAULT 0,
 		SecondQuarterComplete INTEGER NOT NULL DEFAULT 0,
 		ThirdQuarterComplete INTEGER NOT NULL DEFAULT 0,
@@ -107,16 +109,37 @@ func (s *Storage) AddParallel(name string, classesIDs []int) error {
 		}
 	}
 
-	classIDsJSON, err := json.Marshal(classesIDs)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`
+		INSERT INTO parallels (Name, BestClassID, ClassTotalRating)
+		VALUES (?, ?, ?)
+	`, name, bestClassID, maxRating)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.db.Exec(`
-		INSERT INTO parallels (Name, BestClassId, ClassesIds, ClassTotalRating)
-		VALUES (?, ?, ?, ?)
-	`, name, bestClassID, string(classIDsJSON), maxRating)
-	return err
+	parallelID64, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	parallelID := int(parallelID64)
+
+	for _, classID := range classesIDs {
+		_, err := tx.Exec(`
+			INSERT INTO parallel_classes (ParallelID, ClassID)
+			VALUES (?, ?)
+		`, parallelID, classID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
@@ -124,7 +147,7 @@ func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
 	defer s.mu.Unlock()
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, BestClassId, ClassesIds, ClassTotalRating
+		SELECT Id, Name, BestClassID, ClassTotalRating
 		FROM parallels
 		ORDER BY Name
 	`)
@@ -136,26 +159,32 @@ func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
 	parallelClasses := make([]classModels.ParallelClass, 0)
 	for rows.Next() {
 		var parallelClass classModels.ParallelClass
-		var classIDsJSON string
 
 		if err := rows.Scan(
 			&parallelClass.ID,
 			&parallelClass.Name,
 			&parallelClass.BestClassID,
-			&classIDsJSON,
 			&parallelClass.ClassTotalRating,
 		); err != nil {
 			return nil, err
 		}
 
-		if classIDsJSON != "" {
-			if err := json.Unmarshal([]byte(classIDsJSON), &parallelClass.ClassesIDs); err != nil {
+		// load class ids for this parallel
+		classRows, err := s.db.Query(`SELECT ClassID FROM parallel_classes WHERE ParallelID = ? ORDER BY ClassID`, parallelClass.ID)
+		if err != nil {
+			return nil, err
+		}
+		classIDs := make([]int, 0)
+		for classRows.Next() {
+			var cid int
+			if err := classRows.Scan(&cid); err != nil {
+				classRows.Close()
 				return nil, err
 			}
+			classIDs = append(classIDs, cid)
 		}
-		if parallelClass.ClassesIDs == nil {
-			parallelClass.ClassesIDs = []int{}
-		}
+		classRows.Close()
+		parallelClass.ClassesIDs = classIDs
 
 		parallelClasses = append(parallelClasses, parallelClass)
 	}
@@ -231,24 +260,21 @@ func (s *Storage) QuarterComplete(parallelClassID int) ([]*classModels.Class, er
 		if err != nil {
 			return nil, err
 		}
-	} 
+	}
 
 	return top3, nil
 }
 
-
 func (s *Storage) getParallelClassByIDLocked(parallelClassID int) (*classModels.ParallelClass, error) {
 	row := s.db.QueryRow(`
-		SELECT Id, Name, BestClassId, ClassesIds, ClassTotalRating
+		SELECT Id, Name, BestClassID, ClassTotalRating
 		FROM parallels
 		WHERE Id = ?`, parallelClassID)
 	var parallelClass classModels.ParallelClass
-	var classIDsJSON string
 	if err := row.Scan(
 		&parallelClass.ID,
 		&parallelClass.Name,
 		&parallelClass.BestClassID,
-		&classIDsJSON,
 		&parallelClass.ClassTotalRating,
 	); err != nil {
 		if err == sql.ErrNoRows {
@@ -256,14 +282,27 @@ func (s *Storage) getParallelClassByIDLocked(parallelClassID int) (*classModels.
 		}
 		return nil, err
 	}
-	if classIDsJSON != "" {
-		if err := json.Unmarshal([]byte(classIDsJSON), &parallelClass.ClassesIDs); err != nil {
+
+	// load class ids
+	rows, err := s.db.Query(`SELECT ClassID FROM parallel_classes WHERE ParallelID = ? ORDER BY ClassID`, parallelClass.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	classIDs := make([]int, 0)
+	for rows.Next() {
+		var cid int
+		if err := rows.Scan(&cid); err != nil {
 			return nil, err
 		}
+		classIDs = append(classIDs, cid)
 	}
-	if parallelClass.ClassesIDs == nil {
-		parallelClass.ClassesIDs = []int{}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
+	parallelClass.ClassesIDs = classIDs
+
 	return &parallelClass, nil
 }
 
@@ -376,12 +415,12 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 		return errors.New("class name is required")
 	}
 
-	num, _, ok := ParseClass(name)
+	num, letter, ok := ParseClass(name)
 	if !ok {
 		return errors.New("invalid class name format")
 	}
 
-	parallelID, err := s.AddToParallelLocked(num)
+	_, err := s.AddToParallelLocked(num)
 	if err != nil {
 		return errors.New("error adding class to parallel")
 	}
@@ -409,9 +448,9 @@ func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
 	}
 
 	_, err = s.db.Exec(`
-		INSERT INTO classes (Name, TeacherLogin, Parallel)
-		VALUES (?, ?, ?)
-	`, name, nullableString(teacherLogin), parallelID)
+		INSERT INTO classes (Name, Grade, Letter, TeacherLogin)
+		VALUES (?, ?, ?, ?)
+	`, name, num, letter, nullableString(teacherLogin))
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -429,7 +468,7 @@ func ParseClass(s string) (int, string, bool) {
 	var letter string
 
 	runes := []rune(s)
-	
+
 	for _, r := range runes {
 		if unicode.IsDigit(r) {
 			number = number*10 + int(r-'0')
@@ -448,27 +487,24 @@ func ParseClass(s string) (int, string, bool) {
 func (s *Storage) AddToParallelLocked(numberClass int) (int, error) {
 	var parallelID int
 
-	err := s.db.QueryRow(`
-		SELECT Id FROM parallels WHERE ValidClasses = ? LIMIT 1
-	`, numberClass).Scan(&parallelID)
-	
+	err := s.db.QueryRow(`SELECT Id FROM parallels WHERE MinGrade <= ? AND MaxGrade >= ? LIMIT 1`, numberClass, numberClass).Scan(&parallelID)
 	if err == sql.ErrNoRows {
 		name := strconv.Itoa(numberClass) + " параллель"
 		res, err := s.db.Exec(`
-			INSERT INTO parallels (Name, BestClassID, ValidClasses)
-			VALUES (?, 0, ?)
-		`, name, numberClass)
+			INSERT INTO parallels (Name, MinGrade, MaxGrade)
+			VALUES (?, ?, ?)
+		`, name, numberClass, numberClass)
 		if err != nil {
 			return 0, err
 		}
-		
+
 		insertID, err := res.LastInsertId()
 		if err != nil {
 			return 0, err
 		}
 		return int(insertID), nil
 	}
-	
+
 	if err != nil {
 		return 0, err
 	}
@@ -555,8 +591,8 @@ func (s *Storage) GetAllClasses() ([]classModels.Class, error) {
 	defer s.mu.Unlock()
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
-        FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
+		SELECT Id, Name, Grade, Letter, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
+		FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
 		FROM classes
 		ORDER BY Name
 	`)
@@ -887,7 +923,7 @@ func (s *Storage) classExistsLocked(name string) (bool, error) {
 
 func (s *Storage) getClassByNameLocked(name string) (*classModels.Class, error) {
 	row := s.db.QueryRow(`
-		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating
+		SELECT Id, Name, Grade, Letter, TeacherLogin, Members, UserTotalRating, ClassTotalRating
 		FROM classes
 		WHERE Name = ?
 	`, name)
@@ -905,8 +941,8 @@ func (s *Storage) getClassByNameLocked(name string) (*classModels.Class, error) 
 
 func (s *Storage) getClassByIDLocked(id int) (*classModels.Class, error) {
 	row := s.db.QueryRow(`
-		SELECT Id, Name, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
-        FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
+		SELECT Id, Name, Grade, Letter, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
+		FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
 		FROM classes
 		WHERE Id = ?
 	`, id)
@@ -962,6 +998,8 @@ func (s *Storage) scanClassScannerLocked(scanner classScanner, loadTeacher bool)
 	if err := scanner.Scan(
 		&class.ID,
 		&class.Name,
+		&class.Grade,
+		&class.Letter,
 		&teacherLogin,
 		&membersJSON,
 		&class.UserTotalRating,

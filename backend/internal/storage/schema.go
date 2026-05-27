@@ -1,6 +1,9 @@
 package storage
 
-import "database/sql"
+import (
+	"database/sql"
+	"encoding/json"
+)
 
 func (s *Storage) initSchema() error {
 	if err := s.initUserStorage(); err != nil {
@@ -315,10 +318,10 @@ func (s *Storage) initEventsStorage() error {
 }
 
 func (s *Storage) initParamsForEventsStorage() error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-    query := `
+	query := `
     CREATE TABLE IF NOT EXISTS event_params (
         Id INTEGER PRIMARY KEY AUTOINCREMENT,
         EventID INTEGER NOT NULL,
@@ -329,8 +332,8 @@ func (s *Storage) initParamsForEventsStorage() error {
 		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE
 	);`
 
-    if _, err := s.db.Exec(query); err != nil {
-        return err
+	if _, err := s.db.Exec(query); err != nil {
+		return err
 	}
 
 	if err := s.ensureColumn(
@@ -460,39 +463,124 @@ func (s *Storage) initParallelsStorage() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// ВРЕМЕННО: Удаляем старую сломанную таблицу, чтобы SQLite создал её заново
-	// (Если приложение запустится успешно, эту строку можно будет удалить)
-	// s.db.Exec(`DROP TABLE IF EXISTS parallels;`)
-
 	query := `
 	CREATE TABLE IF NOT EXISTS parallels (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
-		Name TEXT NOT NULL,
-		Rating INTEGER NOT NULL DEFAULT 0,
-		BestClassID INTEGER NOT NULL,
-		ClassID INTEGER,
-		ParallelClassID INTEGER, -- ИСПРАВЛЕНО: Теперь колонка существует
-		ValidClasses INTEGER NOT NULL,
-		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE,
-		FOREIGN KEY (ParallelClassID) REFERENCES classes(Id) ON DELETE CASCADE
+		Name TEXT NOT NULL UNIQUE,
+		MinGrade INTEGER NOT NULL,
+		MaxGrade INTEGER NOT NULL,
+		BestClassID INTEGER NOT NULL DEFAULT 0,
+		ClassTotalRating INTEGER NOT NULL DEFAULT 0
 	);`
-	
+
 	if _, err := s.db.Exec(query); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_parallels_class_pair ON parallels(ClassID, ParallelClassID);`); err != nil {
+	// ensure columns exist on older DBs (safe ALTER TABLE)
+	if err := s.ensureColumn("parallels", "MinGrade", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_parallels_class_id ON parallels(ClassID);`); err != nil {
+	if err := s.ensureColumn("parallels", "MaxGrade", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
-	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_parallels_parallel_class_id ON parallels(ParallelClassID);`); err != nil {
+	if err := s.ensureColumn("parallels", "BestClassID", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
-	
+	if err := s.ensureColumn("parallels", "ClassTotalRating", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// migrate legacy ClassesIds JSON column into mapping table if present
+	// check if column exists
+	rows, err := s.db.Query(`PRAGMA table_info(parallels)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	hasClassesIds := false
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var dflt sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == "ClassesIds" || name == "ClassesIds" {
+			hasClassesIds = true
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if hasClassesIds {
+		// read existing parallels and migrate
+		tx, err := s.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
+		pRows, err := tx.Query(`SELECT Id, ClassesIds FROM parallels`)
+		if err != nil {
+			return err
+		}
+		for pRows.Next() {
+			var pid int
+			var classesJSON sql.NullString
+			if err := pRows.Scan(&pid, &classesJSON); err != nil {
+				pRows.Close()
+				return err
+			}
+			if !classesJSON.Valid || classesJSON.String == "" {
+				continue
+			}
+			var classIDs []int
+			if err := json.Unmarshal([]byte(classesJSON.String), &classIDs); err != nil {
+				// skip malformed
+				continue
+			}
+			for _, cid := range classIDs {
+				_, err := tx.Exec(`INSERT OR IGNORE INTO parallel_classes (ParallelID, ClassID) VALUES (?, ?)`, pid, cid)
+				if err != nil {
+					pRows.Close()
+					return err
+				}
+			}
+		}
+		pRows.Close()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_parallels_min_max ON parallels(MinGrade, MaxGrade);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_parallels_name ON parallels(Name);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`
+	CREATE TABLE IF NOT EXISTS parallel_classes (
+		ParallelID INTEGER NOT NULL,
+		ClassID INTEGER NOT NULL,
+		PRIMARY KEY (ParallelID, ClassID),
+		FOREIGN KEY (ParallelID) REFERENCES parallels(Id) ON DELETE CASCADE,
+		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE
+	);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_parallel_classes_parallel ON parallel_classes(ParallelID);`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_parallel_classes_class ON parallel_classes(ClassID);`); err != nil {
+		return err
+	}
+
 	return nil
 }
-
 
 func (s *Storage) ensureColumn(table string, column string, definition string) error {
 	rows, err := s.db.Query(`PRAGMA table_info(` + table + `)`)
