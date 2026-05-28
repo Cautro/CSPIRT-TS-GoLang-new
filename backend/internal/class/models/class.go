@@ -34,3 +34,10 @@ type ClassInput struct {
 	Name         string `json:"Name"`
 	TeacherLogin string `json:"TeacherLogin,omitempty"`
 }
+
+type AddParallelRequest struct {
+    Name     string `json:"Name"`
+    ClassIDs []int  `json:"ClassIDs"` // Если передают конкретные ID
+    MinGrade int    `json:"MinGrade"` // Если нужно по диапазону
+    MaxGrade int    `json:"MaxGrade"` // Если нужно по диапазону
+}

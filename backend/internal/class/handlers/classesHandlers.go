@@ -30,35 +30,44 @@ func GetClassTeachersHandler(s *storage.Storage) gin.HandlerFunc {
 
 func AddParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input classModels.ParallelClass
+		var input classModels.AddParallelRequest
 
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 			return
 		}
 
-		if input.Name == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Parallel class name is required"})
+		classesIDs := input.ClassIDs
+
+		if input.MinGrade > 0 && input.MaxGrade > 0 {
+			ids, err := s.GetClassIDsByRange(input.MinGrade, input.MaxGrade)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch classes by range"})
+				return
+			}
+			classesIDs = ids
+		}
+
+		if input.Name == "" || len(classesIDs) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Name and classes are required"})
 			return
 		}
 
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "info",
-			Action:  "add_parallel_class",
-			Login:   c.GetString("Login"),
-			Message: "Add parallel class input: " + input.Name,
-		})
-
-		classService := sr.NewClassService(s, s.Secret)
-
-		if err := classService.AddParallelClass(input.Name, input.ClassesIDs, c.GetString("Login")); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
+		if input.MinGrade != 0 {
+            err := s.AddParallelByGradeRange(input.Name, input.MinGrade, input.MaxGrade)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+        }
+		
+		classService := sr.NewClassService(s, s.Secret) 
+		if err := classService.AddParallelClass(input.Name, classesIDs, c.GetString("Login")); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{"message": "Parallel class added"})
+		c.JSON(http.StatusOK, gin.H{"message": "Parallel created"})
 	}
 }
 

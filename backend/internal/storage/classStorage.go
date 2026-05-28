@@ -80,66 +80,7 @@ func (s *Storage) AddParallel(name string, classesIDs []int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	name = normalizeClassName(name)
-	if name == "" {
-		return errors.New("parallel class name is required")
-	}
-	if len(classesIDs) == 0 {
-		return errors.New("at least one class id is required")
-	}
-
-	classes := make([]classModels.Class, 0, len(classesIDs))
-	for _, classID := range classesIDs {
-		class, err := s.getClassByIDLocked(classID)
-		if err != nil {
-			return err
-		}
-		if class == nil {
-			return errors.New("class with id " + strconv.Itoa(classID) + " not found")
-		}
-		classes = append(classes, *class)
-	}
-
-	bestClassID := classesIDs[0]
-	maxRating := classes[0].ClassTotalRating
-	for i, class := range classes {
-		if class.ClassTotalRating > maxRating {
-			maxRating = class.ClassTotalRating
-			bestClassID = classesIDs[i]
-		}
-	}
-
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	res, err := tx.Exec(`
-		INSERT INTO parallels (Name, BestClassID, ClassTotalRating)
-		VALUES (?, ?, ?)
-	`, name, bestClassID, maxRating)
-	if err != nil {
-		return err
-	}
-
-	parallelID64, err := res.LastInsertId()
-	if err != nil {
-		return err
-	}
-	parallelID := int(parallelID64)
-
-	for _, classID := range classesIDs {
-		_, err := tx.Exec(`
-			INSERT INTO parallel_classes (ParallelID, ClassID)
-			VALUES (?, ?)
-		`, parallelID, classID)
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
+	return s.addParallelInternal(name, classesIDs)
 }
 
 func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
@@ -407,60 +348,116 @@ func (s *Storage) GetAllClassTeachers() ([]userModels.SafeUser, error) {
 }
 
 func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
+    if err != nil || !check {
+        return errors.New("no permission")
+    }
+
+    grade, letter, ok := ParseClass(input.Name) 
+    if !ok {
+        return errors.New("invalid class name")
+    }
+
+    return s.saveClassInternal(input.Name, grade, letter, input.TeacherLogin)
+}
+
+func (s *Storage) AddParallelByGradeRange(name string, minGrade, maxGrade int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	name := normalizeClassName(input.Name)
-	if name == "" {
-		return errors.New("class name is required")
-	}
-
-	num, letter, ok := ParseClass(name)
-	if !ok {
-		return errors.New("invalid class name format")
-	}
-
-	_, err := s.AddToParallelLocked(num)
-	if err != nil {
-		return errors.New("error adding class to parallel")
-	}
-
-	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
+	
+	rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= ? AND Grade <= ?", minGrade, maxGrade)
 	if err != nil {
 		return err
 	}
-	if !check {
-		return errors.New("only owners can add classes")
+	
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+
+	if len(ids) == 0 {
+		return errors.New("классы не найдены в этом диапазоне")
 	}
 
-	teacherLogin := normalizeLogin(input.TeacherLogin)
-	if teacherLogin != "" {
-		teacher, err := s.getUserByLoginLocked(teacherLogin)
+	return s.addParallelInternal(name, ids)
+}
+
+func (s *Storage) addParallelInternal(name string, classesIDs []int) error {
+	if len(classesIDs) == 0 {
+		return errors.New("список классов пуст")
+	}
+
+	bestClassID := classesIDs[0]
+	maxRating := -1
+
+	for _, id := range classesIDs {
+		var rating int
+		err := s.db.QueryRow("SELECT ClassTotalRating FROM classes WHERE Id = ?", id).Scan(&rating)
+		if err == nil && rating > maxRating {
+			maxRating = rating
+			bestClassID = id
+		}
+	}
+	
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`INSERT INTO parallels (Name, BestClassID, ClassTotalRating) VALUES (?, ?, ?)`,
+		name, bestClassID, maxRating)
+	if err != nil {
+		return err
+	}
+
+	parallelID, _ := res.LastInsertId()
+
+	for _, classID := range classesIDs {
+		_, err := tx.Exec(`INSERT INTO parallel_classes (ParallelID, ClassID) VALUES (?, ?)`,
+			parallelID, classID)
 		if err != nil {
 			return err
 		}
-		if teacher == nil {
-			return errors.New("teacher not found")
-		}
-		if !isTeacherCandidate(teacher.Role) {
-			return errors.New("class teacher must have helper, admin or owner role")
-		}
 	}
 
-	_, err = s.db.Exec(`
-		INSERT INTO classes (Name, Grade, Letter, TeacherLogin)
-		VALUES (?, ?, ?, ?)
-	`, name, num, letter, nullableString(teacherLogin))
-	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_class",
-			Message: "failed to insert class: " + err.Error(),
-		})
-		return err
-	}
+	return tx.Commit()
+}
 
-	return s.syncClassLocked(name)
+func (s *Storage) saveClassInternal(name string, grade int, letter string, teacherLogin string) error {
+    _, err := s.db.Exec(`
+        INSERT INTO classes (Name, Grade, Letter, TeacherLogin) 
+        VALUES (?, ?, ?, ?)
+    `, name, grade, letter, teacherLogin)
+    
+    return err
+}
+
+func (s *Storage) GetClassIDsByRange(minGrade, maxGrade int) ([]int, error) {
+    rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= ? AND Grade <= ?", minGrade, maxGrade)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var ids []int
+    for rows.Next() {
+        var id int
+        if err := rows.Scan(&id); err != nil {
+            return nil, err
+        }
+        ids = append(ids, id)
+    }
+    return ids, nil
 }
 
 func ParseClass(s string) (int, string, bool) {
