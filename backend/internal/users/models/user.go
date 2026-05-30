@@ -2,13 +2,14 @@ package models
 
 import (
 	"time"
+	"database/sql"
 	"cspirt/internal/events/models"
 )
 
 
 type User struct {
 	ID       int        `json:"Id"`
-	Avatar   string     `json:"Avatar"`
+	Avatar   sql.NullString     `json:"Avatar"`
 	Name     string     `json:"Name"`
 	LastName string     `json:"LastName"`
 	FullName []FullName `json:"FullName"`
@@ -22,7 +23,7 @@ type User struct {
 
 type SafeUser struct {
 	ID       int        `json:"Id"`
-	Avatar   string     `json:"Avatar"`
+	Avatar   sql.NullString     `json:"Avatar"`
 	Name     string     `json:"Name"`
 	LastName string     `json:"LastName"`
 	FullName []FullName `json:"FullName"`
@@ -36,7 +37,7 @@ type SafeUser struct {
 type UpdateUserRequest struct {
 	Name     *string `json:"name,omitempty"`
 	LastName  *string `json:"last_name,omitempty"`
-	Avatar    *string `json:"avatar,omitempty"`
+	Avatar    *sql.NullString `json:"avatar,omitempty"`
 	FullName  *[]FullName `json:"full_name,omitempty"`
 	Login     *string `json:"login,omitempty"`
 	Rating    *int    `json:"rating,omitempty"`

@@ -285,8 +285,13 @@ func (s *Storage) UpdateUser(id int, req models.UpdateUserRequest, login string)
 	}
 
 	if req.Avatar != nil {
-		user.Avatar = strings.TrimSpace(*req.Avatar)
-	}
+    trimmedValue := strings.TrimSpace(req.Avatar.String)
+    
+    user.Avatar = sql.NullString{
+        String: trimmedValue,
+        Valid:  true, 
+    }
+}
 
 	if req.Login != nil {
 		login := normalizeLogin(*req.Login)
@@ -718,7 +723,7 @@ func scanSafeUsers(rows *sql.Rows) ([]models.SafeUser, error) {
 			&fullNameJSON,
 			&user.LastName,
 			&user.Login,
-			&user.Rating,
+			&user.Rating,  
 			&user.Role,
 			&user.Class,
 			&user.ClassID,

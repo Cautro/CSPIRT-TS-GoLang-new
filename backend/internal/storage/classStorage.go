@@ -19,13 +19,6 @@ func (s *Storage) initClassStorage() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.db.Exec(`ALTER TABLE classes ADD COLUMN Grade INTEGER NOT NULL DEFAULT 0;`)
-	s.db.Exec(`ALTER TABLE classes ADD COLUMN Letter TEXT NOT NULL DEFAULT '';`)
-	s.db.Exec(`ALTER TABLE classes ADD COLUMN FirstQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
-	s.db.Exec(`ALTER TABLE classes ADD COLUMN SecondQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
-	s.db.Exec(`ALTER TABLE classes ADD COLUMN ThirdQuarterComplete INTEGER NOT NULL DEFAULT 0;`)
-	s.db.Exec(`ALTER TABLE classes ADD COLUMN QuarterComplete INTEGER NOT NULL DEFAULT 0;`)
-
 	query := `
 	CREATE TABLE IF NOT EXISTS classes (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -316,7 +309,7 @@ func (s *Storage) GetAllClassTeachers() ([]userModels.SafeUser, error) {
 	defer s.mu.Unlock()
 
 	rows, err := s.db.Query(`
-		SELECT u.Id, u.Name, u.FullName, u.LastName, u.Login, u.Rating, u.Role, u.Class, u.ClassID
+		SELECT u.Id, u.Avatar, u.Name, u.FullName, u.LastName, u.Login, u.Rating, u.Role, u.Class, u.ClassID
 		FROM users u
 		JOIN classes c ON c.TeacherLogin = u.Login
 		ORDER BY u.LastName, u.Name, u.Login
@@ -1031,7 +1024,7 @@ func (s *Storage) getClassIDByNameLocked(name string) (int, error) {
 
 func (s *Storage) getUsersByClassIDLocked(classID int) ([]userModels.SafeUser, error) {
 	rows, err := s.db.Query(`
-		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
+		SELECT Id, Avatar, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
 		FROM users
 		WHERE ClassID = ?
 		ORDER BY LastName, Name, Login
@@ -1124,7 +1117,7 @@ func (s *Storage) loadClassTeachersLocked(classes []classModels.Class) error {
 	}
 
 	rows, err := s.db.Query(`
-		SELECT Id, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
+		SELECT Id, Avatar, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
 		FROM users
 		WHERE Login IN (`+strings.Join(placeholders, ",")+`)
 	`, args...)
