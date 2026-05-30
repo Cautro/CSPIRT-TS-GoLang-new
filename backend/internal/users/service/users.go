@@ -31,7 +31,7 @@ func (s *UsersService) GetUsersByClassIDHandlerService(classID int) ([]models.Sa
 	return users, nil
 }
 
-func (s *UsersService) UpdateUserHandlerService(userID int, user models.SafeUser) (error) {
+func (s *UsersService) UpdateUserHandlerService(userID int, user models.SafeUser, login string) (error) {
 	NeedUser := models.UpdateUserRequest{
 		Name: &user.Name,
 		LastName: &user.LastName,
@@ -43,7 +43,7 @@ func (s *UsersService) UpdateUserHandlerService(userID int, user models.SafeUser
 		Class: &user.Class,
 		ClassID: &user.ClassID,
 	}
-	err := s.users.UpdateUser(userID, NeedUser)
+	err := s.users.UpdateUser(userID, NeedUser, login)
 	if err != nil {
 		return err
 	}

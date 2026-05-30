@@ -36,6 +36,10 @@ func (s *ClassService) GetParallelClasses() ([]classModels.ParallelClass, error)
 	return parallelClasses, nil
 }
 
+func (s *ClassService) UpdateClass(classID int, input classModels.ClassInput, login string) error {
+	return s.classes.UpdateClass(classID, input, login)
+}
+
 func (s *ClassService) GetClassesInParallel(parallelID int) ([]classModels.Class, error) {
 	return s.classes.GetClassesInParallel(parallelID)
 }

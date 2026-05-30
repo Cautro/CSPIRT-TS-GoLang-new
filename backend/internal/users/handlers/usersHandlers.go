@@ -250,7 +250,7 @@ func UpdateUserHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		userService := sr.NewUsersService(s, s.Secret)
-		if err = userService.UpdateUserHandlerService(idInt, user); err != nil {
+		if err = userService.UpdateUserHandlerService(idInt, user, login); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		} 

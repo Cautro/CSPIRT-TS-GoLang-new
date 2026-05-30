@@ -83,6 +83,47 @@ func AddParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+func UpdateClassHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		classIdStr := c.Param("class_id")
+		classId, err := strconv.Atoi(classIdStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Class ID format"})
+			return
+		}
+
+		var input classModels.ClassInput
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		if err := checkInputClass(input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "update_class",
+			Login:   c.GetString("Login"),
+			Message: "Update class input: " + input.Name + ", " + input.TeacherLogin,
+		})
+
+		classService := sr.NewClassService(s, s.Secret)
+
+		if err := classService.UpdateClass(classId, input, c.GetString("Login")); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Class updated"})
+	}
+}
+
 func GetParallelClassesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classService := sr.NewClassService(s, s.Secret)

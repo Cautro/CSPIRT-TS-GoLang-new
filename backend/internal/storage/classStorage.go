@@ -415,6 +415,41 @@ func (s *Storage) addParallelInternal(name string, classesIDs []int) error {
 	return tx.Commit()
 }
 
+func (s *Storage) UpdateClass(classID int, input classModels.ClassInput, login string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
+	if err != nil || !check {
+		return errors.New("no permission")
+	}
+
+	grade, letter, ok := ParseClass(input.Name)
+	if !ok {
+		return errors.New("invalid class name")
+	}
+
+	return s.updateClassInternal(classID, input.Name, grade, letter, input.TeacherLogin)
+}
+
+func (s *Storage) updateClassInternal(classID int, name string, grade int, letter string, teacherLogin string) error {
+	if classID <= 0 {
+		return errors.New("class id is required")
+	}
+	class, err := s.getClassByIDLocked(classID)
+	if err != nil {
+		return err
+	}
+	if class == nil {
+		return errors.New("class not found")
+	}
+	return s.db.QueryRow(`
+		UPDATE classes
+		SET Name = ?, Grade = ?, Letter = ?, TeacherLogin = ?
+		WHERE Id = ?
+	`, name, grade, letter, teacherLogin, classID).Err()
+}
+
 func (s *Storage) saveClassInternal(name string, grade int, letter string, teacherLogin string) error {
     res, err := s.db.Exec(`INSERT INTO classes (Name, Grade, Letter, TeacherLogin) VALUES (?, ?, ?, ?)`,
         name, grade, letter, teacherLogin)

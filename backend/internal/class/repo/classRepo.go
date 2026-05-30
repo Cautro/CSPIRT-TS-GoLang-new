@@ -15,6 +15,7 @@ type ClassRepository interface {
 	DeleteClassByID(classID int, login string) error
 	GetAllClassTeachers() ([]models.SafeUser, error)
 	AddClass(input classModels.ClassInput, login string) error
+	UpdateClass(classID int, input classModels.ClassInput, login string) error
 
 	// Parallel classes methods
 	AddParallel(name string, classesIDs []int) error

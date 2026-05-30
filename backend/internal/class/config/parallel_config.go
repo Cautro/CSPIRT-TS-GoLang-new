@@ -6,15 +6,12 @@ import (
 	"strings"
 )
 
-// ParallelConfig представляет конфигурацию одной параллели
 type ParallelConfig struct {
-	Name     string // например "1-4 параллель"
-	MinGrade int    // минимальный класс
-	MaxGrade int    // максимальный класс
+	Name     string
+	MinGrade int   
+	MaxGrade int    
 }
 
-// ParseParallelsConfig парсит строку формата "1-4,5-9,10-11"
-// Возвращает слайс конфигураций параллелей
 func ParseParallelsConfig(configStr string) ([]ParallelConfig, error) {
 	if strings.TrimSpace(configStr) == "" {
 		return []ParallelConfig{}, nil
@@ -48,7 +45,6 @@ func ParseParallelsConfig(configStr string) ([]ParallelConfig, error) {
 			return nil, fmt.Errorf("invalid range '%s': min grade (%d) cannot be greater than max grade (%d)", r, minGrade, maxGrade)
 		}
 
-		// Генерируем имя параллели
 		name := fmt.Sprintf("%d-%d параллель", minGrade, maxGrade)
 
 		parallels = append(parallels, ParallelConfig{
