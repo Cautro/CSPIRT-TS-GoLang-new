@@ -20,4 +20,6 @@ type EventsRepository interface {
 	AddEventParams(eventID int, params *eventModels.EventParams) error
 	GetEventParams(eventID int) ([]eventModels.EventParams, error)
 	DeleteEventParams(eventID int) error
+	UpdateEventParams(eventID int, params *eventModels.EventParams) error
+	UpdateEvent(eventID int, updatedEvent *eventModels.Event) error
 }

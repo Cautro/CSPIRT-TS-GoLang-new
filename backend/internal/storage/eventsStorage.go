@@ -762,6 +762,128 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) 
 	return tx.Commit()
 }
 
+func (s *Storage) UpdateEventParams(eventID int, params *models.EventParams) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if eventID <= 0 {
+		return errors.New("invalid event id")
+	}
+
+	if params == nil {
+		return errors.New("invalid event params")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "update_event_params",
+			Message: "failed to start transaction: " + err.Error(),
+		})
+		return err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(`
+		UPDATE event_params
+		SET ExtraRatingReward = ?, Reason = ?, ClassID = ?
+		WHERE EventID = ? AND ClassID = ?
+	`, params.ExtraRatingReward, params.Reason, params.ClassID, eventID, params.ClassID)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "update_event_params",
+			Message: "failed to update event params: " + err.Error(),
+		})
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "update_event_params",
+			Message: "failed to get affected rows: " + err.Error(),
+		})
+		return err
+	}
+	if affected == 0 {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "update_event_params",
+			Message: "event params not found, inserting new params",
+		})
+		if err := s.AddEventParams(eventID, params); err != nil {
+			return err
+		}
+	} else {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "update_event_params",
+			Message: fmt.Sprintf("event params updated, affected rows: %d", affected),
+		})
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "update_event_params",
+			Message: "failed to commit event params update: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "update_event_params",
+		Message: "event params updated successfully",
+	})
+	return nil
+}
+
+func (s *Storage) UpdateEvent(eventID int, updatedEvent *models.Event) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if eventID <= 0 {
+		return errors.New("invalid event id")
+	}
+
+	if updatedEvent == nil {
+		return errors.New("invalid event data")
+	}
+
+	currentEvent, err := s.GetEventsByID(eventID)
+	if err != nil {
+		return err
+	}
+	if currentEvent == nil {
+		return errors.New("event not found")
+	}
+
+	updatedEvent.ID = currentEvent.ID
+	if updatedEvent.CreatedAt.IsZero() {
+		updatedEvent.CreatedAt = currentEvent.CreatedAt
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`
+		UPDATE events
+		SET Title = ?, Status = ?, RatingReward = ?, Description = ?, CreatedAt = ?, StartedAt = ?, Players = ?, Classes = ?
+		WHERE Id = ?
+	`, updatedEvent.Title, updatedEvent.Status, updatedEvent.BaseRatingReward, updatedEvent.Description, updatedEvent.CreatedAt.Format(time.RFC3339), updatedEvent.StartedAt, updatedEvent.Players, updatedEvent.Classes, eventID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (s *Storage) DeletePlayersFromEvent(eventID int, playerIDs []int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

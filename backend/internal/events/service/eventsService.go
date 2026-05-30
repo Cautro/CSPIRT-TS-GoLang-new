@@ -218,6 +218,42 @@ func (s *EventsService) AddPlayersToEvent(eventID int, playerIDs []int, login st
 	return nil
 }
 
+func (s *EventsService) UpdateEventParams(eventID int, params *models.EventParams) error {
+	if err := s.events.UpdateEventParams(eventID, params); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "update_event_params",
+			Message: "failed to update event params: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "update_event_params",
+		Message: "event params updated",
+	})
+	return nil
+}
+
+func (s *EventsService) UpdateEvent(eventID int, event *models.Event) error {
+	if err := s.events.UpdateEvent(eventID, event); err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "update_event",
+			Message: "failed to update event: " + err.Error(),
+		})
+		return err
+	}
+
+	logger.WriteSafe(logger.LogEntry{
+		Level:   "info",
+		Action:  "update_event",
+		Message: "event updated",
+	})
+	return nil
+}
+
 func (s *EventsService) DeletePlayersFromEvent(eventID int, playerIDs []int) error {
 	if err := s.events.DeletePlayersFromEvent(eventID, playerIDs); err != nil {
 		logger.WriteSafe(logger.LogEntry{

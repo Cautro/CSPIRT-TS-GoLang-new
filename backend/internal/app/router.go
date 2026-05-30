@@ -104,6 +104,8 @@ func registerEventRoutes(auth *gin.RouterGroup, s *storage.Storage) {
 	auth.PATCH("/event/:eventId/params/add", eventHandlers.AddEventParams(s))
 	auth.GET("/event/:eventId/params", eventHandlers.GetEventParamsHandler(s))
 	auth.DELETE("/event/:eventId/params/delete", eventHandlers.DeleteEventParamsHandler(s))
+	auth.PATCH("/event/:eventId/params/update", eventHandlers.UpdateEventParamsHandler(s))
+	auth.PATCH("/event/:eventId/update", eventHandlers.UpdateEventHandler(s))
 }
 
 func registerScheduleRoutes(auth *gin.RouterGroup, s *storage.Storage) {
