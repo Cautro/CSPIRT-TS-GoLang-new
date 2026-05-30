@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	classConfig "cspirt/internal/class/config"
 	classRepo "cspirt/internal/class/repo"
 	complaintRepo "cspirt/internal/complaints/repo"
 	eventsRepo "cspirt/internal/events/repo"
@@ -26,6 +27,9 @@ type Storage struct {
 	EventsRepo     eventsRepo.EventsRepository
 
 	Secret string
+
+	// ParallelsConfig хранит конфигурацию параллелей из .env
+	ParallelsConfig []classConfig.ParallelConfig
 }
 
 // NewUserStorage opens the SQLite adapter and initializes every schema module.

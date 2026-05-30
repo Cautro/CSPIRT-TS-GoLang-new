@@ -200,6 +200,73 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+func UpdateUserHandler(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		login := c.GetString("Login")
+		idStr := c.Query("id")
+		idInt, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+			return
+		}
+		if login == "" {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "update_user",
+				Message: "invalid login or token",
+			})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		targetUser, err := s.GetUserByLogin(login)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+		if targetUser == nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "update_user",
+				Login:   login,
+				Message: "user not found",
+			})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		var user models.SafeUser
+
+		if err := c.ShouldBindJSON(&user); err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "update_user",
+				Login:   login,
+				Role:    targetUser.Role,
+				Message: "invalid input: " + err.Error(),
+			})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+			return
+		}
+
+		userService := sr.NewUsersService(s, s.Secret)
+		if err = userService.UpdateUserHandlerService(idInt, user); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		} 
+
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "info",
+			Action:  "update_user",
+			Login:   login,
+			Role:    targetUser.Role,
+			Message: "user updated successfully: " + user.Login,
+		})
+
+		c.JSON(http.StatusOK, gin.H{"message": "User updated successfully"})
+	}
+}
+
 func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")

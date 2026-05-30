@@ -48,10 +48,22 @@ func AddParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
 			classesIDs = ids
 		}
 
-		if input.Name == "" || len(classesIDs) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Name and classes are required"})
-			return
-		}
+		if input.Name == "" {
+            c.JSON(http.StatusBadRequest, gin.H{
+                "error": "Name is required",
+            })
+            return
+        }
+        
+        hasGradeRange := input.MinGrade > 0 && input.MaxGrade > 0
+        hasClassIDs := len(input.ClassIDs) > 0
+        
+        if !hasGradeRange && !hasClassIDs {
+            c.JSON(http.StatusBadRequest, gin.H{
+                "error": "ClassIDs or grade range required",
+            })
+            return
+        }
 
 		if input.MinGrade != 0 {
             err := s.AddParallelByGradeRange(input.Name, input.MinGrade, input.MaxGrade)

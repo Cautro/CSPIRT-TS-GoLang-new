@@ -1,1 +1,0 @@
-{"accessToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJMb2dpbiI6Ik93bmVyIiwiZXhwIjoxNzgwMDg2NDkwLCJuYmYiOjE3Nzk4MjcyOTAsImlhdCI6MTc3OTgyNzI5MH0.Rbt1vtxK9OEPo05N17GfDpTu29Gq_z54UyW-SzGcEHw"}

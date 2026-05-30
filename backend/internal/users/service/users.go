@@ -30,3 +30,22 @@ func (s *UsersService) GetUsersByClassIDHandlerService(classID int) ([]models.Sa
 	}
 	return users, nil
 }
+
+func (s *UsersService) UpdateUserHandlerService(userID int, user models.SafeUser) (error) {
+	NeedUser := models.UpdateUserRequest{
+		Name: &user.Name,
+		LastName: &user.LastName,
+		Avatar: &user.Avatar,
+		FullName: &user.FullName,
+		Login: &user.Login,
+		Rating: &user.Rating,
+		Role: &user.Role,
+		Class: &user.Class,
+		ClassID: &user.ClassID,
+	}
+	err := s.users.UpdateUser(userID, NeedUser)
+	if err != nil {
+		return err
+	}
+	return nil
+}

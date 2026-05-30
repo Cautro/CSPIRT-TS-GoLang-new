@@ -16,4 +16,5 @@ type UserRepository interface {
 	SaveRefreshToken(userID int, token string, expiresAt time.Time) error
 	GetRefreshToken(token string) (*models.RefreshToken, error)
 	DeleteRefreshToken(token string) error
+	UpdateUser(id int, req models.UpdateUserRequest) error
 }

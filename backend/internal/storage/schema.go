@@ -227,6 +227,7 @@ func (s *Storage) initUserStorage() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
 		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Avatar TEXT,
 		Name TEXT NOT NULL,
 		FullName TEXT NOT NULL DEFAULT '[]',
 		LastName TEXT NOT NULL,
@@ -508,7 +509,7 @@ func (s *Storage) initParallelsStorage() error {
 		if err := rows.Scan(&cid, &name, &columnType, &notNull, &dflt, &pk); err != nil {
 			return err
 		}
-		if name == "ClassesIds" || name == "ClassesIds" {
+		if name == "ClassesIds" {
 			hasClassesIds = true
 			break
 		}

@@ -51,6 +51,7 @@ func registerUserRoutes(auth *gin.RouterGroup, s *storage.Storage) {
 	auth.DELETE("/user/delete/:id", userHandlers.DeleteUserHandler(s))
 	auth.GET("/me", userHandlers.GetMeHandler(s))
 	auth.PATCH("/user/logout", userHandlers.LogoutHandler(s))
+	auth.PATCH("/user/update", userHandlers.UpdateUserHandler(s))
 }
 
 func registerClassRoutes(auth *gin.RouterGroup, s *storage.Storage) {

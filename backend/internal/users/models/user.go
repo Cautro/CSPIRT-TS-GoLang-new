@@ -8,6 +8,7 @@ import (
 
 type User struct {
 	ID       int        `json:"Id"`
+	Avatar   string     `json:"Avatar"`
 	Name     string     `json:"Name"`
 	LastName string     `json:"LastName"`
 	FullName []FullName `json:"FullName"`
@@ -21,6 +22,7 @@ type User struct {
 
 type SafeUser struct {
 	ID       int        `json:"Id"`
+	Avatar   string     `json:"Avatar"`
 	Name     string     `json:"Name"`
 	LastName string     `json:"LastName"`
 	FullName []FullName `json:"FullName"`
@@ -31,17 +33,30 @@ type SafeUser struct {
 	ClassID  int        `json:"ClassID"`
 }
 
+type UpdateUserRequest struct {
+	Name     *string `json:"name,omitempty"`
+	LastName  *string `json:"last_name,omitempty"`
+	Avatar    *string `json:"avatar,omitempty"`
+	FullName  *[]FullName `json:"full_name,omitempty"`
+	Login     *string `json:"login,omitempty"`
+	Rating    *int    `json:"rating,omitempty"`
+	Role      *string `json:"role,omitempty"`
+	Class     *string `json:"class,omitempty"`
+	ClassID   *int    `json:"class_id,omitempty"`
+}
+
 type UserWithFullInfo struct {
 	User       *SafeUser     `json:"User"`
 	Notes      []Note        `json:"Notes"`
 	Complaints []Complaint   `json:"Complaints"`
 	ClassTeacher *SafeUser   `json:"ClassTeacher"`
-	Events     []models.Event       `json:"Events"`
+	Events     []models.Event`json:"Events"`
 }
 
 type FullName struct {
 	Name     string `json:"Name"`
 	LastName string `json:"LastName"`
+	MiddleName string `json:"MiddleName"`
 }
 
 type Note struct {

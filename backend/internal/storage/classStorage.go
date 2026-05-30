@@ -84,59 +84,41 @@ func (s *Storage) AddParallel(name string, classesIDs []int) error {
 }
 
 func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+    s.mu.Lock()
+    defer s.mu.Unlock()
 
-	rows, err := s.db.Query(`
-		SELECT Id, Name, BestClassID, ClassTotalRating
-		FROM parallels
-		ORDER BY Name
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+    // Проход 1: читаем все параллели, закрываем курсор
+    rows, err := s.db.Query(`SELECT Id, Name, BestClassID, ClassTotalRating FROM parallels ORDER BY Name`)
+    if err != nil {
+        return nil, err
+    }
+    parallelClasses := make([]classModels.ParallelClass, 0)
+    for rows.Next() {
+        var pc classModels.ParallelClass
+        if err := rows.Scan(&pc.ID, &pc.Name, &pc.BestClassID, &pc.ClassTotalRating); err != nil {
+            rows.Close()
+            return nil, err
+        }
+        parallelClasses = append(parallelClasses, pc)
+    }
+    if err := rows.Err(); err != nil { rows.Close(); return nil, err }
+    rows.Close() // ← явное закрытие: соединение возвращается в пул
 
-	parallelClasses := make([]classModels.ParallelClass, 0)
-	for rows.Next() {
-		var parallelClass classModels.ParallelClass
-
-		if err := rows.Scan(
-			&parallelClass.ID,
-			&parallelClass.Name,
-			&parallelClass.BestClassID,
-			&parallelClass.ClassTotalRating,
-		); err != nil {
-			return nil, err
-		}
-
-		// load class ids for this parallel
-		classRows, err := s.db.Query(`SELECT ClassID FROM parallel_classes WHERE ParallelID = ? ORDER BY ClassID`, parallelClass.ID)
-		if err != nil {
-			return nil, err
-		}
-		classIDs := make([]int, 0)
-		for classRows.Next() {
-			var cid int
-			if err := classRows.Scan(&cid); err != nil {
-				classRows.Close()
-				return nil, err
-			}
-			classIDs = append(classIDs, cid)
-		}
-		classRows.Close()
-		parallelClass.ClassesIDs = classIDs
-
-		parallelClasses = append(parallelClasses, parallelClass)
-	}
-
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return nil, err
-	}
-	rows.Close()
-
-	return parallelClasses, nil
+    // Проход 2: теперь соединение свободно
+    for i := range parallelClasses {
+        classRows, err := s.db.Query(
+            `SELECT ClassID FROM parallel_classes WHERE ParallelID = ? ORDER BY ClassID`,
+            parallelClasses[i].ID,
+        )
+        if err != nil { return nil, err }
+        for classRows.Next() {
+            var cid int
+            if err := classRows.Scan(&cid); err != nil { classRows.Close(); return nil, err }
+            parallelClasses[i].ClassesIDs = append(parallelClasses[i].ClassesIDs, cid)
+        }
+        classRows.Close()
+    }
+    return parallelClasses, nil
 }
 
 func (s *Storage) QuarterComplete(parallelClassID int) ([]*classModels.Class, error) {
@@ -348,31 +330,31 @@ func (s *Storage) GetAllClassTeachers() ([]userModels.SafeUser, error) {
 }
 
 func (s *Storage) AddClass(input classModels.ClassInput, login string) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-    check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
-    if err != nil || !check {
-        return errors.New("no permission")
-    }
+	check, err := s.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
+	if err != nil || !check {
+		return errors.New("no permission")
+	}
 
-    grade, letter, ok := ParseClass(input.Name) 
-    if !ok {
-        return errors.New("invalid class name")
-    }
+	grade, letter, ok := ParseClass(input.Name)
+	if !ok {
+		return errors.New("invalid class name")
+	}
 
-    return s.saveClassInternal(input.Name, grade, letter, input.TeacherLogin)
+	return s.saveClassInternal(input.Name, grade, letter, input.TeacherLogin)
 }
 
 func (s *Storage) AddParallelByGradeRange(name string, minGrade, maxGrade int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= ? AND Grade <= ?", minGrade, maxGrade)
 	if err != nil {
 		return err
 	}
-	
+
 	var ids []int
 	for rows.Next() {
 		var id int
@@ -407,7 +389,7 @@ func (s *Storage) addParallelInternal(name string, classesIDs []int) error {
 			bestClassID = id
 		}
 	}
-	
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -434,30 +416,29 @@ func (s *Storage) addParallelInternal(name string, classesIDs []int) error {
 }
 
 func (s *Storage) saveClassInternal(name string, grade int, letter string, teacherLogin string) error {
-    _, err := s.db.Exec(`
-        INSERT INTO classes (Name, Grade, Letter, TeacherLogin) 
-        VALUES (?, ?, ?, ?)
-    `, name, grade, letter, teacherLogin)
-    
-    return err
+    res, err := s.db.Exec(`INSERT INTO classes (Name, Grade, Letter, TeacherLogin) VALUES (?, ?, ?, ?)`,
+        name, grade, letter, teacherLogin)
+    if err != nil { return err }
+    classID, _ := res.LastInsertId()
+    return s.autoAssignClassToParallelLocked(int(classID)) // ← internal, без Lock
 }
 
 func (s *Storage) GetClassIDsByRange(minGrade, maxGrade int) ([]int, error) {
-    rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= ? AND Grade <= ?", minGrade, maxGrade)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= ? AND Grade <= ?", minGrade, maxGrade)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    var ids []int
-    for rows.Next() {
-        var id int
-        if err := rows.Scan(&id); err != nil {
-            return nil, err
-        }
-        ids = append(ids, id)
-    }
-    return ids, nil
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 func ParseClass(s string) (int, string, bool) {
@@ -585,38 +566,35 @@ func (s *Storage) saveClassTeacherLocked(name string, teacherLogin string) error
 
 func (s *Storage) GetClassesInParallel(id int) ([]classModels.Class, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+    defer s.mu.Unlock()
 
-	rows, err := s.db.Query(`
-		SELECT Id, Name, Grade, Letter, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
-		FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
-		FROM classes
-		WHERE ParallelId = ?
-		ORDER BY Name
-	`, id)
-	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_classes_in_parallel",
-			Message: "failed to query classes in parallel: " + err.Error(),
-		})
-		return nil, err
-	}
-	defer rows.Close()
+    rows, err := s.db.Query(`
+        SELECT c.Id, c.Name, c.Grade, c.Letter, c.TeacherLogin, c.Members,
+               c.UserTotalRating, c.ClassTotalRating,
+               c.FirstQuarterComplete, c.SecondQuarterComplete, c.ThirdQuarterComplete
+        FROM classes c
+        JOIN parallel_classes pc ON pc.ClassID = c.Id
+        WHERE pc.ParallelID = ?
+        ORDER BY c.Name
+    `, id)
+    if err != nil {
+        logger.WriteSafe(logger.LogEntry{
+            Level:   "error",
+            Action:  "get_classes_in_parallel",
+            Message: "failed to query classes in parallel: " + err.Error(),
+        })
+        return nil, err
+    }
+    defer rows.Close()
 
-	classes := make([]classModels.Class, 0)
-	for rows.Next() {
-		class, err := s.scanClassRowsLocked(rows)
-		if err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_classes_in_parallel",
-				Message: "failed to scan class: " + err.Error(),
-			})
-			return nil, err
-		}
-		classes = append(classes, class)
-	}
+    classes := make([]classModels.Class, 0)
+    for rows.Next() {
+        class, err := s.scanClassRowsLocked(rows)
+        if err != nil {
+            // ...
+        }
+        classes = append(classes, class)
+    }
 
 	if err := rows.Err(); err != nil {
 		rows.Close()
@@ -1164,4 +1142,207 @@ func (s *Storage) findTeacherCandidateLocked(classID int) (string, error) {
 	}
 
 	return login, nil
+}
+
+// InitializeParallelsFromConfig инициализирует параллели из конфигурации при старте сервера
+// Создает параллели, если они не существуют, и синхронизирует классы
+func (s *Storage) InitializeParallelsFromConfig() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.ParallelsConfig) == 0 {
+		return nil
+	}
+
+	for _, parallelCfg := range s.ParallelsConfig {
+		if err := s.initializeParallelLocked(parallelCfg.Name, parallelCfg.MinGrade, parallelCfg.MaxGrade); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// initializeParallelLocked создает одну параллель и добавляет в нее все соответствующие классы
+func (s *Storage) initializeParallelLocked(name string, minGrade, maxGrade int) error {
+	// Проверяем, существует ли уже такая параллель
+	var parallelID int
+	err := s.db.QueryRow(`
+		SELECT Id FROM parallels 
+		WHERE MinGrade = ? AND MaxGrade = ?
+	`, minGrade, maxGrade).Scan(&parallelID)
+
+	if err == nil {
+		// Параллель уже существует, просто синхронизируем классы
+		return s.syncParallelClassesLocked(parallelID, minGrade, maxGrade)
+	}
+
+	if err != sql.ErrNoRows {
+		return err
+	}
+
+	// Параллель не существует, создаем ее
+	// Сначала получаем все классы в этом диапазоне
+	rows, err := s.db.Query(`
+		SELECT Id, ClassTotalRating FROM classes 
+		WHERE Grade >= ? AND Grade <= ?
+		ORDER BY ClassTotalRating DESC
+		LIMIT 1
+	`, minGrade, maxGrade)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	bestClassID := 0
+	bestRating := 0
+	if rows.Next() {
+		var id, rating int
+		if err := rows.Scan(&id, &rating); err != nil {
+			return err
+		}
+		bestClassID = id
+		bestRating = rating
+	}
+
+	// Если нет классов в диапазоне, создаем пустую параллель
+	if bestClassID == 0 {
+		bestClassID = 0
+		bestRating = 0
+	}
+
+	// Вставляем новую параллель
+	res, err := s.db.Exec(`
+		INSERT INTO parallels (Name, MinGrade, MaxGrade, BestClassID, ClassTotalRating)
+		VALUES (?, ?, ?, ?, ?)
+	`, name, minGrade, maxGrade, bestClassID, bestRating)
+
+	if err != nil {
+		// Может быть UNIQUE constraint на Name, но это нормально
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return nil
+		}
+		return err
+	}
+
+	newParallelID, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	// Добавляем все классы в этот диапазон в параллель
+	return s.syncParallelClassesLocked(int(newParallelID), minGrade, maxGrade)
+}
+
+// syncParallelClassesLocked синхронизирует классы для параллели
+// Удаляет старые связи и создает новые для всех классов в диапазоне
+func (s *Storage) syncParallelClassesLocked(parallelID, minGrade, maxGrade int) error {
+	// Получаем все классы в диапазоне
+	rows, err := s.db.Query(`
+		SELECT Id FROM classes 
+		WHERE Grade >= ? AND Grade <= ?
+	`, minGrade, maxGrade)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var classIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		classIDs = append(classIDs, id)
+	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	// Удаляем старые связи для этой параллели
+	_, err = s.db.Exec(`DELETE FROM parallel_classes WHERE ParallelID = ?`, parallelID)
+	if err != nil {
+		return err
+	}
+
+	// Добавляем новые связи
+	for _, classID := range classIDs {
+		_, err := s.db.Exec(`
+			INSERT OR IGNORE INTO parallel_classes (ParallelID, ClassID) 
+			VALUES (?, ?)
+		`, parallelID, classID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Обновляем BestClassID и ClassTotalRating для параллели
+	var bestClassID int
+	var bestRating int
+	err = s.db.QueryRow(`
+		SELECT c.Id, c.ClassTotalRating FROM classes c
+		WHERE c.Grade >= ? AND c.Grade <= ?
+		ORDER BY c.ClassTotalRating DESC
+		LIMIT 1
+	`, minGrade, maxGrade).Scan(&bestClassID, &bestRating)
+
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if bestClassID == 0 {
+		bestRating = 0
+	}
+
+	_, err = s.db.Exec(`
+		UPDATE parallels 
+		SET BestClassID = ?, ClassTotalRating = ?
+		WHERE Id = ?
+	`, bestClassID, bestRating, parallelID)
+
+	return err
+}
+
+// AutoAssignClassToParallel автоматически добавляет класс в параллель на основе его grade
+// Вызывается при добавлении нового класса
+func (s *Storage) AutoAssignClassToParallel(classID int) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    return s.autoAssignClassToParallelLocked(classID)
+}
+
+func (s *Storage) autoAssignClassToParallelLocked(classID int) error {
+    var grade int
+    err := s.db.QueryRow(`SELECT Grade FROM classes WHERE Id = ?`, classID).Scan(&grade)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return nil
+        }
+        return err
+    }
+
+    // Находим параллель, которой этот класс должен принадлежать
+    var parallelID int
+    err = s.db.QueryRow(`
+        SELECT Id FROM parallels 
+        WHERE MinGrade <= ? AND MaxGrade >= ?
+        LIMIT 1
+    `, grade, grade).Scan(&parallelID)
+
+    if err != nil {
+        if err == sql.ErrNoRows {
+            // Нет подходящей параллели - это нормально
+            return nil
+        }
+        return err
+    }
+
+    // Добавляем связь класса с параллелью
+    _, err = s.db.Exec(`
+        INSERT OR IGNORE INTO parallel_classes (ParallelID, ClassID)
+        VALUES (?, ?)
+    `, parallelID, classID)
+
+    return err
 }

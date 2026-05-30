@@ -2,6 +2,7 @@ package main
 
 import (
 	"cspirt/internal/app"
+	classConfig "cspirt/internal/class/config"
 	"cspirt/internal/logger"
 	"cspirt/internal/storage"
 	"log/slog"
@@ -42,6 +43,24 @@ func main() {
 		return
 	}
 	defer store.Close()
+
+	// Парсим конфигурацию параллелей из .env
+	parallelsConfigStr := os.Getenv("PARALLELS")
+	if parallelsConfigStr != "" {
+		parallelsConfig, err := classConfig.ParseParallelsConfig(parallelsConfigStr)
+		if err != nil {
+			slog.Error("failed to parse PARALLELS config", "error", err)
+			return
+		}
+		store.ParallelsConfig = parallelsConfig
+
+		// Инициализируем параллели при старте сервера
+		if err := store.InitializeParallelsFromConfig(); err != nil {
+			slog.Error("failed to initialize parallels", "error", err)
+			return
+		}
+		slog.Info("Parallels initialized", "count", len(parallelsConfig))
+	}
 
 	if os.Getenv("SEED_TEST_USERS") == "1" {
 		if err := store.SeedTestUsers(); err != nil {
