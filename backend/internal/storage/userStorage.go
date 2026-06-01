@@ -249,11 +249,6 @@ func (s *Storage) UpdateUser(id int, req models.UpdateUserRequest, login string)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	check := utils.CheckUserRole(s, login, string(ratMod.RoleOwner))
-	if check != nil {
-		return errors.New("only owner can update user")
-	}
-
 	if id <= 0 {
 		return errors.New("user id is required")
 	}

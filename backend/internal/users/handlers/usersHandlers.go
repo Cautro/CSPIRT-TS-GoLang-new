@@ -6,6 +6,7 @@ import (
 	"cspirt/internal/users/models"
 	sr "cspirt/internal/users/service"
 	u "cspirt/internal/utils"
+	ratMod "cspirt/internal/rating/models"
 	"net/http"
 	"strconv"
 	"os"
@@ -247,6 +248,12 @@ func UpdateUserHandler(s *storage.Storage) gin.HandlerFunc {
 			})
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 			return
+		}
+
+		check := u.CheckUserRole(s, login, string(ratMod.RoleOwner))
+		if check != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "only owner can update user"})
+			return 
 		}
 
 		userService := sr.NewUsersService(s, s.Secret)
