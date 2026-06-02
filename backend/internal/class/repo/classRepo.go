@@ -16,6 +16,7 @@ type ClassRepository interface {
 	GetAllClassTeachers() ([]models.SafeUser, error)
 	AddClass(input classModels.ClassInput, login string) error
 	UpdateClass(classID int, input classModels.ClassInput, login string) error
+	YearComplete() ([]*classModels.Class, error)
 
 	// Parallel classes methods
 	AddParallel(name string, classesIDs []int) error

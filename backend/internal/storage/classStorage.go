@@ -80,7 +80,6 @@ func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
     s.mu.Lock()
     defer s.mu.Unlock()
 
-    // Проход 1: читаем все параллели, закрываем курсор
     rows, err := s.db.Query(`SELECT Id, Name, BestClassID, ClassTotalRating FROM parallels ORDER BY Name`)
     if err != nil {
         return nil, err
@@ -95,9 +94,8 @@ func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
         parallelClasses = append(parallelClasses, pc)
     }
     if err := rows.Err(); err != nil { rows.Close(); return nil, err }
-    rows.Close() // ← явное закрытие: соединение возвращается в пул
+    rows.Close()
 
-    // Проход 2: теперь соединение свободно
     for i := range parallelClasses {
         classRows, err := s.db.Query(
             `SELECT ClassID FROM parallel_classes WHERE ParallelID = ? ORDER BY ClassID`,
@@ -179,6 +177,95 @@ func (s *Storage) QuarterComplete(parallelClassID int) ([]*classModels.Class, er
 	}
 
 	return top3, nil
+}
+
+
+func (s *Storage) YearComplete() ([]*classModels.Class, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT Id, Name, Grade, Letter, Members, TeacherLogin, 
+				FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete, 
+				ClassTotalRating, UserTotalRating, QuarterComplete
+		FROM classes
+		ORDER BY ClassTotalRating DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	classes := make([]*classModels.Class, 0)
+	
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() 
+
+	for rows.Next() {
+		var class classModels.Class
+		var membersJSON string 
+
+		if err := rows.Scan(
+			&class.ID,
+			&class.Name,
+			&class.Grade,
+			&class.Letter,
+			&membersJSON, 
+			&class.TeacherLogin,
+			&class.FirstQuarterComplete,
+			&class.SecondQuarterComplete,
+			&class.ThirdQuarterComplete,
+			&class.ClassTotalRating,
+			&class.UserTotalRating,
+			&class.QuarterComplete,
+		); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(membersJSON), &class.Members); err != nil {
+			return nil, err
+		}
+
+		class.QuarterComplete += 1
+		class.Grade += 1
+		class.ClassTotalRating = 0
+
+		for i := range class.Members {
+			class.Members[i].Rating = 0 
+		}
+
+		class.UserTotalRating = 0
+
+		updatedMembersBytes, err := json.Marshal(class.Members)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = tx.Exec(`
+			UPDATE classes 
+			SET Grade = ?, QuarterComplete = ?, ClassTotalRating = ?, Members = ?
+			WHERE Id = ?
+		`, class.Grade, class.QuarterComplete, class.ClassTotalRating, string(updatedMembersBytes), class.ID)
+		
+		if err != nil {
+			return nil, err
+		}
+
+		classes = append(classes, &class)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return classes, nil
 }
 
 func (s *Storage) getParallelClassByIDLocked(parallelClassID int) (*classModels.ParallelClass, error) {

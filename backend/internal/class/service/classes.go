@@ -57,6 +57,10 @@ func (s *ClassService) GetBestClassInParallel(parallelID int) (*classModels.Clas
 	return nil, nil
 }
 
+func (s *ClassService) YearComplete() ([]*classModels.Class, error) {
+	return s.classes.YearComplete()
+}
+
 func (s *ClassService) CompleteQuarter(parallelClassId int) ([]*classModels.Class, error) {
 	return s.classes.QuarterComplete(parallelClassId)
 }

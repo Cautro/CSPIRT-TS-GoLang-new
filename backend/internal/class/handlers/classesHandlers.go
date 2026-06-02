@@ -255,6 +255,20 @@ func CompleteQuarterHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+func YearComplete(s *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		classService := sr.NewClassService(s, s.Secret)
+		var classes []*classModels.Class
+		var err error
+		if classes, err = classService.YearComplete(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete year"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Year completed", "Classes": classes})
+	}
+}
+
 func GetBestClassInParallelHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parallelClassIdStr := c.Param("parallel_class_id")
