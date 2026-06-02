@@ -184,40 +184,33 @@ func (s *Storage) YearComplete() ([]*classModels.Class, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 1. Открываем транзакцию СРАЗУ
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback() 
+	defer tx.Rollback()
 
-	// 2. Делаем запрос чтением ВНУТРИ транзакции (tx.Query вместо s.db.Query)
 	rows, err := tx.Query(`
 		SELECT Id, Name, Grade, Letter, Members, TeacherLogin, 
-		       FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete, 
-		       ClassTotalRating, UserTotalRating, QuarterComplete
+				FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete, 
+				ClassTotalRating, UserTotalRating, QuarterComplete
 		FROM classes
 		ORDER BY ClassTotalRating DESC
 	`)
 	if err != nil {
 		return nil, err
 	}
-	// Мы закроем rows руками чуть ниже, но defer нужен на случай паники
-	defer rows.Close() 
+	defer rows.Close()
 
-	classes := make([]*classModels.Class, 0)
-	
-	// Вспомогательная структура для хранения сырого JSON на этапе чтения
 	type dbClass struct {
 		class       *classModels.Class
 		membersJSON string
 	}
 	var scannedClasses []dbClass
 
-	// 3. Выкачиваем ВСЕ данные в оперативную память
 	for rows.Next() {
 		class := &classModels.Class{}
-		var membersJSON string 
+		var membersJSON string
 
 		if err := rows.Scan(
 			&class.ID, &class.Name, &class.Grade, &class.Letter,
@@ -227,18 +220,12 @@ func (s *Storage) YearComplete() ([]*classModels.Class, error) {
 		); err != nil {
 			return nil, err
 		}
-
 		scannedClasses = append(scannedClasses, dbClass{class: class, membersJSON: membersJSON})
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	
-	// 4. КРИТИЧЕСКИ ВАЖНО: Закрываем чтение, чтобы освободить базу для записи!
 	rows.Close()
 
-	// 5. Теперь спокойно модифицируем данные и делаем UPDATE
+	classes := make([]*classModels.Class, 0)
+
 	for _, item := range scannedClasses {
 		class := item.class
 
@@ -248,11 +235,14 @@ func (s *Storage) YearComplete() ([]*classModels.Class, error) {
 
 		class.QuarterComplete += 1
 		class.Grade += 1
+		if class.Grade > 11 {
+			class.Grade = 11
+		}
 		class.ClassTotalRating = 0
 		class.UserTotalRating = 0
 
 		for i := range class.Members {
-			class.Members[i].Rating = 0 
+			class.Members[i].Rating = 0
 		}
 
 		updatedMembersBytes, err := json.Marshal(class.Members)
@@ -260,28 +250,56 @@ func (s *Storage) YearComplete() ([]*classModels.Class, error) {
 			return nil, err
 		}
 
-		// Выполняем UPDATE в той же транзакции
 		_, err = tx.Exec(`
 			UPDATE classes 
 			SET Grade = ?, QuarterComplete = ?, ClassTotalRating = ?, UserTotalRating = ?, Members = ?
 			WHERE Id = ?
 		`, class.Grade, class.QuarterComplete, class.ClassTotalRating, class.UserTotalRating, string(updatedMembersBytes), class.ID)
-		
 		if err != nil {
 			return nil, err
+		}
+		var newParallelID int
+		err = tx.QueryRow(`
+			SELECT Id FROM parallels 
+			WHERE ? >= MinGrade AND ? <= MaxGrade 
+			LIMIT 1
+		`, class.Grade, class.Grade).Scan(&newParallelID)
+
+		if err == sql.ErrNoRows {
+			println("[DEBUG] Параллель не найдена для класса:", class.Name, "с Grade:", class.Grade)
+			
+			_, err = tx.Exec(`DELETE FROM parallel_classes WHERE ClassID = ?`, class.ID)
+			if err != nil {
+				return nil, err
+			}
+		} else if err != nil {
+			return nil, err
+		} else {
+			println("[DEBUG] Перенос класса", class.Name, "(Grade:", class.Grade, ") в ParallelID:", newParallelID)
+
+			_, err = tx.Exec(`DELETE FROM parallel_classes WHERE ClassID = ?`, class.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			_, err = tx.Exec(`
+				INSERT INTO parallel_classes (ParallelID, ClassID) 
+				VALUES (?, ?)
+			`, newParallelID, class.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		classes = append(classes, class)
 	}
 
-	// 6. Фиксируем транзакцию
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
 	return classes, nil
 }
-
 
 func (s *Storage) getParallelClassByIDLocked(parallelClassID int) (*classModels.ParallelClass, error) {
 	row := s.db.QueryRow(`
