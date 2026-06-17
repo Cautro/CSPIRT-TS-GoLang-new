@@ -29,6 +29,34 @@ func (s *Storage) GetOnlyStaffUsers() ([]models.SafeUser, error) {
 	return scanSafeUsers(rows)
 }
 
+func (s *Storage) UpdateAvatar(input models.UpdateAvatarRequest, id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result, err := s.db.Exec(`
+		UPDATE users
+		SET Avatar = ?
+		WHERE Id = ?
+	`,
+		input.Avatar,
+		id,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return errors.New("user not found")
+	}
+
+	return nil
+}
+
 func (s *Storage) AddUser(user models.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

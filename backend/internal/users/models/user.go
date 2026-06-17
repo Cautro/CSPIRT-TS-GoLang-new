@@ -87,3 +87,7 @@ type RefreshToken struct {
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }
+
+type UpdateAvatarRequest struct {
+	Avatar string `json:"avatar"`
+}
