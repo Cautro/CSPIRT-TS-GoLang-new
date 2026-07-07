@@ -2,18 +2,30 @@ package handlers
 
 import (
 	"cspirt/internal/logger"
+	ratMod "cspirt/internal/rating/models"
 	"cspirt/internal/storage"
 	"cspirt/internal/users/models"
 	sr "cspirt/internal/users/service"
 	u "cspirt/internal/utils"
-	ratMod "cspirt/internal/rating/models"
 	"net/http"
-	"strconv"
 	"os"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
+// GetUsersHandler returns users and detailed user info.
+// @Summary List users
+// @Description Returns a list of users or full details for a specific user by query parameter.
+// @Tags users
+// @Produce json
+// @Param id query int false "User ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/users [get]
 func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -106,12 +118,24 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// UpdateAvatarHandler updates a user's avatar.
+// @Summary Update avatar
+// @Description Updates the avatar of a user by query parameter.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id query int true "User ID"
+// @Param request body models.UpdateAvatarRequest true "Avatar payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/update/avatar [patch]
 func UpdateAvatarHandler(s *storage.Storage) gin.HandlerFunc {
-	return func (c *gin.Context)  {
+	return func(c *gin.Context) {
 		idStr := c.Query("id")
 		if idStr == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Bad request, id is empty"})
-			return 
+			return
 		}
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
@@ -121,20 +145,27 @@ func UpdateAvatarHandler(s *storage.Storage) gin.HandlerFunc {
 		var in models.UpdateAvatarRequest
 		if err := c.ShouldBindJSON(&in); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Bad request"})
-			return 
+			return
 		}
 
 		userService := sr.NewUsersService(s, s.Secret)
 		err = userService.UpdateAvatar(in, id)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
-			return 
+			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	}
 }
 
+// LogoutHandler clears the authentication cookies and invalidates the refresh token.
+// @Summary Logout
+// @Description Logs the user out and clears authentication cookies.
+// @Tags users
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /api/user/logout [patch]
 func LogoutHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if token, err := c.Cookie("refresh_token"); err == nil {
@@ -164,6 +195,19 @@ func cookieSecure() bool {
 	return os.Getenv("COOKIE_SECURE") == "1"
 }
 
+// AddUserHandler creates a new user.
+// @Summary Create user
+// @Description Creates a new user from the request body.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param request body models.User true "User payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/add [patch]
 func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -230,6 +274,20 @@ func AddUserHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// UpdateUserHandler updates a user's profile.
+// @Summary Update user
+// @Description Updates a user by query parameter and request body.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id query int true "User ID"
+// @Param request body models.SafeUser true "Updated user payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/update [patch]
 func UpdateUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -282,14 +340,14 @@ func UpdateUserHandler(s *storage.Storage) gin.HandlerFunc {
 		check := u.CheckUserRole(s, login, string(ratMod.RoleOwner))
 		if check != nil {
 			c.JSON(http.StatusForbidden, gin.H{"error": "only owner can update user"})
-			return 
+			return
 		}
 
 		userService := sr.NewUsersService(s, s.Secret)
 		if err = userService.UpdateUserHandlerService(idInt, user, login); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
-		} 
+		}
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
@@ -303,6 +361,18 @@ func UpdateUserHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// DeleteUserHandler deletes a user by ID.
+// @Summary Delete user
+// @Description Deletes a user by ID.
+// @Tags users
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/delete/{id} [delete]
 func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -372,6 +442,16 @@ func DeleteUserHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetMeHandler returns the current authenticated user profile with related data.
+// @Summary Get current user profile
+// @Description Returns the current authenticated user and related notes, complaints, events, and class teacher data.
+// @Tags users
+// @Produce json
+// @Success 200 {object} models.UserWithFullInfo
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/me [get]
 func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -444,6 +524,14 @@ func GetMeHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetStaffHandler returns all staff users.
+// @Summary List staff users
+// @Description Returns the list of staff users.
+// @Tags users
+// @Produce json
+// @Success 200 {array} models.SafeUser
+// @Failure 500 {object} map[string]string
+// @Router /api/users/get/staff [get]
 func GetStaffHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		staff, err := s.GetOnlyStaffUsers()

@@ -8,9 +8,20 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	
 )
 
+// EventComplete marks an event as completed.
+// @Summary Complete event
+// @Description Marks an event as completed with rating and class rewards.
+// @Tags events
+// @Accept json
+// @Produce json
+// @Param eventId path int true "Event ID"
+// @Param request body object{ratingReward=int,classReward=int} true "Completion payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/{eventId}/complete [patch]
 func EventComplete(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 

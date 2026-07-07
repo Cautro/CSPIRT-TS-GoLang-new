@@ -17,6 +17,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetNotesHandler returns notes visible to the current user.
+// @Summary List notes
+// @Description Returns notes for the requested class or for the current user's class.
+// @Tags notes
+// @Produce json
+// @Param class query int false "Class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/notes [get]
 func GetNotesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := u.AuthenticatedUser(c, s, "get_notes")
@@ -103,6 +114,18 @@ func GetNotesHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// AddNoteHandler creates a new note.
+// @Summary Create note
+// @Description Creates a new note from the request body.
+// @Tags notes
+// @Accept json
+// @Produce json
+// @Param request body noteModels.AddNewNoteResponse true "Note payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/note/add [patch]
 func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -114,7 +137,7 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 		err := u.CheckUserRole(s, login, string(ratingModels.RoleHelper), string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
 		if err != nil {
 			c.JSON(500, gin.H{"error": "You dont have permisions for that action"})
-			return 
+			return
 		}
 
 		notes := sr.NewNoteService(s, s.Secret)
@@ -173,6 +196,18 @@ func AddNoteHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// DeleteNoteHandler deletes a note by ID.
+// @Summary Delete note
+// @Description Deletes the note with the provided ID.
+// @Tags notes
+// @Produce json
+// @Param id path int true "Note ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/note/delete/{id} [delete]
 func DeleteNoteHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")

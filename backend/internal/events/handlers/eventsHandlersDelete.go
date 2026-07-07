@@ -2,13 +2,25 @@ package handlers
 
 import (
 	sr "cspirt/internal/events/service"
-	"github.com/gin-gonic/gin"
-	"cspirt/internal/storage"
 	"cspirt/internal/logger"
+	ratingModels "cspirt/internal/rating/models"
+	"cspirt/internal/storage"
 	"cspirt/internal/utils"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
+// DeleteEventParamsHandler deletes params for an event.
+// @Summary Delete event params
+// @Description Deletes the params for the specified event.
+// @Tags events
+// @Produce json
+// @Param eventId path int true "Event ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/{eventId}/params/delete [delete]
 func DeleteEventParamsHandler(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {
@@ -56,6 +68,16 @@ func DeleteEventParamsHandler(s *storage.Storage) func(ctx *gin.Context) {
 	}
 }
 
+// DeleteEventHandler deletes an event by ID.
+// @Summary Delete event
+// @Description Deletes the event with the provided ID.
+// @Tags events
+// @Produce json
+// @Param id path int true "Event ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/delete/{id} [delete]
 func DeleteEventHandler(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {
@@ -103,6 +125,18 @@ func DeleteEventHandler(s *storage.Storage) func(ctx *gin.Context) {
 	}
 }
 
+// DeletePlayersFromEvent removes players from an event.
+// @Summary Delete players from event
+// @Description Removes one or more player IDs from the specified event.
+// @Tags events
+// @Accept json
+// @Produce json
+// @Param eventId path int true "Event ID"
+// @Param request body object{playerIds=[]int} true "Player IDs payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/{eventId}/players/delete [delete]
 func DeletePlayersFromEvent(s *storage.Storage) func(ctx *gin.Context) {
 	return func(c *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {
@@ -110,7 +144,7 @@ func DeletePlayersFromEvent(s *storage.Storage) func(ctx *gin.Context) {
 			return
 		}
 
-		err := utils.CheckUserRole(s, c.GetString("Login"), "owner")
+		err := utils.CheckUserRole(s, c.GetString("Login"), string(ratingModels.RoleOwner), string(ratingModels.RoleAdmin))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",

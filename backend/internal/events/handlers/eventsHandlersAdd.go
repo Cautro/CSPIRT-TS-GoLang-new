@@ -1,16 +1,28 @@
 package handlers
 
 import (
-	sr "cspirt/internal/events/service"
-	ratingModels "cspirt/internal/rating/models"
 	"cspirt/internal/events/models"
-	"github.com/gin-gonic/gin"
-	"cspirt/internal/storage"
+	sr "cspirt/internal/events/service"
 	"cspirt/internal/logger"
+	ratingModels "cspirt/internal/rating/models"
+	"cspirt/internal/storage"
 	"cspirt/internal/utils"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
+// AddEventHandler creates a new event.
+// @Summary Create event
+// @Description Creates a new event from the request body.
+// @Tags events
+// @Accept json
+// @Produce json
+// @Param request body models.Event true "Event payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/add [patch]
 func AddEventHandler(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {
@@ -58,6 +70,18 @@ func AddEventHandler(s *storage.Storage) func(ctx *gin.Context) {
 	}
 }
 
+// AddEventParams adds params to an existing event.
+// @Summary Add event params
+// @Description Adds parameters to the specified event.
+// @Tags events
+// @Accept json
+// @Produce json
+// @Param eventId path int true "Event ID"
+// @Param request body models.EventParams true "Event params payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/{eventId}/params/add [patch]
 func AddEventParams(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {
@@ -118,6 +142,18 @@ func AddEventParams(s *storage.Storage) func(ctx *gin.Context) {
 	}
 }
 
+// AddPlayersToEvent adds players to an event.
+// @Summary Add players to event
+// @Description Adds one or more player IDs to the specified event.
+// @Tags events
+// @Accept json
+// @Produce json
+// @Param eventId path int true "Event ID"
+// @Param request body object{playerIds=[]int} true "Player IDs payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/{eventId}/players/add [patch]
 func AddPlayersToEvent(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {
@@ -135,7 +171,7 @@ func AddPlayersToEvent(s *storage.Storage) func(ctx *gin.Context) {
 				Message: "failed to get user: " + err.Error(),
 			})
 			ctx.JSON(500, gin.H{"error": "Failed to get user"})
-			return 
+			return
 		}
 
 		err = utils.CheckUserRole(s, ctx.GetString("Login"), string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))

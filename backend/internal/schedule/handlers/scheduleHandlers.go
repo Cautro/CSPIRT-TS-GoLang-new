@@ -16,6 +16,21 @@ import (
 	"cspirt/internal/utils"
 )
 
+// GetSchedulesHandler returns schedule data for the current user or a requested class.
+// @Summary List schedules
+// @Description Returns schedules filtered by type, class, day, and week type.
+// @Tags schedules
+// @Produce json
+// @Param type query string false "Schedule type"
+// @Param class_id query int false "Class ID"
+// @Param day query string false "Day"
+// @Param week_type query string false "Week type"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/schedules [get]
 func GetSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := utils.AuthenticatedUser(c, s, "get_schedules")
@@ -89,6 +104,19 @@ func GetSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetTeacherCurrentScheduleHandler returns the current schedule for a teacher.
+// @Summary Get teacher current schedule
+// @Description Returns the current schedule for the authenticated teacher or a specified teacher ID.
+// @Tags schedules
+// @Produce json
+// @Param teacher_id query int false "Teacher ID"
+// @Param day query string false "Day"
+// @Param week_type query string false "Week type"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/schedules/teacher/current [get]
 func GetTeacherCurrentScheduleHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := utils.AuthenticatedUser(c, s, "get_teacher_current_schedule")
@@ -131,6 +159,17 @@ func GetTeacherCurrentScheduleHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// UpdateSchedulesHandler updates one or more schedule entries.
+// @Summary Update schedules
+// @Description Updates schedules using the request body payload.
+// @Tags schedules
+// @Accept json
+// @Produce json
+// @Param request body scheduleModels.UpdateSchedulesInput true "Schedule update payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /api/schedules/update [patch]
 func UpdateSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := utils.AuthenticatedUser(c, s, "update_schedules")
@@ -182,6 +221,15 @@ func UpdateSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// RolloverSchedulesHandler rolls over schedules for a class.
+// @Summary Rollover schedules
+// @Description Rolls over schedules for the specified class.
+// @Tags schedules
+// @Produce json
+// @Param class_id query int false "Class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /api/schedules/rollover [patch]
 func RolloverSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := utils.AuthenticatedUser(c, s, "rollover_schedules")
@@ -210,6 +258,15 @@ func RolloverSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// ResetPlannedSchedulesHandler resets planned schedules for a class.
+// @Summary Reset planned schedules
+// @Description Resets planned schedules for the specified class.
+// @Tags schedules
+// @Produce json
+// @Param class_id query int false "Class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Router /api/schedules/planned/reset [patch]
 func ResetPlannedSchedulesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := utils.AuthenticatedUser(c, s, "reset_planned_schedules")
@@ -311,4 +368,3 @@ func isTeacherScheduleViewer(role string) bool {
 		strings.EqualFold(role, string(ratingModels.RoleAdmin)) ||
 		strings.EqualFold(role, string(ratingModels.RoleOwner))
 }
-

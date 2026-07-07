@@ -11,6 +11,7 @@ import (
 	"cspirt/internal/events/models"
 	"cspirt/internal/logger"
 	userModels "cspirt/internal/users/models"
+	ratingModels "cspirt/internal/rating/models"
 )
 
 func (s *Storage) ActivateDueEvents() error {
@@ -688,7 +689,7 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) 
 		return errors.New("user not found")
 	}
 
-	if user.ClassID <= 0 {
+	if user.ClassID <= 0 && user.Role != string(ratingModels.RoleOwner) {
 		return errors.New("user has no class")
 	}
 
@@ -697,7 +698,7 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) 
 		return err
 	}
 
-	if class == nil {
+	if class == nil && user.Role != string(ratingModels.RoleOwner) {
 		return errors.New("class not found")
 	}
 

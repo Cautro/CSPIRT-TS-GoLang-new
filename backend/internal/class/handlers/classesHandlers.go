@@ -7,14 +7,22 @@ import (
 	ratingModels "cspirt/internal/rating/models"
 	"cspirt/internal/storage"
 	userModels "cspirt/internal/users/models"
-	"net/http" 
+	"errors"
+	"net/http"
 	"strconv"
 	"strings"
-	"errors"
 
 	"github.com/gin-gonic/gin"
 )
 
+// GetClassTeachersHandler returns the list of class teachers.
+// @Summary Get class teachers
+// @Description Returns all class teachers.
+// @Tags classes
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/teacher [get]
 func GetClassTeachersHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classService := sr.NewClassService(s, s.Secret)
@@ -28,6 +36,17 @@ func GetClassTeachersHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// AddParallelClassHandler creates a parallel class from a grade range or explicit class IDs.
+// @Summary Create parallel class
+// @Description Creates a parallel class from the provided payload.
+// @Tags classes
+// @Accept json
+// @Produce json
+// @Param request body classModels.AddParallelRequest true "Parallel class payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/parallel/add [patch]
 func AddParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input classModels.AddParallelRequest
@@ -49,31 +68,31 @@ func AddParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
 		}
 
 		if input.Name == "" {
-            c.JSON(http.StatusBadRequest, gin.H{
-                "error": "Name is required",
-            })
-            return
-        }
-        
-        hasGradeRange := input.MinGrade > 0 && input.MaxGrade > 0
-        hasClassIDs := len(input.ClassIDs) > 0
-        
-        if !hasGradeRange && !hasClassIDs {
-            c.JSON(http.StatusBadRequest, gin.H{
-                "error": "ClassIDs or grade range required",
-            })
-            return
-        }
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Name is required",
+			})
+			return
+		}
+
+		hasGradeRange := input.MinGrade > 0 && input.MaxGrade > 0
+		hasClassIDs := len(input.ClassIDs) > 0
+
+		if !hasGradeRange && !hasClassIDs {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "ClassIDs or grade range required",
+			})
+			return
+		}
 
 		if input.MinGrade != 0 {
-            err := s.AddParallelByGradeRange(input.Name, input.MinGrade, input.MaxGrade)
+			err := s.AddParallelByGradeRange(input.Name, input.MinGrade, input.MaxGrade)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-        }
-		
-		classService := sr.NewClassService(s, s.Secret) 
+		}
+
+		classService := sr.NewClassService(s, s.Secret)
 		if err := classService.AddParallelClass(input.Name, classesIDs, c.GetString("Login")); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -83,6 +102,18 @@ func AddParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// UpdateClassHandler updates an existing class.
+// @Summary Update class
+// @Description Updates a class by its ID.
+// @Tags classes
+// @Accept json
+// @Produce json
+// @Param class_id path int true "Class ID"
+// @Param request body classModels.ClassInput true "Updated class payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/{class_id}/update [patch]
 func UpdateClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classIdStr := c.Param("class_id")
@@ -124,6 +155,14 @@ func UpdateClassHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetParallelClassesHandler returns all parallel classes.
+// @Summary List parallel classes
+// @Description Returns a list of parallel classes.
+// @Tags classes
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/parallel [get]
 func GetParallelClassesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classService := sr.NewClassService(s, s.Secret)
@@ -137,6 +176,16 @@ func GetParallelClassesHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// DeleteParallelClassHandler deletes a parallel class by ID.
+// @Summary Delete parallel class
+// @Description Deletes a parallel class by query parameter.
+// @Tags classes
+// @Produce json
+// @Param parallel_class_id query int true "Parallel class ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/parallel/delete [delete]
 func DeleteParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parallelClassIdStr := c.Query("parallel_class_id")
@@ -155,6 +204,17 @@ func DeleteParallelClassHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetParallelClassByIDHandler returns a single parallel class by its ID.
+// @Summary Get parallel class by ID
+// @Description Returns the parallel class with the specified ID.
+// @Tags classes
+// @Produce json
+// @Param parallel_class_id path int true "Parallel class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/parallel/{parallel_class_id} [get]
 func GetParallelClassByIDHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parallelClassIdStr := c.Param("parallel_class_id")
@@ -188,6 +248,17 @@ func GetParallelClassByIDHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetParallelClassUsersHandler returns all users belonging to a parallel class.
+// @Summary Get users of parallel class
+// @Description Returns all users from classes included in the specified parallel class.
+// @Tags classes
+// @Produce json
+// @Param parallel_class_id path int true "Parallel class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/parallel/{parallel_class_id}/users [get]
 func GetParallelClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parallelClassIdStr := c.Param("parallel_class_id")
@@ -231,6 +302,16 @@ func GetParallelClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// CompleteQuarterHandler completes quarter results for a parallel class.
+// @Summary Complete quarter
+// @Description Completes the quarter for the specified parallel class.
+// @Tags classes
+// @Produce json
+// @Param parallel_class_id query int true "Parallel class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/quarter/complete [patch]
 func CompleteQuarterHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parallelClassIdStr := c.Query("parallel_class_id")
@@ -255,6 +336,14 @@ func CompleteQuarterHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// YearComplete completes the year for all classes.
+// @Summary Complete year
+// @Description Completes the year for all classes.
+// @Tags classes
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/year/complete [patch]
 func YearComplete(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classService := sr.NewClassService(s, s.Secret)
@@ -269,6 +358,17 @@ func YearComplete(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetBestClassInParallelHandler returns the best class in a parallel class.
+// @Summary Get best class in parallel
+// @Description Returns the best class from the specified parallel class.
+// @Tags classes
+// @Produce json
+// @Param parallel_class_id path int true "Parallel class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/parallel/{parallel_class_id}/best [get]
 func GetBestClassInParallelHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parallelClassIdStr := c.Param("parallel_class_id")
@@ -293,6 +393,16 @@ func GetBestClassInParallelHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetClassesInParallelHandler returns the list of classes inside a parallel class.
+// @Summary Get classes in parallel
+// @Description Returns classes belonging to the given parallel class.
+// @Tags classes
+// @Produce json
+// @Param parallel_class_id path int true "Parallel class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/parallel/{parallel_class_id}/classes [get]
 func GetClassesInParallelHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parallelClassIdStr := c.Param("parallel_class_id")
@@ -313,6 +423,17 @@ func GetClassesInParallelHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// AddClassHandler creates a new class.
+// @Summary Create class
+// @Description Creates a new class from the provided payload.
+// @Tags classes
+// @Accept json
+// @Produce json
+// @Param request body classModels.ClassInput true "Class payload"
+// @Success 201 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/add [patch]
 func AddClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input classModels.ClassInput
@@ -357,6 +478,16 @@ func checkInputClass(input classModels.ClassInput) error {
 	return nil
 }
 
+// DeleteClassHandler deletes a class by ID.
+// @Summary Delete class
+// @Description Deletes a class by its ID.
+// @Tags classes
+// @Produce json
+// @Param id path int true "Class ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/delete/{id} [delete]
 func DeleteClassHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classIdStr := c.Param("id")
@@ -376,6 +507,17 @@ func DeleteClassHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetClassesHandler returns classes, optionally filtered by class_id.
+// @Summary List classes
+// @Description Returns classes, optionally filtered by the given class_id query parameter.
+// @Tags classes
+// @Produce json
+// @Param class_id query int false "Class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes [get]
 func GetClassesHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classService := sr.NewClassService(s, s.Secret)
@@ -412,6 +554,17 @@ func GetClassesHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetClassUsersHandler returns all users in a class.
+// @Summary Get class users
+// @Description Returns all users belonging to the specified class.
+// @Tags classes
+// @Produce json
+// @Param class_id path int true "Class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/{class_id}/users [get]
 func GetClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classIdStr := c.Param("class_id")
@@ -443,6 +596,17 @@ func GetClassUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// GetClassTeacherHandler returns the teacher of a class.
+// @Summary Get class teacher
+// @Description Returns the teacher assigned to the specified class.
+// @Tags classes
+// @Produce json
+// @Param class_id path int true "Class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/classes/{class_id}/teacher [get]
 func GetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		classIdStr := c.Param("class_id")
@@ -477,6 +641,18 @@ func GetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// SetClassTeacherHandler assigns a teacher to a class.
+// @Summary Set class teacher
+// @Description Assigns a teacher login to the specified class.
+// @Tags classes
+// @Accept json
+// @Produce json
+// @Param class_id path int true "Class ID"
+// @Param request body classModels.ClassTeacherInput true "Teacher assignment payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /api/classes/{class_id}/teacher [patch]
 func SetClassTeacherHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := authenticatedUser(c, s, "set_class_teacher")

@@ -2,13 +2,27 @@ package handlers
 
 import (
 	sr "cspirt/internal/events/service"
-	"github.com/gin-gonic/gin"
-	"cspirt/internal/storage"
 	"cspirt/internal/logger"
-	"strconv"
+	"cspirt/internal/storage"
 	"net/http"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
+// GetEventsHandler returns events filtered by user, class, or event ID.
+// @Summary List events
+// @Description Returns events, optionally filtered by user_id, class_id, or event_id query parameters.
+// @Tags events
+// @Produce json
+// @Param user_id query int false "User ID"
+// @Param class_id query int false "Class ID"
+// @Param event_id query int false "Event ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/events [get]
 func GetEventsHandler(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {
@@ -96,6 +110,16 @@ func GetEventsHandler(s *storage.Storage) func(ctx *gin.Context) {
 	}
 }
 
+// GetEventParamsHandler returns params for an event.
+// @Summary Get event params
+// @Description Returns event parameters for the specified event.
+// @Tags events
+// @Produce json
+// @Param eventId path int true "Event ID"
+// @Success 200 {array} models.EventParams
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/{eventId}/params [get]
 func GetEventParamsHandler(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		eventID, err := strconv.Atoi(ctx.Param("eventId"))
@@ -115,6 +139,16 @@ func GetEventParamsHandler(s *storage.Storage) func(ctx *gin.Context) {
 	}
 }
 
+// GetEventPlayersHandler returns the players assigned to an event.
+// @Summary Get event players
+// @Description Returns players for the specified event.
+// @Tags events
+// @Produce json
+// @Param eventId path int true "Event ID"
+// @Success 200 {array} models.SafeUser
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/{eventId}/players [get]
 func GetEventPlayersHandler(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {
@@ -145,6 +179,16 @@ func GetEventPlayersHandler(s *storage.Storage) func(ctx *gin.Context) {
 	}
 }
 
+// GetEventPlayersCountHandler returns the number of players in an event.
+// @Summary Get event players count
+// @Description Returns the count of players participating in the specified event.
+// @Tags events
+// @Produce json
+// @Param eventId path int true "Event ID"
+// @Success 200 {object} map[string]int
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/event/{eventId}/players/count [get]
 func GetEventPlayersCountHandler(s *storage.Storage) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		if err := s.ActivateDueEvents(); err != nil {

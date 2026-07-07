@@ -3,13 +3,24 @@ package handlers
 import (
 	"cspirt/internal/logger"
 	"cspirt/internal/rating/models"
-	"cspirt/internal/rating/service"
+	rating "cspirt/internal/rating/service"
 	"cspirt/internal/storage"
 	userModels "cspirt/internal/users/models"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
+// GetRatingsHandler returns the current user's rating.
+// @Summary Get rating
+// @Description Returns the authenticated user's current rating.
+// @Tags rating
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/rating [get]
 func GetRatingsHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -43,6 +54,19 @@ func GetRatingsHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// UpdateRatingsHandler updates a user's rating.
+// @Summary Update rating
+// @Description Updates the rating of a target user using the request body.
+// @Tags rating
+// @Accept json
+// @Produce json
+// @Param request body models.RatingInput true "Rating update payload"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/rating/update [patch]
 func UpdateRatingsHandler(rs *rating.RatingsService, s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input models.RatingInput

@@ -17,6 +17,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetComplaintsHandler returns complaints visible to the current user.
+// @Summary List complaints
+// @Description Returns complaints for a class or for the current user depending on permissions.
+// @Tags complaints
+// @Produce json
+// @Param class query int false "Class ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/complaints [get]
 func GetComplaintsHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := u.AuthenticatedUser(c, s, "get_notes")
@@ -97,6 +109,19 @@ func GetComplaintsHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// AddcomplaintHandler creates a complaint.
+// @Summary Create complaint
+// @Description Creates a new complaint from the request body.
+// @Tags complaints
+// @Accept json
+// @Produce json
+// @Param request body complaintModels.AddNewComplaintResponse true "Complaint payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/complaint/add [patch]
 func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -160,6 +185,18 @@ func AddcomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+// DeletecomplaintHandler deletes a complaint by ID.
+// @Summary Delete complaint
+// @Description Deletes the complaint with the provided ID.
+// @Tags complaints
+// @Produce json
+// @Param id path int true "Complaint ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/complaint/delete/{id} [delete]
 func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
@@ -179,7 +216,6 @@ func DeletecomplaintHandler(s *storage.Storage) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 			return
 		}
-
 
 		foundUser, err := s.GetUserByLogin(login)
 		if err != nil {
