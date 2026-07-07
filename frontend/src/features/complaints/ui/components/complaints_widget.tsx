@@ -1,7 +1,9 @@
-import {useEffect} from "react";
 import {useAuthStore} from "../../../auth/store/auth_store.ts";
-import {useComplaintsStore} from "../../store/complaints_store.ts";
 import {ComplaintCard} from "../../../../shared/ui/cards/complaint_card.tsx";
+import {useComplaints} from "../../hooks/use_complaints.ts";
+import type {ComplaintType} from "../../../../shared/entities/complaints/types/complaints_types.ts";
+import {useDeleteComplaint} from "../../hooks/use_delete_complaint.ts";
+import {useEffect} from "react";
 
 type props = {
     id: number,
@@ -9,19 +11,15 @@ type props = {
 }
 
 export function ComplaintsWidget({id, name}: props) {
-    const complaints = useComplaintsStore((state) => state.complaints)
-    const getComplaints = useComplaintsStore((state) => state.getComplaints)
-    const deleteComplaint = useComplaintsStore((state) => state.deleteComplaint);
+    const {mutate} = useDeleteComplaint();
     const role = useAuthStore((state) => state.user?.User.Role);
-    const status = useComplaintsStore((state) => state.status);
-    const error = useComplaintsStore((state) => state.error);
-
-    const isLoading = status === "loading";
-
+    const {data, isLoading, error} = useComplaints(id);
+    const complaints = (data as ComplaintType[]) || [];
+    
     useEffect(() => {
-        void getComplaints(id);
-    }, [getComplaints, id])
-
+        console.log(complaints);
+    }, [complaints]);
+    
     return (
         <>
             {isLoading && (
@@ -33,15 +31,14 @@ export function ComplaintsWidget({id, name}: props) {
             )}
 
             {error && !isLoading && (
-                <div className="alert alert--danger mb-4">{error}</div>
+                <div className="alert alert--danger mb-4">{error.message}</div>
             )}
 
             {(complaints !== null && complaints.length > 0) ? (
                 <div className={"class-list"}>
                     {complaints.map((item) => (
                         <ComplaintCard item={item} key={item.ID} onDelete={() => {
-                            deleteComplaint(item.ID);
-                            getComplaints(id);
+                            mutate({id: item.ID})
                         }} role={role ?? "User"} />
                     ))}
                 </div>

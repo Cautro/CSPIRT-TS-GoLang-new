@@ -1,27 +1,19 @@
-import {useEffect} from "react";
-import {useNotesStore} from "../../store/notes_store.ts";
 import {NoteCard} from "../../../../shared/ui/cards/note_card.tsx";
 import {useAuthStore} from "../../../auth/store/auth_store.ts";
+import {useNotes} from "../../hooks/use_notes.ts";
+import {useDeleteNote} from "../../hooks/use_delete_note.ts";
 
-type props = {
-    id: number,
-    name: string,
-}
+type props = { id: number, name: string, }
 
 export function NotesWidget({id, name}: props) {
-    const notes = useNotesStore((state) => state.notes)
-    const getNotes = useNotesStore((state) => state.getNotes)
-    const deleteNote = useNotesStore((state) => state.deleteNote);
+    const getNotes = useNotes(id);
+    const notes = getNotes.data;
+    const deleteNote = useDeleteNote();
     const role = useAuthStore((state) => state.user?.User.Role);
-    const status = useNotesStore((state) => state.status);
-    const error = useNotesStore((state) => state.error);
     
-    const isLoading = status === "loading";
-
-    useEffect(() => {
-        void getNotes(id);
-    }, [getNotes, id])
-
+    const isLoading = getNotes.isLoading;
+    const error = getNotes.error?.message || deleteNote.error?.message || null;
+    
     return (
         <>
             {isLoading && (
@@ -36,12 +28,11 @@ export function NotesWidget({id, name}: props) {
                 <div className="alert alert--danger mb-4">{error}</div>
             )}
             
-            {(notes !== null && notes.length > 0) ? (
+            {(notes && notes.length > 0) ? (
                 <div className={"class-list"}>
-                    {notes.map((note) => (
+                    {notes?.map((note) => (
                         <NoteCard item={note} key={note.ID} onDelete={async () => {
-                            await deleteNote(note.ID);
-                            getNotes(id);
+                            await deleteNote.mutateAsync({id: note.ID});
                         }} role={role ?? "User"} />
                     ))}
                 </div>

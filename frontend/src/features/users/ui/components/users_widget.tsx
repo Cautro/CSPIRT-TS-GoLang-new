@@ -1,7 +1,7 @@
 import {UserCard} from "../../../../shared/ui/cards/user_card.tsx";
-import {useUsersStore} from "../../store/users_store.ts";
 import {useNavigate} from "react-router-dom";
-import {useEffect} from "react";
+import {UseUsersByClass} from "../../hooks/use_users_by_class.ts";
+import type {UserType} from "../../../../shared/entities/user/types/user_types.ts";
 
 type props = {
     id: number,
@@ -10,17 +10,9 @@ type props = {
 
 export function UsersWidget({id, name}: props) {
     const navigate = useNavigate();
-    const users = useUsersStore((state) => state.users);
-    const getUsers = useUsersStore((state) => state.getUsersByClass);
-    const status = useUsersStore((state) => state.status);
-    const error = useUsersStore((state) => state.error);
+    const {data, error, isLoading} = UseUsersByClass(id);
+    const users = (data as UserType[]) || [];
     
-    const isLoading = status === "loading";
-    
-    useEffect(() => {
-        void getUsers(id);
-    }, [getUsers, id])
-
     return (
         <>
             {isLoading && (
@@ -32,7 +24,7 @@ export function UsersWidget({id, name}: props) {
             )}
 
             {error && !isLoading && (
-                <div className="alert alert--danger mb-4">{error}</div>
+                <div className="alert alert--danger mb-4">{error.message}</div>
             )}
             
             {(users !== null && users.length > 0) ? (

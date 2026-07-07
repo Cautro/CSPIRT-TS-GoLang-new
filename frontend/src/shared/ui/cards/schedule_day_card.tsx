@@ -16,6 +16,7 @@ interface Props {
 
 export function ScheduleDayCard({ title, lessons, onChangeScheduleLesson = () => console.log(1), day, classId, type, isTeacher = false}: Props) {
     const role = useAuthStore((state) => state.user?.User.Role);
+    const normalizedRole = role?.toLowerCase();
     const [isAddLessonModalOpen, setIsAddLessonModalOpen] = useState(false);
     
     return (
@@ -51,7 +52,7 @@ export function ScheduleDayCard({ title, lessons, onChangeScheduleLesson = () =>
                     На этот день уроков нет
                 </div>
             )}
-            {role === "Owner" && !isTeacher && (
+            {normalizedRole === "owner" && !isTeacher && (
                 <div className="btn-group">
                     <button className="btn btn--primary"
                         onClick={() => setIsAddLessonModalOpen(true)}

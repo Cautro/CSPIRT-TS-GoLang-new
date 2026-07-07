@@ -11,3 +11,12 @@ export const noteSchema = z.object({
 });
 
 export type NoteType = z.infer<typeof noteSchema>;
+
+export type NoteFormType = {
+    AuthorID: number;
+    TargetID: number;
+    Content: string;
+    CreatedAt: string;
+    AuthorName: string;
+    TargetName: string;
+}

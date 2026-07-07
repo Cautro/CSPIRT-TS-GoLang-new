@@ -1,66 +1,48 @@
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
-
 import type {UserType} from "../../../../shared/entities/user/types/user_types.ts";
-import {addEventPlayersSchema} from "../../../../shared/entities/events/api/events_api.ts";
-import {useEventStore} from "../../store/event_store.ts";
-import {useClassStore} from "../../../class/store/class_store.ts";
 import type {ClassType} from "../../../../shared/entities/class/types/class_types.ts";
+import {addEventPlayersSchema} from "../../../../shared/entities/events/api/events_api.ts";
+import {PageHeader} from "../../../../shared/ui/other/page_header.tsx";
+import {UseEventById} from "../../hooks/use_event_by_id.ts";
+import {useAddEventPlayers} from "../../hooks/use_add_event_players.ts";
+import {useRemoveEventPlayers} from "../../hooks/use_remove_event_players.ts";
+import {useClassId} from "../../../class/hooks/use_class_id.ts";
 
 export function EventClassPlayersPage() {
     const navigate = useNavigate();
 
-    const {eventId, classId} = useParams<{ eventId: string, classId: string }>();
-
+    const {eventId, classId} = useParams<{ eventId: string; classId: string; }>();
+    
     const numericEventId = eventId ? Number(eventId) : null;
     const numericClassId = classId ? Number(classId) : null;
 
-    const event = useEventStore((state) => state.event);
-    const status = useEventStore((state) => state.status);
-    const error = useEventStore((state) => state.error);
-    const [classItem, setClassItem] = useState<ClassType | null>(null)
+    const getEventById = UseEventById(numericEventId ?? 0);
+    const getClassById = useClassId(numericClassId ?? 0);
 
-    const getEventById = useEventStore((state) => state.getEventById);
-    const addPlayersToEvent = useEventStore((state) => state.addPlayersToEvent);
-    const removePlayersFromEvent = useEventStore((state) => state.removePlayersFromEvent);
-    const getClassById = useClassStore((state) => state.getClassById)
+    const addPlayersToEvent = useAddEventPlayers();
+    const removePlayersFromEvent = useRemoveEventPlayers();
+
+    const event = getEventById.data;
+    const classItem = getClassById.data as ClassType | null;
 
     const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
     const [formError, setFormError] = useState<string | null>(null);
 
-    const isLoading = status === "loading";
+    const initializedRef = useRef(false);
 
-    useEffect(() => {
-        if (!numericEventId || Number.isNaN(numericEventId)) {
-            return;
-        }
-        void getEventById(numericEventId);
-    }, [numericEventId, getEventById]);
+    const error =
+        getEventById.error?.message ||
+        addPlayersToEvent.error?.message ||
+        removePlayersFromEvent.error?.message ||
+        getClassById.error?.message ||
+        null;
 
-    useEffect(() => {
-        if (!numericClassId || Number.isNaN(numericClassId)) {
-            return;
-        }
-
-        let isMounted = true;
-
-        async function loadClass() {
-            setClassItem(null);
-
-            const item = await getClassById(numericClassId);
-
-            if (isMounted) {
-                setClassItem(item);
-            }
-        }
-
-        void loadClass();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [getClassById, numericClassId]);
-
+    const isLoading =
+        getEventById.isLoading ||
+        getClassById.isLoading ||
+        addPlayersToEvent.isPending ||
+        removePlayersFromEvent.isPending;
 
     const students = useMemo<UserType[]>(() => {
         if (!classItem) {
@@ -68,7 +50,9 @@ export function EventClassPlayersPage() {
         }
 
         return classItem.Members.filter((user) => {
-            return user.Role === "User" || user.Role === "Helper";
+            const normalizedRole = user.Role.toLowerCase();
+
+            return normalizedRole === "user" || normalizedRole === "helper";
         });
     }, [classItem]);
 
@@ -77,9 +61,7 @@ export function EventClassPlayersPage() {
     }, [students]);
 
     const eventPlayerIdSet = useMemo(() => {
-        const ids = event?.Players;
-
-        return new Set(ids);
+        return new Set(event?.Players ?? []);
     }, [event]);
 
     const initialSelectedUserIds = useMemo(() => {
@@ -89,16 +71,24 @@ export function EventClassPlayersPage() {
     }, [students, eventPlayerIdSet]);
 
     useEffect(() => {
-        setSelectedUserIds(initialSelectedUserIds);
-    }, [initialSelectedUserIds]);
+        if (!initializedRef.current && !getEventById.isLoading && !getClassById.isLoading) {
+            setSelectedUserIds(initialSelectedUserIds);
+            initializedRef.current = true;
+        }
+    }, [initialSelectedUserIds, getEventById.isLoading, getClassById.isLoading]);
 
     if (!numericEventId || Number.isNaN(numericEventId)) {
         return (
             <main className="main">
                 <section className="page">
                     <div className="empty-state">
-                        <h2 className="empty-state__title">ID мероприятия не найден</h2>
-                        <p className="empty-state__text">Некорректный адрес страницы.</p>
+                        <h2 className="empty-state__title">
+                            ID мероприятия не найден
+                        </h2>
+
+                        <p className="empty-state__text">
+                            Некорректный адрес страницы.
+                        </p>
 
                         <button
                             className="btn btn--primary"
@@ -118,8 +108,13 @@ export function EventClassPlayersPage() {
             <main className="main">
                 <section className="page">
                     <div className="empty-state">
-                        <h2 className="empty-state__title">ID класса не найден</h2>
-                        <p className="empty-state__text">Некорректный адрес страницы.</p>
+                        <h2 className="empty-state__title">
+                            ID класса не найден
+                        </h2>
+
+                        <p className="empty-state__text">
+                            Некорректный адрес страницы.
+                        </p>
 
                         <button
                             className="btn btn--primary"
@@ -139,9 +134,20 @@ export function EventClassPlayersPage() {
             <main className="main">
                 <section className="page">
                     <div className="class-list">
-                        <div className="skeleton" style={{height: 120}}/>
-                        <div className="skeleton" style={{height: 88}}/>
-                        <div className="skeleton" style={{height: 88}}/>
+                        <div
+                            className="skeleton"
+                            style={{height: 120}}
+                        />
+
+                        <div
+                            className="skeleton"
+                            style={{height: 88}}
+                        />
+
+                        <div
+                            className="skeleton"
+                            style={{height: 88}}
+                        />
                     </div>
                 </section>
             </main>
@@ -153,7 +159,9 @@ export function EventClassPlayersPage() {
             <main className="main">
                 <section className="page">
                     <div className="empty-state">
-                        <h2 className="empty-state__title">Данные не найдены</h2>
+                        <h2 className="empty-state__title">
+                            Данные не найдены
+                        </h2>
 
                         <p className="empty-state__text">
                             Не удалось получить мероприятие или класс.
@@ -191,7 +199,6 @@ export function EventClassPlayersPage() {
     }
 
     async function handleSaveChanges() {
-
         if (!numericEventId) {
             return;
         }
@@ -214,35 +221,50 @@ export function EventClassPlayersPage() {
             return;
         }
 
-        if (addedIds.length > 0 && numericEventId) {
+        if (addedIds.length > 0) {
             const parsedAdd = addEventPlayersSchema.safeParse({
                 playerIds: addedIds,
             });
 
             if (!parsedAdd.success) {
                 console.log(parsedAdd.error.issues);
-                setFormError("Некорректный список учеников для добавления");
+
+                setFormError(
+                    "Некорректный список учеников для добавления"
+                );
+
                 return;
             }
 
-            await addPlayersToEvent(numericEventId, parsedAdd.data);
+            await addPlayersToEvent.mutateAsync({
+                id: numericEventId,
+                dto: parsedAdd.data,
+            });
         }
 
-        if (removedIds.length > 0 && numericEventId) {
+        if (removedIds.length > 0) {
             const parsedRemove = addEventPlayersSchema.safeParse({
                 playerIds: removedIds,
             });
 
             if (!parsedRemove.success) {
                 console.log(parsedRemove.error.issues);
-                setFormError("Некорректный список учеников для удаления");
+
+                setFormError(
+                    "Некорректный список учеников для удаления"
+                );
+
                 return;
             }
 
-            await removePlayersFromEvent(numericEventId, parsedRemove.data);
+            await removePlayersFromEvent.mutateAsync({
+                id: numericEventId,
+                dto: parsedRemove.data,
+            });
         }
 
-        await getEventById(numericEventId);
+        await getEventById.refetch();
+
         navigate(-1);
     }
 
@@ -250,30 +272,13 @@ export function EventClassPlayersPage() {
         <main className="main">
             <section className="page">
                 <div className="event-players-page">
-                    <div className="event-page__header">
-                        <div>
-                            <p className="event-page__eyebrow">
-                                Мероприятие #{event.ID}
-                            </p>
 
-                            <h1 className="event-page__title">
-                                Участники мероприятия
-                            </h1>
-
-                            <p className="event-page__description">
-                                {event.Title} · {classItem.Name} класс
-                            </p>
-                        </div>
-
-                        <button
-                            className="btn btn--secondary"
-                            type="button"
-                            onClick={() => navigate(-1)}
-                            disabled={isLoading}
-                        >
-                            Назад
-                        </button>
-                    </div>
+                    <PageHeader
+                        eyebrow={`Мероприятие #${event.ID}`}
+                        title={"Участники мероприятия"}
+                        description={`${event.Title} · ${classItem.Name} класс`}
+                        hasBackButton={true}
+                    />
 
                     <div className="event-players-toolbar">
                         <div>
@@ -311,7 +316,9 @@ export function EventClassPlayersPage() {
                                 onClick={handleSaveChanges}
                                 disabled={isLoading}
                             >
-                                {isLoading ? "Сохранение..." : "Сохранить изменения"}
+                                {isLoading
+                                    ? "Сохранение..."
+                                    : "Сохранить изменения"}
                             </button>
                         </div>
                     </div>
@@ -329,7 +336,8 @@ export function EventClassPlayersPage() {
                             </h2>
 
                             <p className="empty-state__text">
-                                В этом классе пока нет учеников для добавления в мероприятие.
+                                В этом классе пока нет учеников
+                                для добавления в мероприятие.
                             </p>
                         </div>
                     )}
@@ -337,8 +345,11 @@ export function EventClassPlayersPage() {
                     {students.length > 0 && (
                         <div className="students-select-list">
                             {students.map((student) => {
-                                const isSelected = selectedUserIds.includes(student.Id);
-                                const wasInitiallySelected = initialSelectedUserIds.includes(student.Id);
+                                const isSelected =
+                                    selectedUserIds.includes(student.Id);
+
+                                const wasInitiallySelected =
+                                    initialSelectedUserIds.includes(student.Id);
 
                                 return (
                                     <div
@@ -352,8 +363,12 @@ export function EventClassPlayersPage() {
                                         tabIndex={0}
                                         onClick={() => toggleUser(student.Id)}
                                         onKeyDown={(event) => {
-                                            if (event.key === "Enter" || event.key === " ") {
+                                            if (
+                                                event.key === "Enter" ||
+                                                event.key === " "
+                                            ) {
                                                 event.preventDefault();
+
                                                 toggleUser(student.Id);
                                             }
                                         }}
@@ -364,7 +379,9 @@ export function EventClassPlayersPage() {
                                                     type="checkbox"
                                                     checked={isSelected}
                                                     onChange={() => toggleUser(student.Id)}
-                                                    onClick={(event) => event.stopPropagation()}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                    }}
                                                     disabled={isLoading}
                                                 />
                                             </div>
@@ -385,7 +402,8 @@ export function EventClassPlayersPage() {
 
                                                 {wasInitiallySelected && (
                                                     <p className="student-select-card__meta">
-                                                        Уже участвует в мероприятии
+                                                        Уже участвует
+                                                        в мероприятии
                                                     </p>
                                                 )}
                                             </div>

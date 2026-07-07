@@ -17,4 +17,5 @@ type UserRepository interface {
 	GetRefreshToken(token string) (*models.RefreshToken, error)
 	DeleteRefreshToken(token string) error
 	UpdateUser(id int, req models.UpdateUserRequest, login string) error
+	UpdateAvatar(input models.UpdateAvatarRequest, id int) error
 }

@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+    
+    <!-- Book Left -->
+    <path
+            d="M70 130C70 117 80 107 93 107H210C253 107 288 142 288 185V430C288 405 268 385 243 385H93C80 385 70 375 70 362V130Z"
+            fill="#0F1F5C"
+    />
+
+    <!-- Book Right -->
+    <path
+            d="M442 130C442 117 432 107 419 107H302C259 107 224 142 224 185V430C224 405 244 385 269 385H419C432 385 442 375 442 362V130Z"
+            fill="#0F1F5C"
+    />
+
+    <!-- Middle Line -->
+    <rect x="248" y="150" width="16" height="240" rx="8" fill="#ffffff22"/>
+
+    <!-- Rating Bars -->
+    <rect x="315" y="255" width="42" height="85" rx="10" fill="#3563FF"/>
+    <rect x="375" y="205" width="42" height="135" rx="10" fill="#3563FF"/>
+    <rect x="435" y="145" width="42" height="195" rx="10" fill="#3563FF"/>
+
+    <!-- Star -->
+    <path
+            d="M456 72L468 96L494 100L475 119L480 145L456 132L432 145L437 119L418 100L444 96L456 72Z"
+            fill="#3563FF"
+    />
+</svg>

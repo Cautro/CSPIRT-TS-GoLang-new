@@ -114,4 +114,12 @@ export const authApi = {
 
         return parsedUser.data;
     },
+    
+    async logout() {
+        const response = await apiClient.patch("/api/user/logout", {}, true);
+        
+        if (!response.checkStatus()) {
+            throw new Error("Ошибка при попытке выхода из аккаунта");
+        }
+    }
 };

@@ -7,7 +7,8 @@ export const classSchema = z.object({
     TeacherLogin: z.string().optional(),
     Members: z.array(userSchema),
     Teacher: userSchema.optional(),
-    TotalRating: z.number(),
+    UserTotalRating: z.number(),
+    ClassTotalRating: z.number(),
 });
 
 export type ClassType = z.infer<typeof classSchema>;

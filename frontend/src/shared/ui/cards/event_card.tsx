@@ -40,8 +40,11 @@ export function EventCard({ item, onClick }: Props) {
         >
             <div className="class-flat-card__main">
                 <div className="class-flat-card__info">
-                    <p className="class-flat-card__subtitle">
+                    <p className="class-flat-card__title">
                         {item.Title}
+                    </p>
+                    <p className="class-flat-card__subtitle">
+                        {item.Description !== ((item.Description).substring(0, 20)) ? `${(item.Description).substring(0, 20)}...` : item.Description}
                     </p>
                 </div>
             </div>

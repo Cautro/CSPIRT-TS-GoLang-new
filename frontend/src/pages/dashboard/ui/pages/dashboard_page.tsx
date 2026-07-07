@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {useNavigate, useSearchParams} from "react-router-dom";
 import { useAuthStore } from "../../../../features/auth/store/auth_store.ts";
 import { AddUserModal } from "../../../../features/users/ui/components/add_user_modal.tsx";
 import {AddClassModal} from "../../../../features/class/ui/components/add_class_modal.tsx";
@@ -7,16 +7,29 @@ import {AddEventModal} from "../../../../features/events/ui/components/add_event
 import {ClassesWidget} from "../../../../features/class/ui/components/classes_widget.tsx";
 import {EventsWidget} from "../../../../features/events/ui/components/events_widget.tsx";
 import {StaffWidget} from "../../../../features/users/ui/components/staff_widget.tsx";
-import {BurgerDrawerMenu, type BurgerDrawerMenuItem} from "../../../../shared/ui/other/burger_menu.tsx";
+import {type BurgerDrawerMenuItem} from "../../../../shared/ui/other/burger_menu.tsx";
+import {PageHeader} from "../../../../shared/ui/other/page_header.tsx";
+import {TabsSwitcher, type TabsSwitcherItem} from "../../../../shared/ui/other/tabs_switcher.tsx";
+import {UserRound} from "lucide-react";
+import {useLogout} from "../../../../features/auth/hooks/use_logout.ts";
 
 type Lists = "classes" | "events" | "staff";
 
 export function DashboardPage() {
     const navigate = useNavigate();
+    const logout = useLogout();
 
     const role = useAuthStore((state) => state.user?.User.Role);
-    
-    const [selectedList, setSelectedList] = useState<Lists>("classes");
+    const normalizedRole = role?.toLowerCase();
+
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const selectedList =
+        (searchParams.get("tab") as Lists) || "classes";
+
+    const setSelectedList = (tab: Lists) => {
+        setSearchParams({ tab }, {replace: true});
+    };
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
     const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
@@ -24,44 +37,36 @@ export function DashboardPage() {
     
     const menuItems: BurgerDrawerMenuItem[] = [
         {
-            label: "Список классов",
-            onClick: () => setSelectedList("classes"),
-            disabled: selectedList === "classes"
-        },
-        {
-            label: "Персонал школы",
-            onClick: () => setSelectedList("staff"),
-            disabled: selectedList === "staff",
-            hidden: (role !== "Owner")
-        },
-        {
-            label: "Мероприятия",
-            onClick: () => setSelectedList("events"),
-            disabled: selectedList === "events",
-        },
-        {
             label: "Добавить пользователя",
-            primary: true,
             onClick: () => setIsAddUserModalOpen(true),
-            hidden: (role !== "Owner" || selectedList !== "classes"),
+            hidden: (normalizedRole !== "owner" || selectedList !== "classes"),
         },
         {
             label: "Добавить класс",
-            primary: true,
             onClick: () => setIsAddClassModalOpen(true),
-            hidden: (role !== "Owner" || selectedList !== "classes"),
+            hidden: (normalizedRole !== "owner" || selectedList !== "classes"),
         },
         {
             label: "Добавить мероприятие",
-            primary: true,
             onClick: () => setIsAddEventModalOpen(true),
-            hidden: (role !== "Owner" || selectedList !== "events"),
+            hidden: (normalizedRole !== "owner" || selectedList !== "events"),
+        },
+    ]
+    
+    const tabs: TabsSwitcherItem<Lists>[] = [
+        {
+            label: "Классы",
+            value: "classes",
         },
         {
-            label: "Профиль",
-            primary: true,
-            onClick: () => navigate("/profile")
+            value: "events",
+            label: "Мероприятия",
         },
+        {
+            label: "Персонал",
+            value: "staff",
+            hidden: normalizedRole !== "owner"
+        }
     ]
 
     if (!role) {
@@ -71,22 +76,47 @@ export function DashboardPage() {
     return (
         <main className="main">
             <section className="page">
-                <div className="profile-hero class-dashboard-hero">
-                    <div className="class-dashboard-hero__content">
-                        <h1 className="info-row__value">Панель управления</h1>
-                        
-                    </div>
-
-                    <div className="class-dashboard-hero__menu">
-                        <BurgerDrawerMenu
-                            title="Меню"
-                            items={menuItems}
-                            side="right"
-                        />
-                    </div>
-                </div>
+                
+                <PageHeader
+                    title={"Рейтинг классов МАОУ СОШ 16-Ф"}
+                    description={"Просматривайте список классов, мероприятий и прочую информацию"}
+                    menuItems={menuItems}
+                    menuTitle={"Меню"}
+                    actions={
+                    <>
+                        {normalizedRole !== "public" ? (
+                            <button
+                                className="app-drawer-button"
+                                type="button"
+                                onClick={() => navigate("/profile")}
+                                aria-label="Перейти в профиль"
+                            >
+                                <UserRound size={22} />
+                            </button>
+                        ) : (
+                        <button
+                            className="btn btn--danger"
+                            type="button"
+                            onClick={async () => await logout.mutateAsync()}
+                            aria-label="Выйти из аккаунта"
+                        >
+                            Выйти
+                        </button>
+                        )}
+                    </>
+                    }
+                />
 
                 <div className="page-spacer" />
+
+                <TabsSwitcher
+                    items={tabs}
+                    value={selectedList}
+                    onChange={setSelectedList}
+                />
+                
+                <div className="page-spacer" />
+                
 
                 {selectedList === "classes" && (
                     <ClassesWidget key={key}/>

@@ -1,4 +1,9 @@
-import {type AddEventFormType, EventSchema, type EventType} from "../types/events_types.ts";
+import {
+    type AddEventFormType,
+    type AddRewardParamsFormType,
+    EventSchema,
+    type EventType, RewardParamsSchema, type RewardParamsType
+} from "../types/events_types.ts";
 import {z} from "zod";
 import {apiClient} from "../../../../core/api/client.ts";
 
@@ -91,5 +96,29 @@ export const EventsApi = {
         }
 
         return true;
+    },
+    
+    async getRewardParams(id: number): Promise<RewardParamsType[]> {
+        const response = await apiClient.get(`/api/event/${id}/params`);
+
+        if (!response.checkStatus()) {
+            throw new Error("Ошибка при попытке получения параметров награждения");
+        }
+        
+        const parsed = z.array(RewardParamsSchema).safeParse(response.data);
+        
+        if (!parsed.success) {
+            throw new Error("Некорректный ответ сервера");
+        }
+        
+        return parsed.data;
+    },
+    
+    async addRewardParams(id: number, form: AddRewardParamsFormType) {
+        const response = await apiClient.patch(`/api/event/${id}/params/add`, form, true);
+
+        if (!response.checkStatus()) {
+            throw new Error("Ошибка при попытке добавления параметров награждения");
+        }
     }
 }

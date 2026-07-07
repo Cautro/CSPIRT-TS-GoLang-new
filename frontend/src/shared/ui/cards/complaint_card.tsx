@@ -14,9 +14,10 @@ interface Props {
 export function ComplaintCard({ item, onDelete, role }: Props) {
     const date = format(new Date(item.CreatedAt), 'd MMMM yyyy, HH:mm', { locale: ru });
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const normalizedRole = role?.toLowerCase();
 
     const canDelete =
-        Boolean(onDelete) && (role === "Owner" || role === "Admin");
+        Boolean(onDelete) && (normalizedRole === "owner" || normalizedRole === "admin");
 
     return (
         <div className="class-flat-card">

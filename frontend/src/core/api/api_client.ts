@@ -1,6 +1,5 @@
 import { AppConfig } from "../app_core/app_config.ts";
 import { ApiResponse } from "./api_response.ts";
-import {clearAccessToken, getAccessToken, setAccessToken} from "../auth/access_token_memory";
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 interface RequestOptions {
@@ -55,14 +54,6 @@ export class ApiClient {
             headers.set("Content-Type", "application/json");
         }
 
-        if (options.auth) {
-            const token = getAccessToken();
-
-            if (token) {
-                headers.set("Authorization", `Bearer ${token}`);
-            }
-        }
-
         const config: RequestInit = {
             method,
             headers,
@@ -87,7 +78,6 @@ export class ApiClient {
                 const refreshed = await this.refreshAccessToken();
 
                 if (refreshed) {
-                    headers.set("Authorization", `Bearer ${getAccessToken()!}`);
                     response = await fetch(url, config);
                 }
             }
@@ -109,11 +99,9 @@ export class ApiClient {
         );
 
         if (!response.checkStatus() || !response.data?.token) {
-            clearAccessToken();
             return false;
         }
-
-        setAccessToken(response.data.token);
+        
         return true;
     }
 

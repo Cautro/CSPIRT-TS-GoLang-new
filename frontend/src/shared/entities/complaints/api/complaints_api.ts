@@ -2,16 +2,15 @@ import {z} from "zod";
 import {complaintSchema, type ComplaintType} from "../types/complaints_types.ts";
 import {apiClient} from "../../../../core/api/client.ts";
 
-export const complaintAddDto = z.object({
-    AuthorID: z.number().int().nonnegative(),
-    CreatedAt: z.string(),
-    TargetID: z.number().int().nonnegative(),
-    Content: z.string().max(500),
-    AuthorName: z.string(),
-    TargetName: z.string(),
-});
 
-export type complaintAddType = z.infer<typeof complaintAddDto>
+export type complaintAddFormType = { 
+    AuthorID: number;
+    CreatedAt: string;
+    TargetID: number;
+    Content: string;
+    AuthorName: string;
+    TargetName: string;
+}
 
 const complaintsResponseShema = z.object({
     Complaints: z.array(complaintSchema),
@@ -34,8 +33,13 @@ export const ComplaintsApi = {
         return parsed.data.Complaints;
     },
 
-    async addComplaint(dto: complaintAddType): Promise<boolean> {
-        const response = await apiClient.patch("/api/complaint/add", dto, true);
+    async addComplaint(dto: complaintAddFormType): Promise<boolean> {
+        console.log(dto.TargetID, dto.Content);
+        
+        const response = await apiClient.patch("/api/complaint/add", {
+            TargetID: dto.TargetID,
+            Content: dto.Content,
+        }, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при добавлении жалобы");

@@ -29,11 +29,11 @@ export const classApi = {
             throw new Error("Некорректный формат классов");
         }
         
-        return parsed.data.Classes;
+        return parsed.data.Classes.sort((a, b) => (b.UserTotalRating + b.ClassTotalRating) - (a.ClassTotalRating + a.UserTotalRating));
     },
     
     async getClassById(id: number): Promise<ClassType> {
-        const response = await apiClient.get(`/api/classes/?class_id=${id}`, true);
+        const response = await apiClient.get(`/api/classes?class_id=${id}`, true);
 
         if (!response.checkStatus()) {
             throw new Error("Ошибка при получении класса");

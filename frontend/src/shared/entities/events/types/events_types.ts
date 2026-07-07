@@ -21,3 +21,17 @@ export type AddEventFormType = {
     Classes: number[];
     RatingReward: number;
 }
+    
+export type AddRewardParamsFormType = {
+    ClassID: number;
+    ExtraRatingReward: number;
+    Reason: string;
+}
+
+export const RewardParamsSchema = z.object({
+    ExtraRatingReward: z.number().int().positive(),
+    Reason: z.string(),
+    ClassID: z.number().int().nonnegative(),
+})
+
+export type RewardParamsType = z.infer<typeof RewardParamsSchema>;

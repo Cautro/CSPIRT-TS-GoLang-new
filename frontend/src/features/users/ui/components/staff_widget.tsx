@@ -1,19 +1,11 @@
-import {useEffect} from "react";
-import {useUsersStore} from "../../store/users_store.ts";
 import {StaffCard} from "../../../../shared/ui/cards/staff_card.tsx";
+import {useStaff} from "../../hooks/use_staff.ts";
+import type {UserType} from "../../../../shared/entities/user/types/user_types.ts";
 
 export function StaffWidget() {
-    const users = useUsersStore((state) => state.staff);
-    const getStaff = useUsersStore((state) => state.getStaff);
-    const status = useUsersStore((state) => state.status);
-    const error = useUsersStore((state) => state.error);
-
-    const isLoading = status === "loading";
-
-    useEffect(() => {
-        void getStaff();
-    }, [getStaff])
-
+    const {data, error, isLoading} = useStaff();
+    const users = (data as UserType[]) || [];
+    
     return (
         <>
             {isLoading && (
@@ -25,7 +17,7 @@ export function StaffWidget() {
             )}
 
             {error && !isLoading && (
-                <div className="alert alert--danger mb-4">{error}</div>
+                <div className="alert alert--danger mb-4">{error.message}</div>
             )}
 
             {users && !isLoading && !error && users.length > 0 ? (

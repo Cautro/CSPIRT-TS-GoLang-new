@@ -22,7 +22,7 @@ export function StaffCard({user}: Props) {
                     {user.Name.split("")[0]}{user.LastName.split("")[0]}
                 </div>
                 <div className={"class-flat-card__info"}>
-                    <h2 className={"class-flat-card__subtitle"}>{user.Name} {user.LastName}</h2>
+                    <h2 className={"class-flat-card__title"}>{user.Name} {user.LastName}</h2>
                 </div>
             </div>
 

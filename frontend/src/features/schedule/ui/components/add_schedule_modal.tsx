@@ -1,8 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ScheduleAddFormValues } from "../../models/add_schedule_usecase.ts";
+import {type ScheduleAddFormValues, ScheduleAddLessonUsecase} from "../../models/add_schedule_usecase.ts";
 import {dayLabels, type ScheduleDay} from "../../../../shared/entities/schedule/types/schedule_types.ts";
-import {useScheduleStore} from "../../store/schedule_store.ts";
+import {useStaff} from "../../../users/hooks/use_staff.ts";
+import {UseAddSchedule} from "../../hooks/use_add_schedule.ts";
 
 
 interface AddScheduleLessonModalProps {
@@ -15,23 +16,14 @@ interface AddScheduleLessonModalProps {
 }
 
 export function AddScheduleLessonModal({isOpen, onClose, classId, dayOfWeek, onAdded, type}: AddScheduleLessonModalProps) {
-    const error = useScheduleStore((state) => state.error);
-    const status = useScheduleStore((state) => state.status);
-    const teachers = useScheduleStore((state) => state.teachers);
-    const addSchedule = useScheduleStore((state) => state.addSchedule);
-    const getTeachers = useScheduleStore((state) => state.getTeachers);
+    const addSchedule = UseAddSchedule()
+    const getTeachers = useStaff();
+    const teachers = getTeachers.data;
+    const error = addSchedule.error?.message;
 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const isLoading = isSubmitting || status === "loading";
-
-    useEffect(() => {
-        if (!isOpen) {
-            return;
-        }
-
-        void getTeachers();
-    }, [isOpen, getTeachers]);
+    const isLoading = isSubmitting || addSchedule.isPending;
 
     useEffect(() => {
         if (!isOpen) {
@@ -76,12 +68,9 @@ export function AddScheduleLessonModal({isOpen, onClose, classId, dayOfWeek, onA
         try {
             setIsSubmitting(true);
 
-            const success = await addSchedule(form, type);
-
-            if (success) {
-                await onAdded();
-                onClose();
-            }
+            const dto = ScheduleAddLessonUsecase(form);
+            addSchedule.mutateAsync({form: dto, type: type});
+            onAdded();
         } finally {
             setIsSubmitting(false);
         }

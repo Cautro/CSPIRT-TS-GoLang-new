@@ -1,5 +1,5 @@
 import {ScheduleChangeFormSchema} from "./schedule_change_schema.ts";
-import {ScheduleApi} from "../../../shared/entities/schedule/api/schedule_api.ts";
+import type {ScheduleChangeLessonFormType} from "../../../shared/entities/schedule/types/schedule_types.ts";
 
 export type ScheduleChangeFormValues = {
     subject?: string,
@@ -9,7 +9,7 @@ export type ScheduleChangeFormValues = {
     room?: number,
 }
 
-export async function ScheduleChangeLessonUsecase(id: number, form: ScheduleChangeFormValues, type: "base" | "current" | "planned"): Promise<boolean> {
+export function ScheduleChangeLessonUsecase(form: ScheduleChangeFormValues,): ScheduleChangeLessonFormType {
     const dto = {
         Subject: form.subject,
         TeacherID: form.teacher_id,
@@ -21,10 +21,9 @@ export async function ScheduleChangeLessonUsecase(id: number, form: ScheduleChan
     const parsed = ScheduleChangeFormSchema.safeParse(dto);
 
     if (!parsed.success) {  
-        throw new Error(JSON.stringify(parsed.error?.format()));
+        throw new Error("Проверьте правильность заполнения полей");
     }
+    
 
-    await ScheduleApi.changeScheduleLesson(id, parsed.data, type);
-
-    return true;
+    return parsed.data as ScheduleChangeLessonFormType;
 }

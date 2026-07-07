@@ -1,14 +1,18 @@
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
 import { format, isValid, parse } from "date-fns";
 import { ru } from "date-fns/locale";
-
-import { useEventStore } from "../../store/event_store.ts";
 import { ClassCard } from "../../../../shared/ui/cards/class_card.tsx";
 import {useAuthStore} from "../../../auth/store/auth_store.ts";
 import {ConfirmModal} from "../../../../shared/ui/modals/confirm_modal.tsx";
-import {useClassStore} from "../../../class/store/class_store.ts";
-import {BurgerDrawerMenu, type BurgerDrawerMenuItem} from "../../../../shared/ui/other/burger_menu.tsx";
+import {type BurgerDrawerMenuItem} from "../../../../shared/ui/other/burger_menu.tsx";
+import {PageHeader} from "../../../../shared/ui/other/page_header.tsx";
+import {useClasses} from "../../../class/hooks/use_classes.ts";
+import {UseEventById} from "../../hooks/use_event_by_id.ts";
+import {useCompleteEvent} from "../../hooks/use_complete_event.ts";
+import {useDeleteEvent} from "../../hooks/use_delete_event.ts";
+import {UseRewardParams} from "../../hooks/use_reward_params.ts";
+import {AddParamModal} from "../components/add_param_modal.tsx";
 
 function getStatusLabel(status: string): string {
     if (!status.trim()) {
@@ -44,49 +48,42 @@ export function EventPage() {
     const navigate = useNavigate();
 
     const { id } = useParams<{id: string}>();
-
-    const classes = useClassStore((state) => state.classes);
-    const event = useEventStore((state) => state.event);
-    const getClasses = useClassStore((state) => state.getClasses);
-    const getEvent = useEventStore((state) => state.getEventById);
-    const completeEvent = useEventStore((state) => state.completeEvent);
-    const deleteEvent = useEventStore((state) => state.deleteEvent);
-    const error = useEventStore((state) => state.error);
-    const status = useEventStore((state) => state.status);
-    const role = useAuthStore((state) => state.user?.User.Role);
+    
+    const classes = useClasses().data;
+    const getEvent = UseEventById(Number(id))
+    const event = getEvent.data
+    const completeEvent = useCompleteEvent()
+    const deleteEvent = useDeleteEvent()
+    const error = getEvent.error?.message || completeEvent.error?.message || deleteEvent.error?.message;
+    const user = useAuthStore((state) => state.user?.User);
+    const normalizedRole = user?.Role.toLowerCase();
+    
+    const getRewardParams = UseRewardParams(Number(id));
+    const rewardParams = getRewardParams.data;
 
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [isCompleteConfirmOpen, setIsCompleteConfirmOpen] = useState(false);
+    const [isAddRewardModalOpen, setIsAddRewardModalOpen] = useState(false);
     
-    const isLoading = status === "loading";
+    const isLoading = getEvent.isLoading || getRewardParams.isLoading;
     
     const menuItems: BurgerDrawerMenuItem[] = [
         {
           label: "Завершить мероприятие",
-          primary: true,
-          hidden: (role !== "Owner"),
+          hidden: (normalizedRole !== "owner"),
           onClick: () => setIsCompleteConfirmOpen(true),  
         },
         {
-            label: "Удалить мероприятие",
-            danger: true,
-            hidden: (role !== "Owner"),
-            onClick: () => setIsDeleteConfirmOpen(true),
+            label: "Изменить награду для класса",
+            hidden: (normalizedRole !== "owner"),
+            onClick: () => setIsAddRewardModalOpen(true),
         },
         {
-            label: "Назад",
-            onClick: () => navigate(-1)
-        }
+            label: "Удалить мероприятие",
+            hidden: (normalizedRole !== "owner"),
+            onClick: () => setIsDeleteConfirmOpen(true),
+        },
     ]
-
-    useEffect(() => {
-        if (!id) {
-            return;
-        }
-
-        void getEvent(Number(id));
-        void getClasses();
-    }, [id, getClasses, getEvent]);
 
     if (!id) {
         return (
@@ -175,9 +172,11 @@ export function EventPage() {
     }
 
     const eventClassIds = new Set(event.Classes ?? []);
-    const eventClasses = classes?.filter((item) => eventClassIds.has(item.Id));
 
-
+    const eventClasses = (classes ?? []).filter((item) => {
+        return eventClassIds.has(item.Id);
+    });
+    
     const statusLabel = getStatusLabel(event.Status);
     const date = formatStartedAt(event.StartedAt);
 
@@ -185,28 +184,15 @@ export function EventPage() {
         <main className="main">
             <section className="page">
                 <div className="event-page">
-                    <div className="event-page__header">
-                        <div>
-                            <p className="event-page__eyebrow">
-                                Мероприятие #{event.ID}
-                            </p>
-
-                            <h1 className="event-page__title">
-                                {event.Title}
-                            </h1>
-
-                            <p className="event-page__description">
-                                {event.Description || "Описание не указано"}
-                            </p>
-                        </div>
-                        
-                        <div className="btn-group">
-
-                            <BurgerDrawerMenu items={menuItems} title={"Меню"} />
-                            
-                        </div>
-
-                    </div>
+                    
+                    <PageHeader
+                        eyebrow={`Мероприятие #${event.ID}`}
+                        title={event.Title}
+                        description={event.Description} 
+                        menuTitle={`Меню мероприятия`}
+                        menuItems={menuItems}
+                        hasBackButton={true}
+                    />
 
                     <div className="event-page__grid">
                         <article className="event-info-card">
@@ -255,26 +241,57 @@ export function EventPage() {
                             {error}
                         </div>
                     )}
-
-                    {!isLoading && !error && eventClasses?.length > 0 && role === "Owner" && (
+                    
+                    {!isLoading && !error && eventClasses?.length > 0 && (
                         <div className="class-list">
-                            {eventClasses?.map((item) => (
-                                <ClassCard
-                                    key={item.Id}
-                                    item={item}
-                                    onClick={() => {
-                                        navigate(
-                                            `/events/${event.ID}/classes/${item.Id}/players/add`,
-                                            {
-                                                state: {
-                                                    event,
-                                                    classItem: item,
-                                                },
+                            {eventClasses?.map((item) => {
+                                let params = null;
+                                rewardParams?.map((param) => {
+                                    if (param.ClassID === item.Id) {
+                                        params = param.Reason + ` Награда: ${param.ExtraRatingReward}`
+                                    }
+                                })
+                                
+                                if (params) {
+                                    return <ClassCard
+                                        key={item.Id}
+                                        item={item}
+                                        param={params}
+                                        onClick={() => {
+                                            if ((normalizedRole === "owner") || (user?.Id === item.Teacher?.Id)) {
+                                                navigate(
+                                                    `/events/${event.ID}/classes/${item.Id}/players/add`,
+                                                    {
+                                                        state: {
+                                                            event,
+                                                            classItem: item,
+                                                        },
+                                                    }
+                                                );
                                             }
-                                        );
-                                    }}
-                                />
-                            ))}
+                                        }}
+                                    />
+                                } else {
+                                    return <ClassCard
+                                        key={item.Id}
+                                        item={item}
+                                        onClick={() => {
+                                            if ((normalizedRole === "owner") || (user?.Id === item.Teacher?.Id)) {
+                                                navigate(
+                                                    `/events/${event.ID}/classes/${item.Id}/players/add`,
+                                                    {
+                                                        state: {
+                                                            event,
+                                                            classItem: item,
+                                                        },
+                                                    }
+                                                );
+                                            }
+                                        }}
+                                    />
+                                }
+                                
+                            })}
                         </div>
                     )}
 
@@ -291,13 +308,23 @@ export function EventPage() {
                     )}
                 </div>
 
+                {isAddRewardModalOpen && (
+                    <AddParamModal 
+                        isOpen={isAddRewardModalOpen} 
+                        onClose={() => setIsAddRewardModalOpen(false)} 
+                        Classes={eventClasses} 
+                        EventID={Number(id)}
+                        OnAdd={() => setIsAddRewardModalOpen(false)}
+                    />
+                )}
+
 
                 {isDeleteConfirmOpen && (
                     <ConfirmModal
                         title={"Удалить мероприятие?"}
                         content={`Это действие удалит мероприятие "${event.Title}". Отменить удаление будет нельзя.`}
                         onConfirm={async () => {
-                            await deleteEvent(event.ID);
+                            await deleteEvent.mutateAsync({id: event.ID});
                             setIsDeleteConfirmOpen(false);
                             navigate(-1);
                         }}
@@ -314,7 +341,7 @@ export function EventPage() {
                         title={"Завершить мероприятие?"}
                         content={`После завершения участникам мероприятия "${event.Title}" будет начислена награда: +${event.RatingReward} рейтинга.`}
                         onConfirm={async () => {
-                            await completeEvent(event);
+                            await completeEvent.mutateAsync({item: event});
                             setIsCompleteConfirmOpen(false);
                             navigate(-1);
                         }}

@@ -1,9 +1,11 @@
 import { type FormEvent, useEffect, useState } from "react";
-import type { ScheduleChangeFormValues } from "../../models/schedule_change_usecase.ts";
+import {type ScheduleChangeFormValues, ScheduleChangeLessonUsecase} from "../../models/schedule_change_usecase.ts";
 import type {ScheduleLessonType} from "../../../../shared/entities/schedule/types/schedule_types.ts";
 import { createPortal } from "react-dom";
 import {ConfirmModal} from "../../../../shared/ui/modals/confirm_modal.tsx";
-import {useScheduleStore} from "../../store/schedule_store.ts";
+import {useStaff} from "../../../users/hooks/use_staff.ts";
+import {UseChangeSchedule} from "../../hooks/use_change_schedule.ts";
+import {UseDeleteSchedule} from "../../hooks/use_delete_schedule.ts";
 
 interface ChangeScheduleLessonModalProps {
     isOpen: boolean;
@@ -14,20 +16,15 @@ interface ChangeScheduleLessonModalProps {
 }
 
 export function ChangeScheduleLessonModal({isOpen, onClose, lesson, onChanged, type,}: ChangeScheduleLessonModalProps) {
-    const error = useScheduleStore((state) => state.error);
-    const status = useScheduleStore((state) => state.status);
-    const teachers = useScheduleStore((state) => state.teachers);
-    const changeSchedule = useScheduleStore((state) => state.changeSchedule);
-    const getTeachers = useScheduleStore((state) => state.getTeachers);
+    const changeSchedule = UseChangeSchedule();
+    const getTeachers = useStaff();
+    const teachers = getTeachers.data;
     const [isDeleteLessonModalOpen, setIsDeleteLessonModalOpen] = useState(false);
-    const deleteSchedule = useScheduleStore((state) => state.deleteSchedule)
+    const deleteSchedule = UseDeleteSchedule();
+    const error = changeSchedule.error?.message || null;
     
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const isLoading = isSubmitting || status === "loading";
-
-    useEffect(() => {
-        void getTeachers();
-    }, [getTeachers]);
+    const isLoading = changeSchedule.isPending || isSubmitting;
     
     useEffect(() => {
         if (!isOpen) {
@@ -36,7 +33,6 @@ export function ChangeScheduleLessonModal({isOpen, onClose, lesson, onChanged, t
 
         function handleEscape(event: KeyboardEvent) {
             if (event.key === "Escape") {
-                useScheduleStore.setState({error: null});
                 onClose();
             }
         }
@@ -73,21 +69,16 @@ export function ChangeScheduleLessonModal({isOpen, onClose, lesson, onChanged, t
 
         try {
             setIsSubmitting(true);
-
-            const success = await changeSchedule(lesson.Id, form, type);
-
-            if (success) {
-                await onChanged();
-                useScheduleStore.setState({error: null});
-                onClose();
-            }
+            const dto = ScheduleChangeLessonUsecase(form);
+            await changeSchedule.mutateAsync({id: lesson.Id, form: dto, type: type});
+            onChanged();
         } finally {
             setIsSubmitting(false);
         }
     }
 
     return createPortal(
-        <div className="modal-backdrop" onMouseDown={() => {onClose(); useScheduleStore.setState({error: null});}}>
+        <div className="modal-backdrop" onMouseDown={() => {onClose();}}>
             <section
                 className="modal modal--wide"
                 role="dialog"
@@ -109,7 +100,7 @@ export function ChangeScheduleLessonModal({isOpen, onClose, lesson, onChanged, t
                     <button
                         className="modal__close"
                         type="button"
-                        onClick={()=> {onClose(); useScheduleStore.setState({error: null});}}
+                        onClick={()=> {onClose();}}
                         disabled={isLoading}
                         aria-label="Закрыть модальное окно"
                     >
@@ -172,7 +163,7 @@ export function ChangeScheduleLessonModal({isOpen, onClose, lesson, onChanged, t
                                         Выберите учителя
                                     </option>
 
-                                    {teachers !== null && (teachers.map((teacher) => (
+                                    {teachers && (teachers.map((teacher) => (
                                         <option key={teacher.Id} value={String(teacher.Id)}>
                                             {teacher.Name} {teacher.LastName}
                                         </option>
@@ -252,7 +243,7 @@ export function ChangeScheduleLessonModal({isOpen, onClose, lesson, onChanged, t
                         <button
                             className="btn btn--secondary"
                             type="button"
-                            onClick={() => {onClose(); useScheduleStore.setState({error: null});}}
+                            onClick={() => {onClose();}}
                             disabled={isLoading}
                         >
                             Отмена
@@ -272,7 +263,7 @@ export function ChangeScheduleLessonModal({isOpen, onClose, lesson, onChanged, t
                     isOpen={isDeleteLessonModalOpen}
                     onClose={() => setIsDeleteLessonModalOpen(false)}
                     onConfirm={async () => {
-                        await deleteSchedule(lesson.Id, type);
+                        await deleteSchedule.mutateAsync({id: lesson.Id, type: type});
                         onChanged();
                     }}
                     isDanger={true}

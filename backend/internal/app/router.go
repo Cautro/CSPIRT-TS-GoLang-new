@@ -52,6 +52,7 @@ func registerUserRoutes(auth *gin.RouterGroup, s *storage.Storage) {
 	auth.GET("/me", userHandlers.GetMeHandler(s))
 	auth.PATCH("/user/logout", userHandlers.LogoutHandler(s))
 	auth.PATCH("/user/update", userHandlers.UpdateUserHandler(s))
+	auth.PATCH("/user/update/avatar", userHandlers.UpdateAvatarHandler(s))
 }
 
 func registerClassRoutes(auth *gin.RouterGroup, s *storage.Storage) {

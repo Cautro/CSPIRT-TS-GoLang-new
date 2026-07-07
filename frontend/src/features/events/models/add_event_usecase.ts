@@ -1,5 +1,5 @@
 import {addEventFormSchema} from "./add_event_schema.ts";
-import {EventsApi} from "../../../shared/entities/events/api/events_api.ts";
+import type {AddEventFormType} from "../../../shared/entities/events/types/events_types.ts";
 
 export type addEventFormValues = {
     title: string;
@@ -9,7 +9,7 @@ export type addEventFormValues = {
     started_at: string;
 }
 
-export async function addEventUsecase(form: addEventFormValues): Promise<boolean> {
+export function addEventUsecase(form: addEventFormValues): AddEventFormType {
     const dto = {
         Title: form.title,
         Description: form.description,
@@ -19,12 +19,10 @@ export async function addEventUsecase(form: addEventFormValues): Promise<boolean
     };
     
     const parsed = addEventFormSchema.safeParse(dto);
-    
+
     if (!parsed.success) {
-        throw new Error(JSON.stringify(parsed.error?.format()));
-    } 
+        throw new Error("Проверьте правильность заполнения формы");
+    }
     
-    await EventsApi.addEvent(parsed.data);
-    
-    return true;
+    return parsed.data;
 }

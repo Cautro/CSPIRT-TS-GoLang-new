@@ -1,11 +1,6 @@
 import {z} from "zod";
 import {apiClient} from "../../../../core/api/client.ts";
-
-export const ratingChangeDTO = z.object({
-    rating: z.number().int().max(5000).min(-5000),
-    target_login: z.string(),
-    reason: z.string(),
-});
+import type {RatingChangeFormType} from "../types/rating_types.ts";
 
 const ratingChangeResponse = z.object({
     message: z.string(),
@@ -13,10 +8,8 @@ const ratingChangeResponse = z.object({
     target: z.string(),
 });
 
-export type ratingChangeType = z.infer<typeof ratingChangeDTO>
-
 export const RatingApi = {
-    async changeRating(dto: ratingChangeType): Promise<string> {
+    async changeRating(dto: RatingChangeFormType): Promise<string> {
         const response = await apiClient.patch("/api/rating/update", dto, true);
         
         if (!response.checkStatus()) {

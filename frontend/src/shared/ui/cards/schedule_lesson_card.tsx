@@ -17,10 +17,11 @@ export function ScheduleLessonCard({item, lessonNumber, onChangeScheduleLesson =
     const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
     const teacherName = item.Teacher ? `${item.Teacher.Name} ${item.Teacher.LastName}` : "Не указан";
     const role = useAuthStore((state) => state.user?.User.Role);
+    const normalizedRole = role?.toLowerCase();
 
     return (
         <article className="schedule-lesson-card" onClick={() => {
-            if (role === "Owner") setIsChangeModalOpen(true)
+            if (normalizedRole === "owner") setIsChangeModalOpen(true)
         }}>
             <div className="schedule-lesson-card__number">
                 {lessonNumber}

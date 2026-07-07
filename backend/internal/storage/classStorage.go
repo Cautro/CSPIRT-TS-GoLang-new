@@ -568,7 +568,7 @@ func (s *Storage) saveClassInternal(name string, grade int, letter string, teach
         name, grade, letter, teacherLogin)
     if err != nil { return err }
     classID, _ := res.LastInsertId()
-    return s.autoAssignClassToParallelLocked(int(classID)) // ← internal, без Lock
+    return s.autoAssignClassToParallelLocked(int(classID)) 
 }
 
 func (s *Storage) GetClassIDsByRange(minGrade, maxGrade int) ([]int, error) {
@@ -896,6 +896,7 @@ func (s *Storage) syncAllClassesLocked() error {
 		return err
 	}
 
+	// ШАГ 1: Привязываем обычных пользователей и учеников по НАЗВАНИЮ класса
 	if _, err := s.db.Exec(`
 		UPDATE users
 		SET ClassID = (
@@ -909,25 +910,24 @@ func (s *Storage) syncAllClassesLocked() error {
 			SELECT 1
 			FROM classes
 			WHERE classes.Name = UPPER(TRIM(users.Class))
-		)
+		);
 	`); err != nil {
 		return err
 	}
 
+	// ШАГ 2: Привязываем учителей по полю TeacherLogin (независимо от того, что у них в users.Class)
 	if _, err := s.db.Exec(`
 		UPDATE users
-		SET Class = (
-			SELECT Name
+		SET ClassID = (
+			SELECT Id
 			FROM classes
-			WHERE classes.Id = users.ClassID
+			WHERE LOWER(classes.TeacherLogin) = LOWER(TRIM(users.Login))
 		)
-		WHERE ClassID IS NOT NULL
-		AND ClassID > 0
-		AND EXISTS (
+		WHERE EXISTS (
 			SELECT 1
 			FROM classes
-			WHERE classes.Id = users.ClassID
-		)
+			WHERE LOWER(classes.TeacherLogin) = LOWER(TRIM(users.Login))
+		);
 	`); err != nil {
 		return err
 	}

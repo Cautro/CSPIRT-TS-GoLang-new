@@ -1,38 +1,29 @@
-import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import {type ReactNode} from "react";
 
 import { useAuthStore } from "../../../features/auth/store/auth_store.ts";
 import { UserRoles } from "../../../shared/entities/user/types/user_types.ts";
-import { NoteCard } from "../../../shared/ui/cards/note_card.tsx";
-import { ComplaintCard } from "../../../shared/ui/cards/complaint_card.tsx";
 import {TeacherScheduleWidget} from "../../../features/schedule/ui/components/teacher_schedule_widget.tsx";
-import {BurgerDrawerMenu, type BurgerDrawerMenuItem} from "../../../shared/ui/other/burger_menu.tsx";
+import {type BurgerDrawerMenuItem} from "../../../shared/ui/other/burger_menu.tsx";
+import {PageHeader} from "../../../shared/ui/other/page_header.tsx";
+import {ComplaintsSection} from "../../../features/complaints/ui/components/complaints_section.tsx";
+import {NotesSection} from "../../../features/notes/ui/components/notes_section.tsx";
+import {RatingSection} from "../../../features/rating/ui/components/rating_section.tsx";
+import {useLogout} from "../../../features/auth/hooks/use_logout.ts";
 
 export function ProfilePage() {
-    const navigate = useNavigate();
-
     const profile = useAuthStore((state) => state.user);
-    const getProfile = useAuthStore((state) => state.checkAuth);
-    const logout = useAuthStore((state) => state.logout);
+    const logout = useLogout()
     const status = useAuthStore((state) => state.status);
     const error = useAuthStore((state) => state.error);
 
     const isLoading = status === "loading";
-
-    async function handleLogout() {
-        await logout();
-        navigate("/login", { replace: true });
-    }
     
     const menuItems: BurgerDrawerMenuItem[] = [
         {
-            label: "Назад",
-            onClick: () => navigate(-1),
-        },
-        {
             label: "Выйти",
-            onClick: () => logout(),
-            danger: true
+            onClick: async () => {
+                await logout.mutateAsync()
+            },
         }
     ]
 
@@ -69,48 +60,34 @@ export function ProfilePage() {
     const complaints = profile.Complaints ?? [];
 
     const fullName = `${user.Name ?? ""} ${user.LastName ?? ""}`.trim();
-    const initials = `${user.Name?.[0] ?? ""}${user.LastName?.[0] ?? ""}` || "?";
+    const normalizedRole = user.Role.toLowerCase();
 
-    const isStudentLikeUser = user.Role === "User" || user.Role === "Helper";
-
-    const rating = user.Rating ?? 0;
-    const ratingPercent = Math.min(Math.max((rating / 5000) * 100, 0), 100);
-
-    const ratingLevel =
-        rating < 1500 ? "low" : rating < 3500 ? "medium" : "high";
-
+    const isStudentLikeUser = normalizedRole === "user" || normalizedRole === "helper";
+    
     return (
         <main className="main">
             <section className="page user-page">
-                <div className="user-hero">
-                    <div className="user-hero__main">
-                        <div className="profile-avatar">{initials}</div>
-
-                        <div className="user-hero__content">
-                            <h1 className="profile-hero__name">
-                                {fullName || "Без имени"}
-                            </h1>
-
-                            <div className="profile-hero__meta">
-                                <span className="badge badge--info">
+                
+                <PageHeader
+                    title={`${fullName}`}
+                    meta={
+                        <>
+                            <span className="badge badge--info">
                                     {UserRoles[user.Role] ?? user.Role}
                                 </span>
 
-                                {isStudentLikeUser && (
-                                    <span className="badge badge--neutral">
+                            {isStudentLikeUser && (
+                                <span className="badge badge--neutral">
                                         Класс {user.Class}
                                     </span>
-                                )}
-
-                                <span className="profile-login">@{user.Login}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="profile-actions">
-                        <BurgerDrawerMenu items={menuItems} title={"Меню"} />
-                    </div>
-                </div>
+                            )}
+                            
+                            <span className="profile-login">@{user.Login}</span>
+                        </>
+                    }
+                    menuItems={menuItems}
+                    hasBackButton={true}
+                />
 
                 {isLoading && <div className="profile-progress" />}
 
@@ -132,7 +109,6 @@ export function ProfilePage() {
                         </div>
 
                         <div className="info-list">
-                            <InfoRow label="ID пользователя" value={user.Id} />
                             <InfoRow label="Имя" value={user.Name} />
                             <InfoRow label="Фамилия" value={user.LastName} />
                             <InfoRow label="Полное имя" value={fullName || "Не указано"} />
@@ -149,7 +125,7 @@ export function ProfilePage() {
                         </div>
                     </section>
 
-                    {(user.Role === "Admin" || user.Role === "Owner") && (
+                    {(normalizedRole === "admin" || normalizedRole === "owner") && (
                         <section className="card card--padded">
                             <div className="section-head">
                                 <h2 className="section-title">Расписание учителя</h2>
@@ -164,98 +140,27 @@ export function ProfilePage() {
                     )}
 
                     {isStudentLikeUser && (
-                        <section className="card card--padded user-rating-card">
-                            <div className="section-head">
-                                <h2 className="section-title">Рейтинг</h2>
-                                <p className="section-description">
-                                    Текущий социальный рейтинг пользователя.
-                                </p>
-                            </div>
-
-                            <div className="user-rating-summary">
-                                <div>
-                                    <div
-                                        className={`profile-rating-value profile-rating-value--${ratingLevel}`}
-                                    >
-                                        {rating}
-                                    </div>
-
-                                    <div className="text-muted">из 5000</div>
-                                </div>
-
-                                <span className={`badge badge--${ratingLevel}`}>
-                                    {Math.round(ratingPercent)}%
-                                </span>
-                            </div>
-
-                            <div className="rating">
-                                <div className="rating__bar">
-                                    <div
-                                        className={`rating__fill rating__fill--${ratingLevel}`}
-                                        style={{ width: `${ratingPercent}%` }}
-                                    />
-                                </div>
-                            </div>
-                        </section>
+                        <RatingSection user={user} />
                     )}
                 </div>
 
                 {isStudentLikeUser && (
                     <div className="user-content-grid">
-                        <section className="card card--padded user-section-card">
-                            <div className="section-head section-head--row">
-                                <div>
-                                    <h2 className="section-title">Жалобы</h2>
-                                    <p className="section-description">
-                                        Жалобы, связанные с текущим пользователем.
-                                    </p>
-                                </div>
+                        <ComplaintsSection
+                            isProfile={true}
+                            complaints={complaints}
+                            user={user}
+                            isYou={true}
+                            currentUser={user}
+                        />
 
-                                <span
-                                    className={
-                                        complaints.length > 0
-                                            ? "badge badge--danger"
-                                            : "badge badge--neutral"
-                                    }
-                                >
-                                    {complaints.length}
-                                </span>
-                            </div>
-
-                            {complaints.length > 0 ? (
-                                <div className="feed">
-                                    {complaints.map((item) => (
-                                        <ComplaintCard key={item.ID} item={item} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="empty-inline">Жалоб нет</div>
-                            )}
-                        </section>
-
-                        <section className="card card--padded user-section-card">
-                            <div className="section-head section-head--row">
-                                <div>
-                                    <h2 className="section-title">Заметки</h2>
-                                    <p className="section-description">
-                                        Поведенческие заметки, оставленные ответственными
-                                        пользователями.
-                                    </p>
-                                </div>
-
-                                <span className="badge badge--neutral">{notes.length}</span>
-                            </div>
-
-                            {notes.length > 0 ? (
-                                <div className="feed">
-                                    {notes.map((note) => (
-                                        <NoteCard key={note.ID} item={note} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="empty-inline">Заметок нет</div>
-                            )}
-                        </section>
+                       <NotesSection
+                         isProfile={true}
+                         notes={notes}    
+                         user={user}
+                         isYou={true}
+                         currentUser={user}
+                       />
                     </div>
                 )}
             </section>

@@ -1,21 +1,13 @@
 import {useNavigate} from "react-router-dom";
-import {useEffect} from "react";
-import {useClassStore} from "../../store/class_store.ts";
 import {ClassCard} from "../../../../shared/ui/cards/class_card.tsx";
+import {useClasses} from "../../hooks/use_classes.ts";
+import type {ClassType} from "../../../../shared/entities/class/types/class_types.ts";
 
 export function ClassesWidget() {
     const navigate = useNavigate();
-    const classes = useClassStore((state) => state.classes);
-    const getClasses = useClassStore((state) => state.getClasses);
-    const status = useClassStore((state) => state.status);
-    const error = useClassStore((state) => state.error);
-
-    const isLoading = status === "loading";
-
-    useEffect(() => {
-        void getClasses();
-    }, [getClasses])
-
+    const {data, isLoading, error} = useClasses();
+    const classes = data as ClassType[];
+    
     return (
         <>
             {isLoading && (
@@ -27,7 +19,7 @@ export function ClassesWidget() {
             )}
 
             {error && !isLoading && (
-                <div className="alert alert--danger mb-4">{error}</div>
+                <div className="alert alert--danger mb-4">{error.message}</div>
             )}
 
             {classes && !isLoading && !error && classes.length > 0 ? (

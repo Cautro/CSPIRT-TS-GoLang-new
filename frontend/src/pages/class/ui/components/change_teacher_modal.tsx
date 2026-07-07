@@ -1,16 +1,16 @@
 import { type FormEvent, useEffect, useState } from "react";
-import {type UserType} from "../../../../shared/entities/user/types/user_types.ts";
+import {useStaff} from "../../../../features/users/hooks/use_staff.ts";
 interface ChangeTeacherProps {
     isOpen: boolean;
     onClose: () => void;
     onChangeTeacher: (teacher: string) => Promise<void>;
-    staff: UserType[];
     className: string;
 }
 
-export function ChangeTeacherModal({isOpen, onClose, onChangeTeacher, staff, className}: ChangeTeacherProps) {
+export function ChangeTeacherModal({isOpen, onClose, onChangeTeacher, className}: ChangeTeacherProps) {
     const [formError, setFormError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const staff = useStaff().data
 
     useEffect(() => {
         if (!isOpen) {
@@ -110,7 +110,7 @@ export function ChangeTeacherModal({isOpen, onClose, onChangeTeacher, staff, cla
                                         Выберите учителя
                                     </option>
                                     
-                                    {staff.map((item) => (
+                                    {staff?.map((item) => (
                                         <option value={item.Login}>{item.Name} {item.LastName}</option>
                                     ))}
                                 </select>

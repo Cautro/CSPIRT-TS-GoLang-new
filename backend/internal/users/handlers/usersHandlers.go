@@ -106,6 +106,35 @@ func GetUsersHandler(s *storage.Storage) gin.HandlerFunc {
 	}
 }
 
+func UpdateAvatarHandler(s *storage.Storage) gin.HandlerFunc {
+	return func (c *gin.Context)  {
+		idStr := c.Query("id")
+		if idStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Bad request, id is empty"})
+			return 
+		}
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+		}
+
+		var in models.UpdateAvatarRequest
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Bad request"})
+			return 
+		}
+
+		userService := sr.NewUsersService(s, s.Secret)
+		err = userService.UpdateAvatar(in, id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+			return 
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	}
+}
+
 func LogoutHandler(s *storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if token, err := c.Cookie("refresh_token"); err == nil {
@@ -118,8 +147,8 @@ func LogoutHandler(s *storage.Storage) gin.HandlerFunc {
 			}
 		}
 
-		c.SetCookie("access_token", "", -1, "/api", "", cookieSecure(), true)
-		c.SetCookie("refresh_token", "", -1, "/api", "", cookieSecure(), true)
+		c.SetCookie("access_token", "", -1, "/backend/api", "", cookieSecure(), true)
+		c.SetCookie("refresh_token", "", -1, "/backend/api", "", cookieSecure(), true)
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",

@@ -2,10 +2,11 @@ import type { ClassType } from "../../entities/class/types/class_types.ts";
 
 interface Props {
     item: ClassType;
+    param?: string;
     onClick?: () => void;
 }
 
-export function ClassCard({ item, onClick }: Props) {
+export function ClassCard({ item, onClick, param }: Props) {
     const teacherFullName = item.Teacher
         ? `${item.Teacher.Name} ${item.Teacher.LastName}`
         : "Не назначен";
@@ -33,6 +34,11 @@ export function ClassCard({ item, onClick }: Props) {
             </div>
 
             <div className="class-flat-card__meta">
+                {param && (<div className="class-flat-card__metric">
+                    <span className="class-flat-card__metric-label">Награда</span>
+                    <span className="class-flat-card__metric-value">{param}</span>
+                </div>)}
+                
                 <div className="class-flat-card__metric">
                     <span className="class-flat-card__metric-label">Ученики</span>
                     <span className="class-flat-card__metric-value">{membersCount}</span>
@@ -40,7 +46,7 @@ export function ClassCard({ item, onClick }: Props) {
 
                 <div className="class-flat-card__metric">
                     <span className="class-flat-card__metric-label">Рейтинг</span>
-                    <span className="class-flat-card__metric-value">{item.TotalRating}</span>
+                    <span className="class-flat-card__metric-value">{item.UserTotalRating + item.ClassTotalRating}</span>
                 </div>
 
                 <span className="class-flat-card__arrow">→</span>

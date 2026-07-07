@@ -1,21 +1,11 @@
 import {useNavigate} from "react-router-dom";
-import {useEffect} from "react";
-import {useEventStore} from "../../store/event_store.ts";
 import {EventCard} from "../../../../shared/ui/cards/event_card.tsx";
+import {UseEvents} from "../../hooks/use_events.ts";
 
 export function EventsWidget() {
     const navigate = useNavigate();
-    const events = useEventStore((state) => state.events);
-    const getEvents = useEventStore((state) => state.getEvents);
-    const status = useEventStore((state) => state.status);
-    const error = useEventStore((state) => state.error);
-
-    const isLoading = status === "loading";
-
-    useEffect(() => {
-        void getEvents();
-    }, [getEvents])
-
+    const {error: error, data: events, isLoading: isLoading} = UseEvents();
+    
     return (
         <>
             {isLoading && (
@@ -27,7 +17,7 @@ export function EventsWidget() {
             )}
 
             {error && !isLoading && (
-                <div className="alert alert--danger mb-4">{error}</div>
+                <div className="alert alert--danger mb-4">{error.message}</div>
             )}
 
             {events && !isLoading && !error && events.length > 0 ? (

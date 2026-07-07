@@ -1,7 +1,8 @@
 import { type FormEvent, useEffect, useState } from "react";
-import type {addEventFormValues} from "../../models/add_event_usecase.ts";
-import {useEventStore} from "../../store/event_store.ts";
-import {useClassStore} from "../../../class/store/class_store.ts";
+import {type addEventFormValues, addEventUsecase} from "../../models/add_event_usecase.ts";
+import {useAddEvent} from "../../hooks/use_add_event.ts";
+import {useClasses} from "../../../class/hooks/use_classes.ts";
+import {UseEvents} from "../../hooks/use_events.ts";
 
 interface Props {
     isOpen: boolean;
@@ -10,18 +11,13 @@ interface Props {
 }
 
 export function AddEventModal({isOpen, onClose, onEventAdd,}: Props) {
-    const error = useEventStore((state) => state.error);
-    const classes = useClassStore((state) => state.classes);
-    const getClasses = useClassStore((state) => state.getClasses);
-    const addEvent = useEventStore((state) => state.addEvent);
+    const [error, setError] = useState<string | null>(null);
+    const classes = useClasses().data
+    const addEvent = useAddEvent()
+    const getEvents = UseEvents();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
     const [isClassesDropdownOpen, setIsClassesDropdownOpen] = useState(false);
-
-    
-    useEffect(() => {
-        void getClasses();
-    }, [getClasses]);
     
     useEffect(() => {
         if (!isOpen) {
@@ -30,7 +26,6 @@ export function AddEventModal({isOpen, onClose, onEventAdd,}: Props) {
 
         function handleEscape(event: KeyboardEvent) {
             if (event.key === "Escape") {
-                useEventStore.setState({error: null});
                 onClose();
             }
         }
@@ -58,13 +53,13 @@ export function AddEventModal({isOpen, onClose, onEventAdd,}: Props) {
         });
     }
 
-    const selectedClassNames = classes?.filter((item) => selectedClassIds.includes(item.Id)).map((item) => item.Name);
-
+    const selectedClassNames = classes ? classes.filter((item) => selectedClassIds.includes(item.Id)).map((item) => item.Name) : [];
+    
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         
         if (selectedClassIds.length === 0) {
-            useEventStore.setState({error: "Выберите классы, участвующие в мероприятии"});
+            setError("Выберите классы, участвующие в мероприятии");
             return;
         }
         
@@ -72,7 +67,7 @@ export function AddEventModal({isOpen, onClose, onEventAdd,}: Props) {
         const formData = new FormData(event.currentTarget);
         const startedAtRaw = String(formData.get("startedAt") ?? "").trim();
         
-        const dto: addEventFormValues = {
+        const form: addEventFormValues = {
             title: String(formData.get("title") ?? "").trim(),
             description: String(formData.get("description") ?? "").trim(),
             started_at: startedAtRaw.replace("T", " "),
@@ -82,23 +77,24 @@ export function AddEventModal({isOpen, onClose, onEventAdd,}: Props) {
 
         try {
             setIsSubmitting(true);
-            const response = await addEvent(dto);
-            if (response) {
-                await onEventAdd();
-            }
-
+            const dto = await addEventUsecase(form);
+            await addEvent.mutateAsync(dto);
+            await onEventAdd();
             setSelectedClassIds([]);
             setIsClassesDropdownOpen(false);
-            useEventStore.setState({error: null});
+            await getEvents.refetch();
             onClose();
-        } finally {
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Неизвестная ошибка")
+        }
+        finally {
             setIsSubmitting(false);
         }
     }
     
     if (!classes) {
         return (
-            <div className="modal-backdrop" onMouseDown={() => {onClose(); useEventStore.setState({error: null});}}>
+            <div className="modal-backdrop" onMouseDown={() => {onClose(); setError(null);}}>
                 <section
                     className="modal modal--wide"
                     role="dialog"
@@ -123,7 +119,7 @@ export function AddEventModal({isOpen, onClose, onEventAdd,}: Props) {
     }
 
     return (
-        <div className="modal-backdrop" onMouseDown={() => {onClose(); useEventStore.setState({error: null});}}>
+        <div className="modal-backdrop" onMouseDown={() => {onClose(); setError(null);}}>
             <section
                 className="modal modal--wide"
                 role="dialog"
@@ -145,7 +141,7 @@ export function AddEventModal({isOpen, onClose, onEventAdd,}: Props) {
                     <button
                         className="modal__close"
                         type="button"
-                        onClick={() => {onClose(); useEventStore.setState({error: null});}}
+                        onClick={() => {onClose(); setError(null);}}
                         aria-label="Закрыть модальное окно"
                     >
                         ×
@@ -276,7 +272,7 @@ export function AddEventModal({isOpen, onClose, onEventAdd,}: Props) {
                         <button
                             className="btn btn--secondary"
                             type="button"
-                            onClick={() => {onClose(); useEventStore.setState({error: null});}}
+                            onClick={() => {onClose(); setError(null);}}
                             disabled={isSubmitting}
                         >
                             Отмена

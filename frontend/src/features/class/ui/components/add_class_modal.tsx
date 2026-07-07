@@ -1,8 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import type {addClassFormValues} from "../../models/add_class_usecase.ts";
-import {useClassStore} from "../../store/class_store.ts";
-import {useUsersStore} from "../../../users/store/users_store.ts";
-import {useEventStore} from "../../../events/store/event_store.ts";
+import {useAddClass} from "../../hooks/use_add_class.ts";
+import {useStaff} from "../../../users/hooks/use_staff.ts";
 
 interface AddUserModalProps {
     isOpen: boolean;
@@ -11,15 +10,10 @@ interface AddUserModalProps {
 }
 
 export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) {
-    const error = useClassStore((state) => state.error);
-    const addClass = useClassStore((state) => state.addClass);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const staff = useUsersStore((state) => state.staff);
-    const getStaff = useUsersStore((state) => state.getStaff);
-
-    useEffect(() => {
-        void getStaff();
-    }, [getStaff]);
+    const getStaff = useStaff();
+    const staff = getStaff.data
+    const {mutateAsync, error, isError} = useAddClass()
     
     useEffect(() => {
         if (!isOpen) {
@@ -28,7 +22,6 @@ export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) 
 
         function handleEscape(event: KeyboardEvent) {
             if (event.key === "Escape") {
-                useClassStore.setState({error: null});
                 onClose();
             }
         }
@@ -60,10 +53,8 @@ export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) 
 
         try {
             setIsSubmitting(true);
-            const response = await addClass(dto);
-            if (response) {
-                await onAddClass();
-            }
+            await mutateAsync(dto);
+            onAddClass();
         } finally {
             setIsSubmitting(false);
         }
@@ -71,7 +62,7 @@ export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) 
 
     if (!staff) {
         return (
-            <div className="modal-backdrop" onMouseDown={() => {onClose(); useEventStore.setState({error: null});}}>
+            <div className="modal-backdrop" onMouseDown={() => {onClose();}}>
                 <section
                     className="modal modal--wide"
                     role="dialog"
@@ -96,7 +87,7 @@ export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) 
     }
 
     return (
-        <div className="modal-backdrop" onMouseDown={() => {onClose(); useClassStore.setState({error: null});}}>
+        <div className="modal-backdrop" onMouseDown={() => {onClose();}}>
             <section
                 className="modal modal--wide"
                 role="dialog"
@@ -118,7 +109,7 @@ export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) 
                     <button
                         className="modal__close"
                         type="button"
-                        onClick={() => {onClose(); useClassStore.setState({error: null});}}
+                        onClick={() => {onClose();}}
                         aria-label="Закрыть модальное окно"
                     >
                         ×
@@ -127,9 +118,9 @@ export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) 
 
                 <form className="form" onSubmit={handleSubmit}>
                     <div className="modal__body">
-                        {error && (
+                        {isError && (
                             <div className="alert alert--danger">
-                                {error}
+                                {error.message}
                             </div>
                         )}
 
@@ -167,7 +158,7 @@ export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) 
                                     </option>
 
                                     {staff.map((item) => (
-                                        <option value={item.Login}>{item.Name} {item.LastName}</option>
+                                        <option key={item.Id} value={item.Login}>{item.Name} {item.LastName}</option>
                                     ))}
                                 </select>
                             </div>
@@ -180,7 +171,7 @@ export function AddClassModal({isOpen, onClose, onAddClass}: AddUserModalProps) 
                         <button
                             className="btn btn--secondary"
                             type="button"
-                            onClick={() => {onClose(); useClassStore.setState({error: null});}}
+                            onClick={() => {onClose();}}
                             disabled={isSubmitting}
                         >
                             Отмена

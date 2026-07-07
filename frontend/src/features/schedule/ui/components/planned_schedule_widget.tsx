@@ -1,5 +1,5 @@
 import {ScheduleDayCard} from "../../../../shared/ui/cards/schedule_day_card.tsx";
-import {useScheduleStore} from "../../store/schedule_store.ts";
+import {useClassSchedule} from "../../hooks/use_class_schedule.ts";
 import {useEffect} from "react";
 
 type props = {
@@ -8,17 +8,12 @@ type props = {
 }
 
 export function PlannedScheduleWidget({id, name}: props) {
-    const schedule = useScheduleStore((state) => state.schedule);
-    const getSchedule = useScheduleStore((state) => state.getClassSchedule);
-    const status = useScheduleStore((state) => state.status);
-    const error = useScheduleStore((state) => state.error)
-
-    const isLoading = status === "loading";
+    const {data: schedule, error: error, isLoading: isLoading, refetch: refetch} = useClassSchedule(id, "planned");
 
     useEffect(() => {
-        void getSchedule(id, "planned");
-    }, [getSchedule, id]);
-
+        refetch();
+    }, [id])
+    
     return (
         <>
             {isLoading && (
@@ -30,16 +25,16 @@ export function PlannedScheduleWidget({id, name}: props) {
             )}
 
             {error && !isLoading && (
-                <div className="alert alert--danger mb-4">{error}</div>
+                <div className="alert alert--danger mb-4">{error.message}</div>
             )}
 
             {schedule ? (
                 <div className="schedule-days-list">
-                    <ScheduleDayCard title="Понедельник" lessons={schedule.monday ?? []} onChangeScheduleLesson={async () => getSchedule(id, "planned")} classId={id} day={"monday"}  type={"planned"} />
-                    <ScheduleDayCard title="Вторник" lessons={schedule.tuesday ?? []} onChangeScheduleLesson={async () => getSchedule(id, "planned")}  classId={id} day={"tuesday"} type={"planned"} />
-                    <ScheduleDayCard title="Среда" lessons={schedule.wednesday ?? []} onChangeScheduleLesson={async () => getSchedule(id, "planned")} classId={id} day={"wednesday"} type={"planned"} />
-                    <ScheduleDayCard title="Четверг" lessons={schedule.thursday ?? []} onChangeScheduleLesson={async () => getSchedule(id, "planned")} classId={id} day={"thursday"} type={"planned"} />
-                    <ScheduleDayCard title="Пятница" lessons={schedule.friday ?? []} onChangeScheduleLesson={async () => getSchedule(id, "planned")} classId={id} day={"friday"} type={"planned"} />
+                    <ScheduleDayCard title="Понедельник" lessons={schedule.monday ?? []} onChangeScheduleLesson={async () => refetch()} classId={id} day={"monday"}  type={"planned"} />
+                    <ScheduleDayCard title="Вторник" lessons={schedule.tuesday ?? []} onChangeScheduleLesson={async () => refetch()}  classId={id} day={"tuesday"} type={"planned"} />
+                    <ScheduleDayCard title="Среда" lessons={schedule.wednesday ?? []} onChangeScheduleLesson={async () => refetch()} classId={id} day={"wednesday"} type={"planned"} />
+                    <ScheduleDayCard title="Четверг" lessons={schedule.thursday ?? []} onChangeScheduleLesson={async () => refetch()} classId={id} day={"thursday"} type={"planned"} />
+                    <ScheduleDayCard title="Пятница" lessons={schedule.friday ?? []} onChangeScheduleLesson={async () => refetch()} classId={id} day={"friday"} type={"planned"} />
                 </div>
             ) : !isLoading && !schedule && (
                 <div className="empty-state">

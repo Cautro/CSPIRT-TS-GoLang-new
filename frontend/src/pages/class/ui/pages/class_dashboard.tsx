@@ -1,6 +1,5 @@
-import {useEffect, useState} from "react";
-import {useNavigate, useParams, useSearchParams} from "react-router-dom";
-import {useClassDashboardStore} from "../../store/class_dashboard_store.ts";
+import {useState} from "react";
+import {useParams, useSearchParams} from "react-router-dom";
 import {useAuthStore} from "../../../../features/auth/store/auth_store.ts";
 import {ChangeTeacherModal} from "../components/change_teacher_modal.tsx";
 import {ConfirmModal} from "../../../../shared/ui/modals/confirm_modal.tsx";
@@ -9,123 +8,127 @@ import {NotesWidget} from "../../../../features/notes/ui/components/notes_widget
 import {ComplaintsWidget} from "../../../../features/complaints/ui/components/complaints_widget.tsx";
 import {ScheduleWidget} from "../../../../features/schedule/ui/components/schedule_widget.tsx";
 import {BaseScheduleWidget} from "../../../../features/schedule/ui/components/base_schedule_widget.tsx";
+import {type BurgerDrawerMenuItem} from "../../../../shared/ui/other/burger_menu.tsx";
+import {PageHeader} from "../../../../shared/ui/other/page_header.tsx";
+import {TabsSwitcher, type TabsSwitcherItem} from "../../../../shared/ui/other/tabs_switcher.tsx";
+import {useStaff} from "../../../../features/users/hooks/use_staff.ts";
+import {useChangeTeacher} from "../../../../features/class/hooks/use_change_teacher.ts";
+import {useClassTeacher} from "../../../../features/class/hooks/use_class_teacher.ts";
+import {useDeleteClass} from "../../../../features/class/hooks/use_delete_class.ts";
+import {UseRolloverSchedule} from "../../../../features/schedule/hooks/use_rollover_schedule.ts";
+import {AddUserModal} from "../../../../features/users/ui/components/add_user_modal.tsx";
 // import {PlannedScheduleWidget} from "../../../../features/schedule/ui/components/planned_schedule_widget.tsx";
-import {BurgerDrawerMenu, type BurgerDrawerMenuItem} from "../../../../shared/ui/other/burger_menu.tsx";
 
 type SelectedList = | "users" | "notes" | "complaints" | "schedule" | "baseschedule" | "plannedschedule";
 
 export function ClassDashboard() {
-    const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     
-    const teacher = useClassDashboardStore((state) => state.teacher);
     const { id } = useParams<{id: string, name: string}>();
     const name = searchParams.get("name");
     const classId = id ? parseInt(id, 10) : null;
     const role = useAuthStore((state) => state.user?.User.Role);
-    const status = useClassDashboardStore((state) => state.status);
-    const error = useClassDashboardStore((state) => state.error);
-    const staff = useClassDashboardStore((state) => state.staff);
-    const changeTeacher = useClassDashboardStore((state) => state.changeTeacher);
-    const getStaff = useClassDashboardStore((state) => state.getStaff);
-    const getClassTeacher = useClassDashboardStore((state) => state.getClassTeacher);
-    const deleteClass = useClassDashboardStore((state) => state.deleteClass);
-    const rolloverSchedule = useClassDashboardStore((state) => state.rolloverSchedule);
+    const normalizedRole = role?.toLowerCase();
+    const changeTeacher = useChangeTeacher();
+    const getStaff = useStaff();
+    const getClassTeacher = useClassTeacher(classId ?? 0);
+    const deleteClass = useDeleteClass()
+    const teacher = getClassTeacher.data
+    const rolloverSchedule   = UseRolloverSchedule();
+    const error = changeTeacher.error?.message || getStaff.error?.message || deleteClass.error?.message || getStaff.error?.message || getClassTeacher.error?.message;
     
-    const isLoading = status === "loading";
     
-    const [selectedList, setSelectedList] = useState<SelectedList>("users"); 
+    const isLoading = changeTeacher.isPending || getStaff.isLoading || deleteClass.isPending || getStaff.isLoading || getClassTeacher.isLoading;
+
+
+    const selectedList =
+        (searchParams.get("tab") as SelectedList) || "users";
+
+    const setSelectedList = (tab: SelectedList) => {
+        setSearchParams(prev => {
+            prev.set("tab", tab);
+            return prev;
+        }, { replace: true });
+    };
     const [isChangeTeacherModalOpen, setChangeTeacherModalOpen] = useState(false);
     const [isDeleteClassModalOpen, setDeleteClassModalOpen] = useState(false);
     const [isRolloverModalOpen, setRolloverModalOpen] = useState(false);
+    const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [key, setKey] = useState<number>(0);
-
-    useEffect(() => {
-        if (classId) {
-            void getClassTeacher(classId);
-        }
-    }, [classId, getClassTeacher]);
 
     const menuItems: BurgerDrawerMenuItem[] = [
         {
-            label: "Список учеников",
-            onClick: () => setSelectedList("users"),
-            disabled: selectedList === "users",
-        },
-        {
-            label: "Расписание класса",
-            onClick: () => setSelectedList("schedule"),
-            disabled: selectedList === "schedule",
-        },
-        {
-            label: "Стандартное расписание",
-            onClick: () => setSelectedList("baseschedule"),
-            disabled: selectedList === "baseschedule",
-            hidden: role !== "Owner",
-        },
-        {
-            label: "Список заметок класса",
-            onClick: () => setSelectedList("notes"),
-            disabled: selectedList === "notes",
-            hidden: !(role === "Admin" || role === "Owner" || role === "Helper"),
-        },
-        {
-            label: "Список жалоб класса",
-            onClick: () => setSelectedList("complaints"),
-            disabled: selectedList === "complaints",
-            hidden: !(role === "Admin" || role === "Owner"),
+            label: "Добавить пользователя",
+            onClick: () => setIsAddUserModalOpen(true),
+            hidden: (normalizedRole !== "owner" && normalizedRole !== "admin"),
         },
         {
             label: "Изменить классного руководителя",
             onClick: async () => {
-                await getStaff();
+                await getStaff.refetch();
                 setChangeTeacherModalOpen(true);
             },
-            hidden: role !== "Owner",
-            primary: true,
+            hidden: normalizedRole !== "owner",
         },
         {
             label: "Удалить класс",
             onClick: () => setDeleteClassModalOpen(true),
-            hidden: role !== "Owner",
-            danger: true,
+            hidden: normalizedRole !== "owner",
         },
         {
             label: "Сбросить расписание",
             onClick: () => setRolloverModalOpen(true),
-            hidden: role !== "Owner",
-            danger: true,
-        },
-        {
-            label: "На главную",
-            onClick: () => navigate("/"),
-            primary: true,
+            hidden: normalizedRole !== "owner",
         },
     ];
+    
+    const tabs: TabsSwitcherItem<SelectedList>[] = [
+        {
+            value: "users",
+            label: "Ученики",
+        },
+        {
+            value: "schedule",
+            label: "Расписание",
+        },
+        {
+            value: "baseschedule",
+            label: "Стандартное расписание",
+            hidden: normalizedRole !== "owner",
+        },
+        {
+            value: "notes",
+            label: "Заметки",
+            hidden: !(normalizedRole === "admin" || normalizedRole === "owner" || normalizedRole === "helper"),
+        },
+        {
+            value: "complaints",
+            label: "Жалобы",
+            hidden: !(normalizedRole === "admin" || normalizedRole === "owner"),
+        },
+    ]
 
     return (
         <main className={"main"}>
             <section className={"page"}>
-                <div className="profile-hero class-dashboard-hero">
-                    <div className="class-dashboard-hero__content">
-                        <h1 className="info-row__value">{name} Класс</h1>
-
-                        <h2 className="info-row__label">
-                            Классный руководитель - {teacher?.Name} {teacher?.LastName}
-                        </h2>
-                    </div>
-
-                    <div className="class-dashboard-hero__menu">
-                        <BurgerDrawerMenu
-                            title="Меню класса"
-                            items={menuItems}
-                            side="right"
-                        />
-                    </div>
-                </div>
+                
+                <PageHeader 
+                    title={`${name} Класс`}
+                    description={`Классный руководитель - ${teacher?.Name ?? ""} ${teacher?.LastName ?? ""}`}
+                    menuItems={menuItems}
+                    hasBackButton={true}
+                />
                 
                 <div className="page-spacer"></div>
+                
+                <TabsSwitcher
+                    items={tabs}
+                    value={selectedList}
+                    onChange={setSelectedList}
+                />
 
+                <div className="page-spacer"></div>
+                
                 {isLoading && (
                     <div className="grid grid--3">
                         <div className="skeleton" style={{ height: 160 }} />
@@ -166,19 +169,19 @@ export function ClassDashboard() {
             
             <ChangeTeacherModal isOpen={isChangeTeacherModalOpen} onClose={() => setChangeTeacherModalOpen(false)} onChangeTeacher={async (dto) => {
                 if (classId !== null) {
-                    await changeTeacher(classId, dto);
-                    await getClassTeacher(classId);
+                    await changeTeacher.mutateAsync({id: classId, teacher: dto});
+                    getClassTeacher.refetch();
                     setKey(key + 1);
+                    setChangeTeacherModalOpen(false);
                 } 
-                setChangeTeacherModalOpen(false);
-            }} staff={staff} className={name ?? ""}/>
+            }}className={name ?? ""}/>
             
             <ConfirmModal
                 title={"Удалить класс?"}
                 content={`Это действие удалит ${name} класс. Отменить удаление будет нельзя.`}
                 onConfirm={async () => {
                     if (classId !== null) {
-                        await deleteClass(classId);
+                        await deleteClass.mutateAsync({id: classId});
                         setKey(key + 1);
                         setDeleteClassModalOpen(false);
                     }
@@ -195,12 +198,23 @@ export function ClassDashboard() {
                 buttonContent={"Сбросить"}
                 onConfirm={async () => {
                     if (classId) {
-                        await rolloverSchedule(classId ?? 0);
+                        await rolloverSchedule.mutateAsync({id: classId ?? 0});
                         setKey(key + 1);
+                        setRolloverModalOpen(false);
                     }
                 }}
                 isOpen={isRolloverModalOpen}
                 onClose={() => setRolloverModalOpen(false)}
+            />
+
+            <AddUserModal
+                isOpen={isAddUserModalOpen}
+                onClose={() => setIsAddUserModalOpen(false)}
+                onAddUser={async () => {
+                    setKey(prevKey => prevKey + 1);
+                    setIsAddUserModalOpen(false);
+                }}
+                classId={classId}
             />
             
         </main>

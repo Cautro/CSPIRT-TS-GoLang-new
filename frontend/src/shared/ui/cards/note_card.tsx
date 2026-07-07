@@ -16,9 +16,10 @@ export function NoteCard({ item, onDelete, role }: Props) {
         locale: ru,
     });
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const normalizedRole = role?.toLowerCase();
 
     const canDelete =
-        Boolean(onDelete) && (role === "Owner" || role === "Admin");
+        Boolean(onDelete) && (normalizedRole === "owner" || normalizedRole === "admin");
 
     return (
         <div className="class-flat-card">
