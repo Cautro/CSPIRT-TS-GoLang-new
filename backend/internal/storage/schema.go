@@ -529,6 +529,5 @@ func (s *Storage) ensureColumn(table string, column string, definition string) e
 		return nil
 	}
 
-	_, err = s.db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column + ` ` + definition)
 	return err
 }

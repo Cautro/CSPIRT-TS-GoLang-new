@@ -138,7 +138,7 @@ func setAccessTokenCookie(c *gin.Context, token string) {
 		utils.AccessTokenCookieName,
 		token,
 		utils.AccessTokenCookieMaxAge,
-		"/backend/api",
+		"/api",
 		"",
 		cookieSecure(),
 		true,
@@ -151,7 +151,7 @@ func setRefreshTokenCookie(c *gin.Context, token string) {
 		utils.RefreshTokenCookieName,
 		token,
 		utils.RefreshTokenCookieMaxAge,
-		"/backend/api",
+		"/api",
 		"",
 		cookieSecure(),
 		true,
@@ -169,8 +169,8 @@ func updateNetscapeCookiesFile(accessToken, refreshToken string) {
 
 	// Строки в формате Netscape (разделенные \t)
 	// Если кука HttpOnly, то строка ДОЛЖНА начинаться с #HttpOnly_
-	newAccessLine := fmt.Sprintf("#HttpOnly_localhost\tFALSE\t/backend/api\tFALSE\t%d\taccess_token\t%s", accessExpiry, accessToken)
-	newRefreshLine := fmt.Sprintf("#HttpOnly_localhost\tFALSE\t/backend/api\tFALSE\t%d\trefresh_token\t%s", refreshExpiry, refreshToken)
+	newAccessLine := fmt.Sprintf("#HttpOnly_localhost\tFALSE\t/api\tFALSE\t%d\taccess_token\t%s", accessExpiry, accessToken)
+	newRefreshLine := fmt.Sprintf("#HttpOnly_localhost\tFALSE\t/api\tFALSE\t%d\trefresh_token\t%s", refreshExpiry, refreshToken)
 
 	var lines []string
 

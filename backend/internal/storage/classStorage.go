@@ -50,6 +50,12 @@ func (s *Storage) initClassStorage() error {
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_classes_teacher_login ON classes(TeacherLogin);`); err != nil {
 		return err
 	}
+	// В функции initClassStorage
+	if err := s.ensureColumn("classes", "TotalRating", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	_, _ = s.db.Exec(`ALTER TABLE classes ALTER COLUMN TotalRating SET DEFAULT 0;`)
 
 	return s.syncAllClassesLocked()
 }

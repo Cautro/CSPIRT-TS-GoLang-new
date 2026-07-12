@@ -5,3 +5,6 @@ backend/main
 backend/*.exe
 node_modules/
 dist/
+cookies.*
+cookie.*
+cookies.txt

@@ -15,7 +15,7 @@ func openPostgres(_ string) (*sql.DB, error) {
 	}
 
 	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(10)
+	db.SetMaxIdleConns(25)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := db.Ping(); err != nil {
