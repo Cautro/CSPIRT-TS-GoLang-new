@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -187,7 +188,7 @@ func (s *Storage) DeleteScheduleLesson(scheduleType string, id int) error {
 		Message: "deleting schedule lesson",
 	})
 
-	result, err := s.db.Exec(`DELETE FROM `+table+` WHERE Id = ?`, id)
+	result, err := s.db.Exec(`DELETE FROM `+table+` WHERE Id = $1`, id)
 	if err != nil {
 		return err
 	}
@@ -380,27 +381,27 @@ func (s *Storage) getScheduleLessonsLocked(scheduleType string, filter scheduleM
 	args := make([]interface{}, 0)
 
 	if id > 0 {
-		query += ` AND l.Id = ?`
 		args = append(args, id)
+		query += fmt.Sprintf(` AND l.Id = $%d`, len(args))
 	}
 	if filter.ClassID > 0 {
-		query += ` AND l.ClassID = ?`
 		args = append(args, filter.ClassID)
+		query += fmt.Sprintf(` AND l.ClassID = $%d`, len(args))
 	}
 	if filter.TeacherID > 0 {
-		query += ` AND l.TeacherID = ?`
 		args = append(args, filter.TeacherID)
+		query += fmt.Sprintf(` AND l.TeacherID = $%d`, len(args))
 	}
 	if filter.Day != "" {
-		query += ` AND LOWER(l.DayOfWeek) = LOWER(?)`
 		args = append(args, filter.Day)
+		query += fmt.Sprintf(` AND LOWER(l.DayOfWeek) = LOWER($%d)`, len(args))
 	}
 	if filter.WeekType != "" {
 		if filter.WeekType == "all" {
 			query += ` AND LOWER(l.WeekType) = 'all'`
 		} else {
-			query += ` AND LOWER(l.WeekType) IN ('all', LOWER(?))`
 			args = append(args, filter.WeekType)
+			query += fmt.Sprintf(` AND LOWER(l.WeekType) IN ('all', LOWER($%d))`, len(args))
 		}
 	}
 	if scheduleType == scheduleModels.ScheduleTypePlanned {
@@ -455,10 +456,10 @@ func (s *Storage) getScheduleLessonByUniqueKeyLocked(scheduleType string, classI
 	err = s.db.QueryRow(`
 		SELECT Id
 		FROM `+table+`
-		WHERE ClassID = ?
-			AND LOWER(DayOfWeek) = LOWER(?)
-			AND LessonNumber = ?
-			AND LOWER(WeekType) = LOWER(?)
+		WHERE ClassID = $1
+			AND LOWER(DayOfWeek) = LOWER($2)
+			AND LessonNumber = $3
+			AND LOWER(WeekType) = LOWER($4)
 		LIMIT 1
 	`, classID, day, lessonNumber, weekType).Scan(&id)
 	if err != nil {
@@ -480,7 +481,7 @@ func (s *Storage) getPlannedScheduleByBaseIDLocked(baseScheduleID int) (*schedul
 	err := s.db.QueryRow(`
 		SELECT Id
 		FROM planned_schedules
-		WHERE BaseScheduleID = ?
+		WHERE BaseScheduleID = $1
 		LIMIT 1
 	`, baseScheduleID).Scan(&id)
 	if err != nil {
@@ -501,19 +502,16 @@ func (s *Storage) insertScheduleLessonLocked(scheduleType string, lesson schedul
 	})
 
 	if scheduleType == scheduleModels.ScheduleTypePlanned {
-		result, err := s.db.Exec(`
+		var id int64
+		err := s.db.QueryRow(`
 			INSERT INTO planned_schedules
 				(BaseScheduleID, ClassID, Date, DayOfWeek, LessonNumber, WeekType, Subject,
 				 ChangeType, Scope, TeacherID, Room, StartTime, EndTime, Description, Reason, CreatedAt)
-			VALUES (?, ?, '', ?, ?, ?, ?, 'update', 'lesson', ?, ?, ?, ?, ?, '', ?)
+			VALUES ($1, $2, '', $3, $4, $5, $6, 'update', 'lesson', $7, $8, $9, $10, $11, '', $12)
+			RETURNING Id
 		`, nullableScheduleInt(lesson.BaseScheduleID), lesson.ClassID, lesson.DayOfWeek, lesson.LessonNumber,
 			lesson.WeekType, lesson.Subject, lesson.TeacherID, lesson.Room, lesson.StartTime,
-			lesson.EndTime, lesson.Description, time.Now().UTC().Format(time.RFC3339))
-		if err != nil {
-			return 0, err
-		}
-
-		id, err := result.LastInsertId()
+			lesson.EndTime, lesson.Description, time.Now().UTC().Format(time.RFC3339)).Scan(&id)
 		return int(id), err
 	}
 
@@ -522,17 +520,14 @@ func (s *Storage) insertScheduleLessonLocked(scheduleType string, lesson schedul
 		return 0, err
 	}
 
-	result, err := s.db.Exec(`
+	var id int64
+	err = s.db.QueryRow(`
 		INSERT INTO `+table+`
 			(ClassID, DayOfWeek, LessonNumber, WeekType, Subject, TeacherID, Room, StartTime, EndTime, Description)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING Id
 	`, lesson.ClassID, lesson.DayOfWeek, lesson.LessonNumber, lesson.WeekType, lesson.Subject,
-		lesson.TeacherID, lesson.Room, lesson.StartTime, lesson.EndTime, lesson.Description)
-	if err != nil {
-		return 0, err
-	}
-
-	id, err := result.LastInsertId()
+		lesson.TeacherID, lesson.Room, lesson.StartTime, lesson.EndTime, lesson.Description).Scan(&id)
 	return int(id), err
 }
 
@@ -546,9 +541,9 @@ func (s *Storage) updateScheduleLessonLocked(scheduleType string, lesson schedul
 	if scheduleType == scheduleModels.ScheduleTypePlanned {
 		result, err := s.db.Exec(`
 			UPDATE planned_schedules
-			SET BaseScheduleID = ?, ClassID = ?, DayOfWeek = ?, LessonNumber = ?, WeekType = ?,
-				Subject = ?, TeacherID = ?, Room = ?, StartTime = ?, EndTime = ?, Description = ?
-			WHERE Id = ?
+			SET BaseScheduleID = $1, ClassID = $2, DayOfWeek = $3, LessonNumber = $4, WeekType = $5,
+				Subject = $6, TeacherID = $7, Room = $8, StartTime = $9, EndTime = $10, Description = $11
+			WHERE Id = $12
 		`, nullableScheduleInt(lesson.BaseScheduleID), lesson.ClassID, lesson.DayOfWeek, lesson.LessonNumber,
 			lesson.WeekType, lesson.Subject, lesson.TeacherID, lesson.Room, lesson.StartTime,
 			lesson.EndTime, lesson.Description, lesson.ID)
@@ -568,9 +563,9 @@ func (s *Storage) updateScheduleLessonLocked(scheduleType string, lesson schedul
 
 	result, err := s.db.Exec(`
 		UPDATE `+table+`
-		SET ClassID = ?, DayOfWeek = ?, LessonNumber = ?, WeekType = ?, Subject = ?,
-			TeacherID = ?, Room = ?, StartTime = ?, EndTime = ?, Description = ?
-		WHERE Id = ?
+		SET ClassID = $1, DayOfWeek = $2, LessonNumber = $3, WeekType = $4, Subject = $5,
+			TeacherID = $6, Room = $7, StartTime = $8, EndTime = $9, Description = $10
+		WHERE Id = $11
 	`, lesson.ClassID, lesson.DayOfWeek, lesson.LessonNumber, lesson.WeekType, lesson.Subject,
 		lesson.TeacherID, lesson.Room, lesson.StartTime, lesson.EndTime, lesson.Description, lesson.ID)
 	if err != nil {
@@ -817,8 +812,8 @@ func countScheduleRowsTx(tx *sql.Tx, table string, classID int, onlyLessons bool
 	args := make([]interface{}, 0)
 
 	if classID > 0 {
-		query += ` AND ClassID = ?`
 		args = append(args, classID)
+		query += fmt.Sprintf(` AND ClassID = $%d`, len(args))
 	}
 	if onlyLessons {
 		query += ` AND TRIM(DayOfWeek) <> ''`
@@ -833,8 +828,8 @@ func deleteCurrentSchedulesTx(tx *sql.Tx, classID int) error {
 	query := `DELETE FROM current_schedules`
 	args := make([]interface{}, 0)
 	if classID > 0 {
-		query += ` WHERE ClassID = ?`
 		args = append(args, classID)
+		query += fmt.Sprintf(` WHERE ClassID = $%d`, len(args))
 	}
 
 	_, err := tx.Exec(query, args...)
@@ -845,8 +840,8 @@ func deletePlannedSchedulesTx(tx *sql.Tx, classID int) (int, error) {
 	query := `DELETE FROM planned_schedules`
 	args := make([]interface{}, 0)
 	if classID > 0 {
-		query += ` WHERE ClassID = ?`
 		args = append(args, classID)
+		query += fmt.Sprintf(` WHERE ClassID = $%d`, len(args))
 	}
 
 	result, err := tx.Exec(query, args...)
@@ -868,8 +863,8 @@ func copyLessonsToCurrentTx(tx *sql.Tx, sourceTable string, classID int, onlyVal
 	args := make([]interface{}, 0)
 
 	if classID > 0 {
-		query += ` AND ClassID = ?`
 		args = append(args, classID)
+		query += fmt.Sprintf(` AND ClassID = $%d`, len(args))
 	}
 	if onlyValidLessons {
 		query += ` AND TRIM(DayOfWeek) <> ''`
@@ -889,15 +884,15 @@ func copyBaseLessonsToPlannedTx(tx *sql.Tx, classID int) (int, error) {
 			(BaseScheduleID, ClassID, Date, DayOfWeek, LessonNumber, WeekType, Subject,
 			 ChangeType, Scope, TeacherID, Room, StartTime, EndTime, Description, Reason, CreatedAt)
 		SELECT Id, ClassID, '', DayOfWeek, LessonNumber, WeekType, Subject,
-			'update', 'lesson', TeacherID, Room, StartTime, EndTime, Description, '', ?
+			'update', 'lesson', TeacherID, Room, StartTime, EndTime, Description, '', $1
 		FROM schedules
 		WHERE 1 = 1
 	`
 	args := []interface{}{time.Now().UTC().Format(time.RFC3339)}
 
 	if classID > 0 {
-		query += ` AND ClassID = ?`
 		args = append(args, classID)
+		query += fmt.Sprintf(` AND ClassID = $%d`, len(args))
 	}
 
 	result, err := tx.Exec(query, args...)

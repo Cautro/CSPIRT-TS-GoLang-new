@@ -1,5 +1,5 @@
 import {z} from "zod";
-import {type addUserFormType, userSchema, type UserType} from "../types/user_types.ts";
+import {type addUserFormType, type updateUserFormType, userSchema, type UserType} from "../types/user_types.ts";
 import {noteSchema} from "../../notes/types/notes_types.ts";
 import {complaintSchema} from "../../complaints/types/complaints_types.ts";
 import {EventSchema} from "../../events/types/events_types.ts";
@@ -48,8 +48,32 @@ export const UserApi = {
         return parsed.data
     },
     
+    async updateUser(form: updateUserFormType): Promise<void> {
+        const response = await apiClient.patch(`/api/user/update?id=${form.Id}`, {
+            Avatar: {
+                Valid: true,
+                String: form.Avatar,
+            },
+            Name: form.Name,
+            LastName: form.LastName,
+            ClassID: form.ClassID,
+            Login: form.Login,
+            Role: form.Role,
+            Rating: form.Rating,
+            Class: form.Class,
+        }, true);
+
+        if (!response.checkStatus()) {
+            throw new Error("Ошибка при попытке обновлении пользователя");
+        }
+    },
+    
     async addUser(form: addUserFormType): Promise<boolean> {
       const response = await apiClient.patch("/api/user/add", {
+          Avatar: {
+            String: form.Avatar,
+            Valid: true,  
+          },
           Name: form.Name,
           LastName: form.LastName,
           FullName: form.FullName,

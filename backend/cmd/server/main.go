@@ -44,7 +44,6 @@ func main() {
 	}
 	defer store.Close()
 
-	// Парсим конфигурацию параллелей из .env
 	parallelsConfigStr := os.Getenv("PARALLELS")
 	if parallelsConfigStr != "" {
 		parallelsConfig, err := classConfig.ParseParallelsConfig(parallelsConfigStr)
@@ -54,7 +53,6 @@ func main() {
 		}
 		store.ParallelsConfig = parallelsConfig
 
-		// Инициализируем параллели при старте сервера
 		if err := store.InitializeParallelsFromConfig(); err != nil {
 			slog.Error("failed to initialize parallels", "error", err)
 			return

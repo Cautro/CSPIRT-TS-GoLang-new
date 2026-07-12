@@ -17,9 +17,11 @@ import {useClassTeacher} from "../../../../features/class/hooks/use_class_teache
 import {useDeleteClass} from "../../../../features/class/hooks/use_delete_class.ts";
 import {UseRolloverSchedule} from "../../../../features/schedule/hooks/use_rollover_schedule.ts";
 import {AddUserModal} from "../../../../features/users/ui/components/add_user_modal.tsx";
+import {InfoRow} from "../../../profile/ui/profile_page.tsx";
+import {useClassId} from "../../../../features/class/hooks/use_class_id.ts";
 // import {PlannedScheduleWidget} from "../../../../features/schedule/ui/components/planned_schedule_widget.tsx";
 
-type SelectedList = | "users" | "notes" | "complaints" | "schedule" | "baseschedule" | "plannedschedule";
+type SelectedList = | "users" | "notes" | "complaints" | "schedule" | "baseschedule" | "plannedschedule" | "info";
 
 export function ClassDashboard() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -35,14 +37,15 @@ export function ClassDashboard() {
     const deleteClass = useDeleteClass()
     const teacher = getClassTeacher.data
     const rolloverSchedule   = UseRolloverSchedule();
-    const error = changeTeacher.error?.message || getStaff.error?.message || deleteClass.error?.message || getStaff.error?.message || getClassTeacher.error?.message;
+    const classData = useClassId(classId ?? 0);
+    const error = changeTeacher.error?.message || getStaff.error?.message || deleteClass.error?.message || getStaff.error?.message || getClassTeacher.error?.message || classData.error?.message;
     
     
     const isLoading = changeTeacher.isPending || getStaff.isLoading || deleteClass.isPending || getStaff.isLoading || getClassTeacher.isLoading;
 
 
     const selectedList =
-        (searchParams.get("tab") as SelectedList) || "users";
+        (searchParams.get("tab") as SelectedList) || "info";
 
     const setSelectedList = (tab: SelectedList) => {
         setSearchParams(prev => {
@@ -83,6 +86,10 @@ export function ClassDashboard() {
     ];
     
     const tabs: TabsSwitcherItem<SelectedList>[] = [
+        {
+            value: "info",
+            label: "Информация"
+        },
         {
             value: "users",
             label: "Ученики",
@@ -139,6 +146,19 @@ export function ClassDashboard() {
 
                 {error && !isLoading && (
                     <div className="alert alert--danger mb-4">{error}</div>
+                )}
+
+                {selectedList === "info" && (
+                    <div className={"card card--padded"}>
+                        <div className="info-list">
+                            <InfoRow label={"Общий рейтинг класса"} value={(classData.data?.ClassTotalRating ?? 0) + (classData.data?.UserTotalRating ?? 0)} />
+                            <InfoRow label={"Рейтинг учеников класса"} value={classData.data?.UserTotalRating.toString()} />
+                            <InfoRow label={"Кол-во учеников в классе"} value={classData.data?.Members.length.toString()} />
+                            <InfoRow label={"Кол-во первых мест в кубке школы"} value={classData.data?.FirstQuarterComplete.toString()}/>
+                            <InfoRow label={"Кол-во вторых мест в кубке школы"} value={classData.data?.SecondQuarterComplete.toString()}/>
+                            <InfoRow label={"Кол-во третьих мест в кубке школы"} value={classData.data?.ThirdQuarterComplete.toString()}/>
+                        </div>
+                    </div>
                 )}
                 
                 {selectedList === "users" && (

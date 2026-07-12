@@ -13,7 +13,7 @@ func (s *Storage) SaveRefreshToken(userID int, token string, expiresAt time.Time
 
 	_, err := s.db.Exec(`
 		INSERT INTO refresh_tokens (user_id, token, expires_at)
-		VALUES (?, ?, ?)
+		VALUES ($1, $2, $3)
 	`, userID, token, expiresAt)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -39,7 +39,7 @@ func (s *Storage) GetRefreshToken(token string) (*models.RefreshToken, error) {
 	row := s.db.QueryRow(`
 		SELECT id, user_id, token, expires_at, created_at
 		FROM refresh_tokens
-		WHERE token = ?
+		WHERE token = $1
 	`, token)
 
 	var rt models.RefreshToken
@@ -72,7 +72,7 @@ func (s *Storage) DeleteRefreshToken(token string) error {
 
 	_, err := s.db.Exec(`
 		DELETE FROM refresh_tokens
-		WHERE token = ?
+		WHERE token = $1
 	`, token)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{

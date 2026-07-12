@@ -1,9 +1,5 @@
 package storage
 
-import (
-	"database/sql"
-	"encoding/json"
-)
 
 func (s *Storage) initSchema() error {
 	if err := s.initUserStorage(); err != nil {
@@ -54,7 +50,7 @@ func (s *Storage) initBaseSchedulesStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS schedules (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		ClassID INTEGER NOT NULL,
 		DayOfWeek TEXT NOT NULL,
 		LessonNumber INTEGER NOT NULL,
@@ -62,8 +58,8 @@ func (s *Storage) initBaseSchedulesStorage() error {
 		Subject TEXT NOT NULL,
 		TeacherID INTEGER NOT NULL,
 		Room INTEGER NOT NULL,
-		StartTime TEXT NOT NULL,
-		EndTime TEXT NOT NULL,
+		StartTime TIMESTAMPTZ NOT NULL,
+		EndTime TIMESTAMPTZ NOT NULL,
 		Description TEXT NOT NULL DEFAULT '',
 		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE,
 		FOREIGN KEY (TeacherID) REFERENCES users(Id) ON DELETE CASCADE
@@ -100,7 +96,7 @@ func (s *Storage) initCurrentSchedulesStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS current_schedules (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		ClassID INTEGER NOT NULL,
 		DayOfWeek TEXT NOT NULL,
 		LessonNumber INTEGER NOT NULL,
@@ -108,8 +104,8 @@ func (s *Storage) initCurrentSchedulesStorage() error {
 		Subject TEXT NOT NULL,
 		TeacherID INTEGER NOT NULL,
 		Room INTEGER NOT NULL,
-		StartTime TEXT NOT NULL,
-		EndTime TEXT NOT NULL,
+		StartTime TIMESTAMPTZ NOT NULL,
+		EndTime TIMESTAMPTZ NOT NULL,
 		Description TEXT NOT NULL DEFAULT '',
 		FOREIGN KEY (ClassID) REFERENCES classes(Id) ON DELETE CASCADE,
 		FOREIGN KEY (TeacherID) REFERENCES users(Id) ON DELETE CASCADE
@@ -149,7 +145,7 @@ func (s *Storage) initPlannedSchedulesStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS planned_schedules (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		BaseScheduleID INTEGER,
 		ClassID INTEGER NOT NULL,
 		Date TEXT NOT NULL DEFAULT '',
@@ -167,8 +163,8 @@ func (s *Storage) initPlannedSchedulesStorage() error {
 		Scope TEXT NOT NULL DEFAULT 'lesson',
 		TeacherID INTEGER NOT NULL,
 		Room INTEGER NOT NULL,
-		StartTime TEXT NOT NULL,
-		EndTime TEXT NOT NULL,
+		StartTime TIMESTAMPTZ NOT NULL,
+		EndTime TIMESTAMPTZ NOT NULL,
 		Description TEXT NOT NULL DEFAULT '',
 		Reason TEXT NOT NULL DEFAULT '',
 		CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -226,10 +222,10 @@ func (s *Storage) initUserStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		Avatar TEXT,
 		Name TEXT NOT NULL,
-		FullName TEXT NOT NULL DEFAULT '[]',
+		FullName JSONB NOT NULL DEFAULT '[]',
 		LastName TEXT NOT NULL,
 		Login TEXT NOT NULL UNIQUE,
 		Password TEXT NOT NULL,
@@ -262,15 +258,15 @@ func (s *Storage) initEventsStorage() error {
 
 	eventsQuery := `
 	CREATE TABLE IF NOT EXISTS events (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		Title TEXT NOT NULL,
 		Status TEXT NOT NULL DEFAULT 'scheduled',
 		RatingReward INTEGER NOT NULL DEFAULT 0,
 		Description TEXT NOT NULL,
-		CreatedAt TEXT NOT NULL,
-		StartedAt TEXT NOT NULL,
+		CreatedAt TIMESTAMPTZ NOT NULL,
+		StartedAt TIMESTAMPTZ NOT NULL,
 		Players TEXT NOT NULL,
-		Classes TEXT NOT NULL DEFAULT '[]'
+		Classes JSONB NOT NULL DEFAULT '[]'
 	);`
 
 	if _, err := s.db.Exec(eventsQuery); err != nil {
@@ -279,7 +275,7 @@ func (s *Storage) initEventsStorage() error {
 	if err := s.ensureColumn("events", "RatingReward", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
-	if err := s.ensureColumn("events", "Classes", "TEXT NOT NULL DEFAULT '[]'"); err != nil {
+	if err := s.ensureColumn("events", "Classes", "JSONB NOT NULL DEFAULT '[]'"); err != nil {
 		return err
 	}
 
@@ -324,7 +320,7 @@ func (s *Storage) initParamsForEventsStorage() error {
 
 	query := `
     CREATE TABLE IF NOT EXISTS event_params (
-        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+        Id BIGSERIAL PRIMARY KEY,
         EventID INTEGER NOT NULL,
 		ClassID INTEGER NOT NULL,
 		ExtraRatingReward INTEGER NOT NULL DEFAULT 0,
@@ -384,7 +380,7 @@ func (s *Storage) initNoteStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS notes (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		TargetID INTEGER NOT NULL,
 		AuthorID INTEGER NOT NULL,
 		TargetName TEXT NOT NULL,
@@ -412,11 +408,11 @@ func (s *Storage) initHTTPOnlyStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS refresh_tokens (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id BIGSERIAL PRIMARY KEY,
 		user_id INTEGER NOT NULL,
 		token TEXT NOT NULL UNIQUE,
-		expires_at DATETIME NOT NULL,
-		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		expires_at TIMESTAMPTZ NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (user_id) REFERENCES users(Id) ON DELETE CASCADE
 	);`
 
@@ -436,13 +432,13 @@ func (s *Storage) initComplaintStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS complaints (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		TargetID INTEGER NOT NULL,
 		TargetName TEXT NOT NULL,
 		AuthorID INTEGER NOT NULL,
 		AuthorName TEXT NOT NULL,
 		Content TEXT NOT NULL,
-		CreatedAt TEXT NOT NULL,
+		CreatedAt TIMESTAMPTZ NOT NULL,
 		FOREIGN KEY (TargetID) REFERENCES users(Id) ON DELETE CASCADE,
 		FOREIGN KEY (AuthorID) REFERENCES users(Id) ON DELETE CASCADE
 	);`
@@ -466,7 +462,7 @@ func (s *Storage) initParallelsStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS parallels (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		Name TEXT NOT NULL UNIQUE,
 		MinGrade INTEGER NOT NULL,
 		MaxGrade INTEGER NOT NULL,
@@ -491,72 +487,6 @@ func (s *Storage) initParallelsStorage() error {
 		return err
 	}
 
-	// migrate legacy ClassesIds JSON column into mapping table if present
-	// check if column exists
-	rows, err := s.db.Query(`PRAGMA table_info(parallels)`)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	hasClassesIds := false
-	for rows.Next() {
-		var cid int
-		var name string
-		var columnType string
-		var notNull int
-		var dflt sql.NullString
-		var pk int
-		if err := rows.Scan(&cid, &name, &columnType, &notNull, &dflt, &pk); err != nil {
-			return err
-		}
-		if name == "ClassesIds" {
-			hasClassesIds = true
-			break
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	if hasClassesIds {
-		// read existing parallels and migrate
-		tx, err := s.db.Begin()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-
-		pRows, err := tx.Query(`SELECT Id, ClassesIds FROM parallels`)
-		if err != nil {
-			return err
-		}
-		for pRows.Next() {
-			var pid int
-			var classesJSON sql.NullString
-			if err := pRows.Scan(&pid, &classesJSON); err != nil {
-				pRows.Close()
-				return err
-			}
-			if !classesJSON.Valid || classesJSON.String == "" {
-				continue
-			}
-			var classIDs []int
-			if err := json.Unmarshal([]byte(classesJSON.String), &classIDs); err != nil {
-				// skip malformed
-				continue
-			}
-			for _, cid := range classIDs {
-				_, err := tx.Exec(`INSERT OR IGNORE INTO parallel_classes (ParallelID, ClassID) VALUES (?, ?)`, pid, cid)
-				if err != nil {
-					pRows.Close()
-					return err
-				}
-			}
-		}
-		pRows.Close()
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-	}
 	if _, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_parallels_min_max ON parallels(MinGrade, MaxGrade);`); err != nil {
 		return err
 	}
@@ -584,29 +514,19 @@ func (s *Storage) initParallelsStorage() error {
 }
 
 func (s *Storage) ensureColumn(table string, column string, definition string) error {
-	rows, err := s.db.Query(`PRAGMA table_info(` + table + `)`)
+	var exists bool
+	err := s.db.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = lower($1) AND column_name = lower($2)
+		)
+	`, table, column).Scan(&exists)
+	
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var cid int
-		var name string
-		var columnType string
-		var notNull int
-		var defaultValue sql.NullString
-		var pk int
-
-		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk); err != nil {
-			return err
-		}
-		if name == column {
-			return nil
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return err
+	if exists {
+		return nil
 	}
 
 	_, err = s.db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column + ` ` + definition)

@@ -24,9 +24,6 @@ export function NoteCard({ item, onDelete, role }: Props) {
     return (
         <div className="class-flat-card">
             <div className="class-flat-card__main">
-                <div className="class-flat-card__icon">
-                    {item.ID}
-                </div>
 
                 <div className="class-flat-card__info">
                     <h2 className="class-flat-card__subtitle">

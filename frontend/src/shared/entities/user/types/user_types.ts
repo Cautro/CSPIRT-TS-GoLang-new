@@ -38,9 +38,11 @@ export const userSchema = z.object({
     Id: z.number().int().nonnegative(),
     Name: z.string().max(100),
     LastName: z.string().max(100),
-
+    Avatar: z.object({
+        String: z.string(),
+        Valid: z.boolean()
+    }),
     FullName: nullableArray(fullNameSchema),
-
     Login: z.string().min(1).max(64),
     Rating: z.number().int(),
     Role: userRoleSchema,
@@ -60,6 +62,7 @@ export const UserRoles: Record<UserRole, string> = {
 };
 
 export type addUserFormType = {
+    Avatar: string;
     Name: string;
     LastName: string;
     FullName: Array<{
@@ -71,4 +74,16 @@ export type addUserFormType = {
     Login: string;
     Role: UserRole;
     Rating: number;
+}
+
+export type updateUserFormType = {
+    Avatar: string;
+    Name: string;
+    LastName: string;
+    ClassID: number;
+    Login: string;
+    Role: UserRole;
+    Rating: number;
+    Id: number;
+    Class: string;
 }

@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,12 +22,12 @@ func (s *Storage) initClassStorage() error {
 
 	query := `
 	CREATE TABLE IF NOT EXISTS classes (
-		Id INTEGER PRIMARY KEY AUTOINCREMENT,
+		Id BIGSERIAL PRIMARY KEY,
 		Name TEXT NOT NULL UNIQUE,
 		Grade INTEGER NOT NULL DEFAULT 0,
 		Letter TEXT NOT NULL DEFAULT '',
 		TeacherLogin TEXT,
-		Members TEXT NOT NULL DEFAULT '[]',
+		Members JSONB NOT NULL DEFAULT '[]',
 		FirstQuarterComplete INTEGER NOT NULL DEFAULT 0,
 		SecondQuarterComplete INTEGER NOT NULL DEFAULT 0,
 		ThirdQuarterComplete INTEGER NOT NULL DEFAULT 0,
@@ -98,7 +99,7 @@ func (s *Storage) GetParallelClasses() ([]classModels.ParallelClass, error) {
 
     for i := range parallelClasses {
         classRows, err := s.db.Query(
-            `SELECT ClassID FROM parallel_classes WHERE ParallelID = ? ORDER BY ClassID`,
+            `SELECT ClassID FROM parallel_classes WHERE ParallelID = $1 ORDER BY ClassID`,
             parallelClasses[i].ID,
         )
         if err != nil { return nil, err }
@@ -168,8 +169,8 @@ func (s *Storage) QuarterComplete(parallelClassID int) ([]*classModels.Class, er
 		}
 		_, err := s.db.Exec(`
 			UPDATE classes
-			SET FirstQuarterComplete = ?, SecondQuarterComplete = ?, ThirdQuarterComplete = ?
-			WHERE Id = ?
+			SET FirstQuarterComplete = $1, SecondQuarterComplete = $2, ThirdQuarterComplete = $3
+			WHERE id = $4
 		`, class.FirstQuarterComplete, class.SecondQuarterComplete, class.ThirdQuarterComplete, class.ID)
 		if err != nil {
 			return nil, err
@@ -251,24 +252,24 @@ func (s *Storage) YearComplete() ([]*classModels.Class, error) {
 		}
 
 		_, err = tx.Exec(`
-			UPDATE classes 
-			SET Grade = ?, QuarterComplete = ?, ClassTotalRating = ?, UserTotalRating = ?, Members = ?
-			WHERE Id = ?
+			UPDATE classes
+			SET Grade = $1, QuarterComplete = $2, ClassTotalRating = $3, UserTotalRating = $4, Members = $5
+			WHERE id = $6
 		`, class.Grade, class.QuarterComplete, class.ClassTotalRating, class.UserTotalRating, string(updatedMembersBytes), class.ID)
 		if err != nil {
 			return nil, err
 		}
 		var newParallelID int
 		err = tx.QueryRow(`
-			SELECT Id FROM parallels 
-			WHERE ? >= MinGrade AND ? <= MaxGrade 
+			SELECT Id FROM parallels
+			WHERE $1 >= MinGrade AND $2 <= MaxGrade
 			LIMIT 1
 		`, class.Grade, class.Grade).Scan(&newParallelID)
 
 		if err == sql.ErrNoRows {
 			println("[DEBUG] Параллель не найдена для класса:", class.Name, "с Grade:", class.Grade)
-			
-			_, err = tx.Exec(`DELETE FROM parallel_classes WHERE ClassID = ?`, class.ID)
+
+			_, err = tx.Exec(`DELETE FROM parallel_classes WHERE ClassID = $1`, class.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -277,14 +278,15 @@ func (s *Storage) YearComplete() ([]*classModels.Class, error) {
 		} else {
 			println("[DEBUG] Перенос класса", class.Name, "(Grade:", class.Grade, ") в ParallelID:", newParallelID)
 
-			_, err = tx.Exec(`DELETE FROM parallel_classes WHERE ClassID = ?`, class.ID)
+			_, err = tx.Exec(`DELETE FROM parallel_classes WHERE ClassID = $1`, class.ID)
 			if err != nil {
 				return nil, err
 			}
 
 			_, err = tx.Exec(`
-				INSERT INTO parallel_classes (ParallelID, ClassID) 
-				VALUES (?, ?)
+				INSERT INTO parallel_classes (ParallelID, ClassID)
+				VALUES ($1, $2)
+				ON CONFLICT DO NOTHING
 			`, newParallelID, class.ID)
 			if err != nil {
 				return nil, err
@@ -305,7 +307,7 @@ func (s *Storage) getParallelClassByIDLocked(parallelClassID int) (*classModels.
 	row := s.db.QueryRow(`
 		SELECT Id, Name, BestClassID, ClassTotalRating
 		FROM parallels
-		WHERE Id = ?`, parallelClassID)
+		WHERE id = $1`, parallelClassID)
 	var parallelClass classModels.ParallelClass
 	if err := row.Scan(
 		&parallelClass.ID,
@@ -320,7 +322,7 @@ func (s *Storage) getParallelClassByIDLocked(parallelClassID int) (*classModels.
 	}
 
 	// load class ids
-	rows, err := s.db.Query(`SELECT ClassID FROM parallel_classes WHERE ParallelID = ? ORDER BY ClassID`, parallelClass.ID)
+	rows, err := s.db.Query(`SELECT ClassID FROM parallel_classes WHERE ParallelID = $1 ORDER BY ClassID`, parallelClass.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +362,7 @@ func (s *Storage) DeleteParallelClassByID(parallelClassID int, login string) err
 
 	_, err = s.db.Exec(`
 		DELETE FROM parallels
-		WHERE Id = ?
+		WHERE id = $1
 	`, parallelClassID)
 	return err
 }
@@ -389,13 +391,17 @@ func (s *Storage) DeleteClassByID(classID int, login string) error {
 
 	_, err = tx.Exec(`
 		DELETE FROM users
-		WHERE ClassID = ?
-		AND LOWER(Role) IN ('user', 'helper');
-
+		WHERE ClassID = $1
+		AND LOWER(Role) IN ('user', 'helper')
+	`, classID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
 		UPDATE users
 		SET ClassID = 0,
 			Class = ''
-		WHERE ClassID = ?;
+		WHERE ClassID = $1
 	`, classID)
 	if err != nil {
 		return err
@@ -403,7 +409,7 @@ func (s *Storage) DeleteClassByID(classID int, login string) error {
 
 	res, err := tx.Exec(`
 		DELETE FROM classes
-		WHERE Id = ?
+		WHERE id = $1
 	`, classID)
 	if err != nil {
 		return err
@@ -463,7 +469,7 @@ func (s *Storage) AddParallelByGradeRange(name string, minGrade, maxGrade int) e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= ? AND Grade <= ?", minGrade, maxGrade)
+	rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= $1 AND Grade <= $2", minGrade, maxGrade)
 	if err != nil {
 		return err
 	}
@@ -496,7 +502,7 @@ func (s *Storage) addParallelInternal(name string, classesIDs []int) error {
 
 	for _, id := range classesIDs {
 		var rating int
-		err := s.db.QueryRow("SELECT ClassTotalRating FROM classes WHERE Id = ?", id).Scan(&rating)
+		err := s.db.QueryRow("SELECT ClassTotalRating FROM classes WHERE id = $1", id).Scan(&rating)
 		if err == nil && rating > maxRating {
 			maxRating = rating
 			bestClassID = id
@@ -509,16 +515,15 @@ func (s *Storage) addParallelInternal(name string, classesIDs []int) error {
 	}
 	defer tx.Rollback()
 
-	res, err := tx.Exec(`INSERT INTO parallels (Name, BestClassID, ClassTotalRating) VALUES (?, ?, ?)`,
-		name, bestClassID, maxRating)
+	var parallelID int64
+	err = tx.QueryRow(`INSERT INTO parallels (Name, BestClassID, ClassTotalRating) VALUES ($1, $2, $3) RETURNING Id`,
+		name, bestClassID, maxRating).Scan(&parallelID)
 	if err != nil {
 		return err
 	}
 
-	parallelID, _ := res.LastInsertId()
-
 	for _, classID := range classesIDs {
-		_, err := tx.Exec(`INSERT INTO parallel_classes (ParallelID, ClassID) VALUES (?, ?)`,
+		_, err := tx.Exec(`INSERT INTO parallel_classes (ParallelID, ClassID) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 			parallelID, classID)
 		if err != nil {
 			return err
@@ -558,21 +563,23 @@ func (s *Storage) updateClassInternal(classID int, name string, grade int, lette
 	}
 	return s.db.QueryRow(`
 		UPDATE classes
-		SET Name = ?, Grade = ?, Letter = ?, TeacherLogin = ?
-		WHERE Id = ?
+		SET Name = $1, Grade = $2, Letter = $3, TeacherLogin = $4
+		WHERE id = $5
 	`, name, grade, letter, teacherLogin, classID).Err()
 }
 
 func (s *Storage) saveClassInternal(name string, grade int, letter string, teacherLogin string) error {
-    res, err := s.db.Exec(`INSERT INTO classes (Name, Grade, Letter, TeacherLogin) VALUES (?, ?, ?, ?)`,
-        name, grade, letter, teacherLogin)
-    if err != nil { return err }
-    classID, _ := res.LastInsertId()
-    return s.autoAssignClassToParallelLocked(int(classID)) 
+	var classID int64
+	err := s.db.QueryRow(`INSERT INTO classes (Name, Grade, Letter, TeacherLogin) VALUES ($1, $2, $3, $4) RETURNING Id`,
+		name, grade, letter, teacherLogin).Scan(&classID)
+	if err != nil {
+		return err
+	}
+	return s.autoAssignClassToParallelLocked(int(classID))
 }
 
 func (s *Storage) GetClassIDsByRange(minGrade, maxGrade int) ([]int, error) {
-	rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= ? AND Grade <= ?", minGrade, maxGrade)
+	rows, err := s.db.Query("SELECT Id FROM classes WHERE Grade >= $1 AND Grade <= $2", minGrade, maxGrade)
 	if err != nil {
 		return nil, err
 	}
@@ -613,18 +620,15 @@ func ParseClass(s string) (int, string, bool) {
 func (s *Storage) AddToParallelLocked(numberClass int) (int, error) {
 	var parallelID int
 
-	err := s.db.QueryRow(`SELECT Id FROM parallels WHERE MinGrade <= ? AND MaxGrade >= ? LIMIT 1`, numberClass, numberClass).Scan(&parallelID)
+	err := s.db.QueryRow(`SELECT Id FROM parallels WHERE MinGrade <= $1 AND MaxGrade >= $2 LIMIT 1`, numberClass, numberClass).Scan(&parallelID)
 	if err == sql.ErrNoRows {
 		name := strconv.Itoa(numberClass) + " параллель"
-		res, err := s.db.Exec(`
+		var insertID int64
+		err := s.db.QueryRow(`
 			INSERT INTO parallels (Name, MinGrade, MaxGrade)
-			VALUES (?, ?, ?)
-		`, name, numberClass, numberClass)
-		if err != nil {
-			return 0, err
-		}
-
-		insertID, err := res.LastInsertId()
+			VALUES ($1, $2, $3)
+			RETURNING Id
+		`, name, numberClass, numberClass).Scan(&insertID)
 		if err != nil {
 			return 0, err
 		}
@@ -702,8 +706,8 @@ func (s *Storage) saveClassTeacherLocked(name string, teacherLogin string) error
 
 	_, err = s.db.Exec(`
 		UPDATE classes
-		SET TeacherLogin = ?
-		WHERE Name = ?
+		SET TeacherLogin = $1
+		WHERE Name = $2
 	`, teacher.Login, name)
 	if err != nil {
 		return err
@@ -722,7 +726,7 @@ func (s *Storage) GetClassesInParallel(id int) ([]classModels.Class, error) {
                c.FirstQuarterComplete, c.SecondQuarterComplete, c.ThirdQuarterComplete
         FROM classes c
         JOIN parallel_classes pc ON pc.ClassID = c.Id
-        WHERE pc.ParallelID = ?
+        WHERE pc.ParallelID = $1
         ORDER BY c.Name
     `, id)
     if err != nil {
@@ -888,10 +892,11 @@ func (s *Storage) syncAllClasses() error {
 
 func (s *Storage) syncAllClassesLocked() error {
 	if _, err := s.db.Exec(`
-		INSERT OR IGNORE INTO classes (Name)
+		INSERT INTO classes (Name)
 		SELECT DISTINCT UPPER(TRIM(Class))
 		FROM users
 		WHERE TRIM(Class) <> ''
+		ON CONFLICT DO NOTHING
 	`); err != nil {
 		return err
 	}
@@ -1016,7 +1021,7 @@ func (s *Storage) syncClassByIDLocked(classID int) error {
 	}
 
 	var teacherLogin sql.NullString
-	err = s.db.QueryRow(`SELECT TeacherLogin FROM classes WHERE Id = ?`, classID).Scan(&teacherLogin)
+	err = s.db.QueryRow(`SELECT TeacherLogin FROM classes WHERE id = $1`, classID).Scan(&teacherLogin)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil
@@ -1050,8 +1055,8 @@ func (s *Storage) syncClassByIDLocked(classID int) error {
 
 	_, err = s.db.Exec(`
 		UPDATE classes
-		SET Members = ?, UserTotalRating = ?, TeacherLogin = ?
-		WHERE Id = ?
+		SET Members = $1, UserTotalRating = $2, TeacherLogin = $3
+		WHERE id = $4
 	`, string(membersJSON), userTotalRating, teacherLogin, classID)
 	return err
 }
@@ -1059,8 +1064,8 @@ func (s *Storage) syncClassByIDLocked(classID int) error {
 func (s *Storage) AddClassRating(classID int, points int) error {
 	_, err := s.db.Exec(`
 		UPDATE classes
-		SET ClassTotalRating = ClassTotalRating + ?
-		WHERE Id = ?
+		SET ClassTotalRating = ClassTotalRating + $1
+		WHERE id = $2
 	`, points, classID)
 
 	return err
@@ -1073,15 +1078,16 @@ func (s *Storage) ensureClassLocked(name string) error {
 	}
 
 	_, err := s.db.Exec(`
-		INSERT OR IGNORE INTO classes (Name)
-		VALUES (?)
+		INSERT INTO classes (Name)
+		VALUES ($1)
+		ON CONFLICT DO NOTHING
 	`, name)
 	return err
 }
 
 func (s *Storage) classExistsLocked(name string) (bool, error) {
 	var exists int
-	err := s.db.QueryRow(`SELECT 1 FROM classes WHERE Name = ?`, name).Scan(&exists)
+	err := s.db.QueryRow(`SELECT 1 FROM classes WHERE Name = $1`, name).Scan(&exists)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
@@ -1096,7 +1102,7 @@ func (s *Storage) getClassByNameLocked(name string) (*classModels.Class, error) 
 	row := s.db.QueryRow(`
 		SELECT Id, Name, Grade, Letter, TeacherLogin, Members, UserTotalRating, ClassTotalRating
 		FROM classes
-		WHERE Name = ?
+		WHERE Name = $1
 	`, name)
 
 	class, err := s.scanClassScannerLocked(row, true)
@@ -1115,7 +1121,7 @@ func (s *Storage) getClassByIDLocked(id int) (*classModels.Class, error) {
 		SELECT Id, Name, Grade, Letter, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
 		FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
 		FROM classes
-		WHERE Id = ?
+		WHERE id = $1
 	`, id)
 
 	class, err := s.scanClassScannerLocked(row, true)
@@ -1131,7 +1137,7 @@ func (s *Storage) getClassByIDLocked(id int) (*classModels.Class, error) {
 
 func (s *Storage) getClassIDByNameLocked(name string) (int, error) {
 	var classID int
-	err := s.db.QueryRow(`SELECT Id FROM classes WHERE Name = ?`, normalizeClassName(name)).Scan(&classID)
+	err := s.db.QueryRow(`SELECT Id FROM classes WHERE Name = $1`, normalizeClassName(name)).Scan(&classID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return 0, nil
@@ -1146,7 +1152,7 @@ func (s *Storage) getUsersByClassIDLocked(classID int) ([]userModels.SafeUser, e
 	rows, err := s.db.Query(`
 		SELECT Id, Avatar, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
 		FROM users
-		WHERE ClassID = ?
+		WHERE ClassID = $1
 		ORDER BY LastName, Name, Login
 	`, classID)
 	if err != nil {
@@ -1232,7 +1238,7 @@ func (s *Storage) loadClassTeachersLocked(classes []classModels.Class) error {
 	placeholders := make([]string, len(logins))
 	args := make([]interface{}, len(logins))
 	for i, login := range logins {
-		placeholders[i] = "?"
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
 		args[i] = login
 	}
 
@@ -1270,7 +1276,7 @@ func (s *Storage) findTeacherCandidateLocked(classID int) (string, error) {
 	err := s.db.QueryRow(`
 		SELECT Login
 		FROM users
-		WHERE ClassID = ?
+		WHERE ClassID = $1
 		AND LOWER(Role) IN ('admin', 'owner', 'helper')
 		ORDER BY
 			CASE LOWER(Role)
@@ -1317,7 +1323,7 @@ func (s *Storage) initializeParallelLocked(name string, minGrade, maxGrade int) 
 	var parallelID int
 	err := s.db.QueryRow(`
 		SELECT Id FROM parallels 
-		WHERE MinGrade = ? AND MaxGrade = ?
+		WHERE MinGrade = $1 AND MaxGrade = $2
 	`, minGrade, maxGrade).Scan(&parallelID)
 
 	if err == nil {
@@ -1333,7 +1339,7 @@ func (s *Storage) initializeParallelLocked(name string, minGrade, maxGrade int) 
 	// Сначала получаем все классы в этом диапазоне
 	rows, err := s.db.Query(`
 		SELECT Id, ClassTotalRating FROM classes 
-		WHERE Grade >= ? AND Grade <= ?
+		WHERE Grade >= $1 AND Grade <= $2
 		ORDER BY ClassTotalRating DESC
 		LIMIT 1
 	`, minGrade, maxGrade)
@@ -1360,21 +1366,18 @@ func (s *Storage) initializeParallelLocked(name string, minGrade, maxGrade int) 
 	}
 
 	// Вставляем новую параллель
-	res, err := s.db.Exec(`
+	var newParallelID int64
+	err = s.db.QueryRow(`
 		INSERT INTO parallels (Name, MinGrade, MaxGrade, BestClassID, ClassTotalRating)
-		VALUES (?, ?, ?, ?, ?)
-	`, name, minGrade, maxGrade, bestClassID, bestRating)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING Id
+	`, name, minGrade, maxGrade, bestClassID, bestRating).Scan(&newParallelID)
 
 	if err != nil {
 		// Может быть UNIQUE constraint на Name, но это нормально
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
 			return nil
 		}
-		return err
-	}
-
-	newParallelID, err := res.LastInsertId()
-	if err != nil {
 		return err
 	}
 
@@ -1388,7 +1391,7 @@ func (s *Storage) syncParallelClassesLocked(parallelID, minGrade, maxGrade int) 
 	// Получаем все классы в диапазоне
 	rows, err := s.db.Query(`
 		SELECT Id FROM classes 
-		WHERE Grade >= ? AND Grade <= ?
+		WHERE Grade >= $1 AND Grade <= $2
 	`, minGrade, maxGrade)
 	if err != nil {
 		return err
@@ -1409,7 +1412,7 @@ func (s *Storage) syncParallelClassesLocked(parallelID, minGrade, maxGrade int) 
 	}
 
 	// Удаляем старые связи для этой параллели
-	_, err = s.db.Exec(`DELETE FROM parallel_classes WHERE ParallelID = ?`, parallelID)
+	_, err = s.db.Exec(`DELETE FROM parallel_classes WHERE ParallelID = $1`, parallelID)
 	if err != nil {
 		return err
 	}
@@ -1417,8 +1420,9 @@ func (s *Storage) syncParallelClassesLocked(parallelID, minGrade, maxGrade int) 
 	// Добавляем новые связи
 	for _, classID := range classIDs {
 		_, err := s.db.Exec(`
-			INSERT OR IGNORE INTO parallel_classes (ParallelID, ClassID) 
-			VALUES (?, ?)
+			INSERT INTO parallel_classes (ParallelID, ClassID)
+			VALUES ($1, $2)
+			ON CONFLICT DO NOTHING
 		`, parallelID, classID)
 		if err != nil {
 			return err
@@ -1430,7 +1434,7 @@ func (s *Storage) syncParallelClassesLocked(parallelID, minGrade, maxGrade int) 
 	var bestRating int
 	err = s.db.QueryRow(`
 		SELECT c.Id, c.ClassTotalRating FROM classes c
-		WHERE c.Grade >= ? AND c.Grade <= ?
+		WHERE c.Grade >= $1 AND c.Grade <= $2
 		ORDER BY c.ClassTotalRating DESC
 		LIMIT 1
 	`, minGrade, maxGrade).Scan(&bestClassID, &bestRating)
@@ -1445,8 +1449,8 @@ func (s *Storage) syncParallelClassesLocked(parallelID, minGrade, maxGrade int) 
 
 	_, err = s.db.Exec(`
 		UPDATE parallels 
-		SET BestClassID = ?, ClassTotalRating = ?
-		WHERE Id = ?
+		SET BestClassID = $1, ClassTotalRating = $2
+		WHERE id = $3
 	`, bestClassID, bestRating, parallelID)
 
 	return err
@@ -1462,7 +1466,7 @@ func (s *Storage) AutoAssignClassToParallel(classID int) error {
 
 func (s *Storage) autoAssignClassToParallelLocked(classID int) error {
     var grade int
-    err := s.db.QueryRow(`SELECT Grade FROM classes WHERE Id = ?`, classID).Scan(&grade)
+    err := s.db.QueryRow(`SELECT Grade FROM classes WHERE id = $1`, classID).Scan(&grade)
     if err != nil {
         if err == sql.ErrNoRows {
             return nil
@@ -1474,7 +1478,7 @@ func (s *Storage) autoAssignClassToParallelLocked(classID int) error {
     var parallelID int
     err = s.db.QueryRow(`
         SELECT Id FROM parallels 
-        WHERE MinGrade <= ? AND MaxGrade >= ?
+        WHERE MinGrade <= $1 AND MaxGrade >= $2
         LIMIT 1
     `, grade, grade).Scan(&parallelID)
 
@@ -1488,8 +1492,9 @@ func (s *Storage) autoAssignClassToParallelLocked(classID int) error {
 
     // Добавляем связь класса с параллелью
     _, err = s.db.Exec(`
-        INSERT OR IGNORE INTO parallel_classes (ParallelID, ClassID)
-        VALUES (?, ?)
+        INSERT INTO parallel_classes (ParallelID, ClassID)
+        VALUES ($1, $2)
+        ON CONFLICT DO NOTHING
     `, parallelID, classID)
 
     return err

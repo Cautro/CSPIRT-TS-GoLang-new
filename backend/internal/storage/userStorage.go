@@ -35,8 +35,8 @@ func (s *Storage) UpdateAvatar(input models.UpdateAvatarRequest, id int) error {
 
 	result, err := s.db.Exec(`
 		UPDATE users
-		SET Avatar = ?
-		WHERE Id = ?
+		SET Avatar = $1
+		WHERE Id = $2
 	`,
 		input.Avatar,
 		id,
@@ -124,7 +124,7 @@ func (s *Storage) AddUser(user models.User) error {
 	query := `
 		INSERT INTO users
 		(Avatar, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	_, err = s.db.Exec(
@@ -220,8 +220,8 @@ func (s *Storage) SaveUser(user models.SafeUser) error {
 
 	query := `
 		UPDATE users
-		SET Avatar = ?, Name = ?, FullName = ?, LastName = ?, Login = ?, Rating = ?, Role = ?, Class = ?, ClassID = ?
-		WHERE Id = ?
+		SET Avatar = $1, Name = $2, FullName = $3, LastName = $4, Login = $5, Rating = $6, Role = $7, Class = $8, ClassID = $9
+		WHERE Id = $10
 	`
 
 	result, err := s.db.Exec(
@@ -383,8 +383,8 @@ func (s *Storage) UpdateUser(id int, req models.UpdateUserRequest, login string)
 
 	_, err = s.db.Exec(`
 		UPDATE users
-		SET Avatar = ?, Name = ?, FullName = ?, LastName = ?, Login = ?, Rating = ?, Role = ?, Class = ?, ClassID = ?
-		WHERE Id = ?
+		SET Avatar = $1, Name = $2, FullName = $3, LastName = $4, Login = $5, Rating = $6, Role = $7, Class = $8, ClassID = $9
+		WHERE Id = $10
 	`,
 		user.Avatar,
 		user.Name,
@@ -426,7 +426,7 @@ func (s *Storage) UpdateRating(login string, rating int) error {
 	}
 
 	rating = clampRating(rating)
-	_, err = s.db.Exec(`UPDATE users SET Rating = ? WHERE Login = ?`, rating, login)
+	_, err = s.db.Exec(`UPDATE users SET Rating = $1 WHERE Login = $2`, rating, login)
 	if err != nil {
 		return err
 	}
@@ -455,7 +455,7 @@ func (s *Storage) DeleteUser(id int, user models.SafeUser) error {
 		return errors.New("user not found")
 	}
 
-	query := `DELETE FROM users WHERE Id = ?`
+	query := `DELETE FROM users WHERE Id = $1`
 	result, err := s.db.Exec(query, id)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -676,7 +676,7 @@ func (s *Storage) getUserByLoginLocked(login string) (*models.User, error) {
 	row := s.db.QueryRow(`
 		SELECT Id, Avatar, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID
 		FROM users
-		WHERE Login = ?
+		WHERE Login = $1
 	`, normalizeLogin(login))
 
 	return scanUser(row)
@@ -686,7 +686,7 @@ func (s *Storage) getUserByIDLocked(id int) (*models.User, error) {
 	row := s.db.QueryRow(`
 		SELECT Id, Avatar, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID
 		FROM users
-		WHERE Id = ?
+		WHERE Id = $1
 	`, id)
 
 	return scanUser(row)

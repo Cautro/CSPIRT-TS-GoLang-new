@@ -11,6 +11,7 @@ import {NotesSection} from "../../../../features/notes/ui/components/notes_secti
 import {ComplaintsSection} from "../../../../features/complaints/ui/components/complaints_section.tsx";
 import {RatingSection} from "../../../../features/rating/ui/components/rating_section.tsx";
 import {useDeleteUser} from "../../../../features/users/hooks/use_delete_user.ts";
+import {UpdateUserModal} from "../../../../features/users/ui/components/update_user_modal.tsx";
 
 export function UserPage() {
     const navigate = useNavigate();
@@ -24,6 +25,7 @@ export function UserPage() {
     
     const [formError, setFormError] = useState<string | null>(null);
     const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
+    const [isUpdateUserModalOpen, setIsUpdateUserModalOpen] = useState(false);
 
     const error = getUser.error?.message ?? null;
     const isLoading = getUser.isLoading;
@@ -77,6 +79,11 @@ export function UserPage() {
             hidden: (normalizedCurrentRole !== "owner"),
             onClick: () => setIsDeleteUserModalOpen(true)
         },
+        {
+            label: "Изменить пользователя",
+            hidden: (normalizedCurrentRole !== "owner"),
+            onClick: () => setIsUpdateUserModalOpen(true)
+        }
     ]
 
     return (
@@ -180,6 +187,15 @@ export function UserPage() {
                         )}
                         
                     </div>
+                )}
+
+                {isUpdateUserModalOpen && (
+                    <UpdateUserModal 
+                        isOpen={isUpdateUserModalOpen}
+                         onClose={() => setIsUpdateUserModalOpen(false)} 
+                         onAddUser={() => setIsUpdateUserModalOpen(false)} 
+                         user={user.User}
+                    />
                 )}
 
                 {isDeleteUserModalOpen && (

@@ -1,8 +1,9 @@
-import { type FormEvent, useEffect, useState } from "react";
+import {type ChangeEvent, type FormEvent, useEffect, useState} from "react";
 import {type UserRole, UserRoles} from "../../../../shared/entities/user/types/user_types.ts";
 import type {addUserValues} from "../../models/add_user_usecase.ts";
 import {useClasses} from "../../../class/hooks/use_classes.ts";
 import {useAddUser} from "../../hooks/use_add_user.ts";
+import {compressImage} from "../../../../core/image/image_compress.ts";
 
 interface AddUserModalProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ export function AddUserModal({isOpen, onClose, onAddUser, classId = null}: AddUs
     const [selectedRole, setSelectedRole] = useState<UserRole>("User");
     const normalizedSelectedRole = selectedRole.toLowerCase();
     const shouldShowClass = normalizedSelectedRole === "user" || normalizedSelectedRole === "helper";
+    const [selectedImage, setSelectedImage] = useState("")
     
     useEffect(() => {
         if (!isOpen) {
@@ -43,16 +45,25 @@ export function AddUserModal({isOpen, onClose, onAddUser, classId = null}: AddUs
         return null;
     }
 
+    const handleChangeImage = async (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const compressed = await compressImage(file, 512, 512, 0.75);
+        setSelectedImage(compressed);
+    };
+
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
         const formData = new FormData(event.currentTarget);
         
         const form: addUserValues = {
+            avatar: selectedImage,
             name: String(formData.get("name") ?? "").trim(),
             lastname: String(formData.get("lastName") ?? "").trim(),
             password: String(formData.get("password") ?? "").trim(),
-            classId: shouldShowClass ? Number(String(formData.get("classId") ?? "")) : 0,
+            classId: classId ?? (shouldShowClass ? Number(String(formData.get("classId") ?? "")) : 0),
             login: String(formData.get("login") ?? "").trim(),
             role: String(formData.get("role") ?? "User").trim() as UserRole,
         };
@@ -63,6 +74,7 @@ export function AddUserModal({isOpen, onClose, onAddUser, classId = null}: AddUs
             onAddUser();
         } finally {
             setIsSubmitting(false);
+            setSelectedImage("")
         }
     }
 
@@ -131,6 +143,46 @@ export function AddUserModal({isOpen, onClose, onAddUser, classId = null}: AddUs
                         )}
 
                         <div className="form-row">
+
+                            <div className="field">
+                                <label className="field__label">
+                                    Иконка пользователя
+                                </label>
+                                <div className="avatar-picker">
+                                    <label htmlFor="avatar-upload" className="avatar-picker__label">
+                                        {selectedImage ? (
+                                            <img
+                                                src={selectedImage}
+                                                alt="preview"
+                                                className="avatar-picker__preview"
+                                            />
+                                        ) : (
+                                            <div className="avatar-picker__placeholder">
+                                                +
+                                            </div>
+                                        )}
+                                    </label>
+
+                                    <input
+                                        id="avatar-upload"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleChangeImage}
+                                        hidden
+                                    />
+
+                                    <button
+                                        type="button"
+                                        className="btn btn--secondary"
+                                        onClick={() =>
+                                            document.getElementById("avatar-upload")?.click()
+                                        }
+                                    >
+                                        Выбрать изображение
+                                    </button>
+                                </div>
+                            </div>
+                            
                             <div className="field">
                                 <label className="field__label" htmlFor="userName">
                                     Имя
@@ -257,7 +309,7 @@ export function AddUserModal({isOpen, onClose, onAddUser, classId = null}: AddUs
                                         </option>
 
                                         {classes.map((item) => (
-                                            <option key={item.Id} value={String(item.Id)}>
+                                            <option key={item.Id} value={item.Id}>
                                                 {item.Name}
                                             </option>
                                         ))}

@@ -3,6 +3,7 @@ import {addUserFormSchema} from "./add_user_chema.ts";
 import {UserApi} from "../../../shared/entities/user/api/user_api.ts";
 
 export type addUserValues = {
+    avatar: string;
     name: string;
     lastname: string;
     password: string;
@@ -14,6 +15,7 @@ export type addUserValues = {
 export async function AddUserUseCase(form: addUserValues): Promise<boolean> {
     
     const dto = {
+        Avatar: form.avatar,
         Name: form.name,
         LastName: form.lastname,
         Password: form.password,
@@ -29,7 +31,7 @@ export async function AddUserUseCase(form: addUserValues): Promise<boolean> {
     const parsed = addUserFormSchema.safeParse(dto);
     
     if (!parsed.success) {
-        throw new Error(JSON.stringify(parsed.error?.format()));
+        throw new Error("Проверьте правильность заполнения полей");
     }
     
     await UserApi.addUser(parsed.data);

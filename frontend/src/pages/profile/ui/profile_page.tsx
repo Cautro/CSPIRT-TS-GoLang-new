@@ -173,7 +173,7 @@ interface InfoRowProps {
     value: ReactNode;
 }
 
-function InfoRow({ label, value }: InfoRowProps) {
+export function InfoRow({ label, value }: InfoRowProps) {
     return (
         <div className="info-row">
             <span className="info-row__label">{label}</span>

@@ -12,9 +12,11 @@ export const NotesSection = ({isYou, notes, setFormError = () => {}, currentUser
   const addNote = useAddNote()
   const deleteNote = useDeleteNote()
   const getUser = useUser(user.Id)
+  const [isSubmiting, setIsSubmitting] = useState(false);
 
   async function handleNoteAdd() {
     setFormError(null);
+    setIsSubmitting(true);
 
     if (!user || !currentUser) {
       setFormError("Не удалось определить пользователя");
@@ -36,7 +38,7 @@ export const NotesSection = ({isYou, notes, setFormError = () => {}, currentUser
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Неизвестная ошибка");
     }
-    
+    setIsSubmitting(false);
   }
   
   return (
@@ -72,10 +74,10 @@ export const NotesSection = ({isYou, notes, setFormError = () => {}, currentUser
             <button
                 className="btn btn--primary"
                 type="button"
-                disabled={!noteText.trim()}
+                disabled={!noteText.trim() || isProfile}
                 onClick={() => void handleNoteAdd()}
             >
-              Добавить заметку
+              {!isSubmiting ? "Добавить заметку" : "Заметка добавляется"}
             </button>
           </div>
         </div>)}

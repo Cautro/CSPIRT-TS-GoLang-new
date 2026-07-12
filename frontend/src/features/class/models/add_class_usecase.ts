@@ -16,7 +16,7 @@ export async function AddClassUsecase(form: addClassFormValues): Promise<boolean
     const parsed = addClassFormSchema.safeParse(dto);
     
     if (!parsed.success) {
-        throw new Error(JSON.stringify(parsed.error?.format()));
+        throw new Error("Проверьте правильность заполнения полей");
     }
     
     await classApi.addClass(parsed.data);

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import {useNavigate, useSearchParams} from "react-router-dom";
+import {Navigate, useNavigate, useSearchParams} from "react-router-dom";
 import { useAuthStore } from "../../../../features/auth/store/auth_store.ts";
 import { AddUserModal } from "../../../../features/users/ui/components/add_user_modal.tsx";
 import {AddClassModal} from "../../../../features/class/ui/components/add_class_modal.tsx";
@@ -12,8 +12,11 @@ import {PageHeader} from "../../../../shared/ui/other/page_header.tsx";
 import {TabsSwitcher, type TabsSwitcherItem} from "../../../../shared/ui/other/tabs_switcher.tsx";
 import {UserRound} from "lucide-react";
 import {useLogout} from "../../../../features/auth/hooks/use_logout.ts";
+import {ParallelsWidget} from "../../../../features/class/ui/components/parallels_widget.tsx";
+import {ConfirmModal} from "../../../../shared/ui/modals/confirm_modal.tsx";
+import {useCompleteYear} from "../../../../features/class/hooks/use_complete_year.ts";
 
-type Lists = "classes" | "events" | "staff";
+type Lists = "classes" | "events" | "staff" | "parallels";
 
 export function DashboardPage() {
     const navigate = useNavigate();
@@ -33,7 +36,10 @@ export function DashboardPage() {
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
     const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
+    const [isYearCompleteModalOpen, setIsYearCompleteModalOpen] = useState(false);
     const [key, setKey] = useState(0);
+    
+    const completeYear = useCompleteYear()
     
     const menuItems: BurgerDrawerMenuItem[] = [
         {
@@ -51,12 +57,21 @@ export function DashboardPage() {
             onClick: () => setIsAddEventModalOpen(true),
             hidden: (normalizedRole !== "owner" || selectedList !== "events"),
         },
+        {
+            label: "Завершить учебный год",
+            onClick: () => setIsYearCompleteModalOpen(true),
+            hidden: (normalizedRole !== "owner"),
+        }
     ]
     
     const tabs: TabsSwitcherItem<Lists>[] = [
         {
             label: "Классы",
             value: "classes",
+        },
+        {
+            label: "Параллели",
+            value: "parallels",
         },
         {
             value: "events",
@@ -72,11 +87,14 @@ export function DashboardPage() {
     if (!role) {
         return null;
     }
+    
+    if (normalizedRole === "public") {
+        return <Navigate to={"/public"}/>
+    }
 
     return (
         <main className="main">
             <section className="page">
-                
                 <PageHeader
                     title={"Рейтинг классов МАОУ СОШ 16-Ф"}
                     description={"Просматривайте список классов, мероприятий и прочую информацию"}
@@ -129,6 +147,21 @@ export function DashboardPage() {
                 {selectedList === "staff" && (
                     <StaffWidget key={key}/>
                 )}
+
+                {selectedList === "parallels" && (
+                    <ParallelsWidget key={key}/>
+                )}
+
+                <ConfirmModal 
+                    content={"Вы уверены что хотите завершить учебный год?"} 
+                    buttonContent={"Завершить"} 
+                    isOpen={isYearCompleteModalOpen} 
+                    onClose={() => setIsYearCompleteModalOpen(false)} 
+                    onConfirm={async () => {
+                        await completeYear.mutateAsync()
+                        setIsYearCompleteModalOpen(false);
+                    }}
+                />
 
                 <AddUserModal
                     isOpen={isAddUserModalOpen}

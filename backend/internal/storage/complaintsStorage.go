@@ -59,7 +59,7 @@ func (s *Storage) AddComplaint(login string, complaint userModels.Complaint, use
 	query := `
 		INSERT INTO complaints
 		(TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt)
-		VALUES (?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
 	CreateAt := time.Now()
@@ -107,7 +107,7 @@ func (s *Storage) DeleteComplaint(id int, user userModels.SafeUser) error {
 		Message: "deleting complaint",
 	})
 
-	query := `DELETE FROM complaints WHERE Id = ?`
+	query := `DELETE FROM complaints WHERE Id = $1`
 
 	check, err := s.hasUserRoleLocked(user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
 	if err != nil {
@@ -224,7 +224,7 @@ func (s *Storage) GetComplaintByID(id int) ([]userModels.Complaint, error) {
 	rows, err := s.db.Query(`
 		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM complaints
-		WHERE Id = ?
+		WHERE Id = $1
 	`, id)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -293,7 +293,7 @@ func (s *Storage) GetComplaintsByUserId(User_id int) ([]userModels.Complaint, er
 	rows, err := s.db.Query(`
 		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM complaints
-		WHERE TargetID = ?
+		WHERE TargetID = $1
 	`, User_id)
 
 	if err != nil {
@@ -362,7 +362,7 @@ func (s *Storage) GetComplaintsByClassID(classID int) ([]userModels.Complaint, e
 		SELECT c.Id, c.TargetID, c.TargetName, c.AuthorID, c.AuthorName, c.Content, c.CreatedAt
 		FROM complaints c
 		JOIN users u ON u.Id = c.TargetID
-		WHERE u.ClassID = ?
+		WHERE u.ClassID = $1
 		ORDER BY c.Id DESC
 	`, classID)
 	if err != nil {

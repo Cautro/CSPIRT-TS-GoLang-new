@@ -2,8 +2,6 @@ package storage
 
 import (
 	"database/sql"
-	"os"
-	"path/filepath"
 	"sync"
 
 	classConfig "cspirt/internal/class/config"
@@ -17,9 +15,7 @@ import (
 type Storage struct {
 	db *sql.DB
 	mu sync.Mutex
-
-	// Repositories expose this SQLite adapter through feature-owned interfaces.
-	// Services depend on these interfaces instead of depending on SQL directly.
+	
 	RatingRepo     ratingRepo.RatingRepository
 	NotesRepo      noteRepo.NoteRepository
 	ComplaintsRepo complaintRepo.ComplaintRepository
@@ -28,20 +24,11 @@ type Storage struct {
 
 	Secret string
 
-	// ParallelsConfig хранит конфигурацию параллелей из .env
 	ParallelsConfig []classConfig.ParallelConfig
 }
 
-// NewUserStorage opens the SQLite adapter and initializes every schema module.
-//
-// The name is kept for compatibility with existing handlers/tests; new code
-// should treat the returned value as the application storage adapter.
 func NewUserStorage(path string, jwtSecret string) (*Storage, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, err
-	}
-
-	db, err := openSQLite(path)
+	db, err := openPostgres(path)
 	if err != nil {
 		return nil, err
 	}

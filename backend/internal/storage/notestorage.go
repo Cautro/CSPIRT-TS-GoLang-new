@@ -22,7 +22,7 @@ func (s *Storage) AddNote(login string, note models.Note, user models.SafeUser) 
 	query := `
 		INSERT INTO notes
 		(TargetID, AuthorID, TargetName, AuthorName, Content, CreatedAt)
-		VALUES (?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 
 	_, err := s.db.Exec(
@@ -59,7 +59,7 @@ func (s *Storage) DeleteNote(id int, user models.SafeUser) error {
 		Role:    user.Role,
 	})
 
-	query := `DELETE FROM notes WHERE Id = ?`
+	query := `DELETE FROM notes WHERE Id = $1`
 	result, err := s.db.Exec(query, id)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -165,7 +165,7 @@ func (s *Storage) GetNotesByUserId(User_id int) ([]models.Note, error) {
 	rows, err := s.db.Query(`
 		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM notes
-		WHERE TargetID = ?
+		WHERE TargetID = $1
 	`, User_id)
 
 	if err != nil {
@@ -234,7 +234,7 @@ func (s *Storage) GetNotesByClassID(classID int) ([]models.Note, error) {
 		SELECT n.Id, n.TargetID, n.TargetName, n.AuthorID, n.AuthorName, n.Content, n.CreatedAt
 		FROM notes n
 		JOIN users u ON u.Id = n.TargetID
-		WHERE u.ClassID = ?
+		WHERE u.ClassID = $1
 		ORDER BY n.Id DESC
 	`, classID)
 	if err != nil {
@@ -298,7 +298,7 @@ func (s *Storage) GetNoteByID(id int) ([]models.Note, error) {
 	rows, err := s.db.Query(`
 		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM notes
-		WHERE Id = ?
+		WHERE Id = $1
 	`, id)
 	if err != nil {
 		return nil, err

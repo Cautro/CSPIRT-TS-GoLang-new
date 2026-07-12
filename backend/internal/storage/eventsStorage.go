@@ -24,7 +24,7 @@ func (s *Storage) ActivateDueEvents() error {
 		UPDATE events
 		SET Status = 'active'
 		WHERE Status IN ('scheduled', 'pending')
-		AND StartedAt <= ?
+		AND StartedAt <= $1
 	`, now)
 
 	return err
@@ -41,7 +41,7 @@ func (s *Storage) GetEventsByID(eventID int) (*models.Event, error) {
 	rows, err := s.db.Query(`
 		SELECT Id, Title, Status, RatingReward, Description, CreatedAt, StartedAt, Players, Classes
 		FROM events
-		WHERE Id = ?
+		WHERE Id = $1
 		LIMIT 1
 	`, eventID)
 	if err != nil {
@@ -159,25 +159,17 @@ func (s *Storage) AddEvent(event models.Event) error {
 
 	createdAt := event.CreatedAt.Format(time.RFC3339)
 
-	result, err := tx.Exec(`
+	var eventID int64
+	err = tx.QueryRow(`
 		INSERT INTO events (Title, Status, RatingReward, Description, CreatedAt, StartedAt, Players, Classes)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, event.Title, event.Status, event.BaseRatingReward, event.Description, createdAt, event.StartedAt, playersJSON, classesJSON)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING Id
+	`, event.Title, event.Status, event.BaseRatingReward, event.Description, createdAt, event.StartedAt, playersJSON, classesJSON).Scan(&eventID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_event",
 			Message: "failed to insert event: " + err.Error(),
-		})
-		return err
-	}
-
-	eventID, err := result.LastInsertId()
-	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "add_event",
-			Message: "failed to get inserted event id: " + err.Error(),
 		})
 		return err
 	}
@@ -227,7 +219,7 @@ func (s *Storage) GetEventParams(eventID int) ([]models.EventParams, error) {
 	rows, err := s.db.Query(`
 		SELECT EventID, ExtraRatingReward, Reason, ClassID
 		FROM event_params
-		WHERE EventID = ?
+		WHERE EventID = $1
 		ORDER BY Id
 	`, eventID)
 	if err != nil {
@@ -271,7 +263,7 @@ func (s *Storage) DeleteEventParams(eventID int) error {
 
 	_, err = tx.Exec(`
 		DELETE FROM event_params
-		WHERE EventID = ?
+		WHERE EventID = $1
 	`, eventID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -324,7 +316,7 @@ func (s *Storage) AddEventParams(eventID int, params *models.EventParams) error 
 
 	_, err = tx.Exec(`
 		INSERT INTO event_params (EventID, ExtraRatingReward, Reason, ClassID)
-		VALUES (?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4)
 	`, eventID, params.ExtraRatingReward, params.Reason, params.ClassID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -365,7 +357,7 @@ func (s *Storage) GetEventPlayers(eventID int) ([]userModels.SafeUser, error) {
 		SELECT EXISTS(
 			SELECT 1
 			FROM events
-			WHERE Id = ?
+			WHERE Id = $1
 		)
 	`, eventID).Scan(&exists); err != nil {
 		return nil, err
@@ -379,7 +371,7 @@ func (s *Storage) GetEventPlayers(eventID int) ([]userModels.SafeUser, error) {
 		SELECT u.Id, u.Name, u.FullName, u.LastName, u.Login, u.Rating, u.Role, u.Class, u.ClassID
 		FROM event_players ep
 		JOIN users u ON u.Id = ep.player_id
-		WHERE ep.event_id = ?
+		WHERE ep.event_id = $1
 		ORDER BY u.LastName, u.Name, u.Login
 	`, eventID)
 	if err != nil {
@@ -439,8 +431,8 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, _ int) error {
 
 	result, err := tx.Exec(`
 		UPDATE events
-		SET Status = 'completed', RatingReward = ?
-		WHERE Id = ? AND Status != 'completed'
+		SET Status = 'completed', RatingReward = $1
+		WHERE Id = $2 AND Status != 'completed'
 	`, ratingReward, eventID)
 	if err != nil {
 		return err
@@ -461,10 +453,10 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, _ int) error {
 
 	for _, classID := range classIDs {
 		rows, err := tx.Query(`
-			SELECT ep.player_id 
+			SELECT ep.player_id
 			FROM event_players ep
 			JOIN users u ON ep.player_id = u.Id
-			WHERE ep.event_id = ? AND u.classID = ?
+			WHERE ep.event_id = $1 AND u.classID = $2
 		`, eventID, classID)
 		if err != nil {
 			return err
@@ -489,8 +481,8 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, _ int) error {
 		for _, playerID := range participantIDs {
 			_, err := tx.Exec(`
 				UPDATE users
-				SET Rating = MAX(0, MIN(5000, Rating + ?))
-				WHERE Id = ?
+				SET Rating = GREATEST(0, LEAST(5000, Rating + $1))
+				WHERE Id = $2
 			`, ratingReward, playerID)
 			if err != nil {
 				return err
@@ -501,8 +493,8 @@ func (s *Storage) EventComplete(eventID int, ratingReward int, _ int) error {
 	for classID, extraRatingReward := range classRewards {
 		_, err = tx.Exec(`
 			UPDATE classes
-			SET ClassTotalRating = ClassTotalRating + ?
-			WHERE Id = ?
+			SET ClassTotalRating = ClassTotalRating + $1
+			WHERE Id = $2
 		`, extraRatingReward, classID)
 		if err != nil {
 			return err
@@ -531,7 +523,7 @@ func getEventClassRewardsTx(tx *sql.Tx, eventID int) (map[int]int, []int, error)
 	rows, err := tx.Query(`
 		SELECT ClassID, SUM(ExtraRatingReward)
 		FROM event_params
-		WHERE EventID = ? AND ClassID > 0
+		WHERE EventID = $1 AND ClassID > 0
 		GROUP BY ClassID
 	`, eventID)
 	if err != nil {
@@ -568,7 +560,7 @@ func (s *Storage) GetEventsByUserID(userID int) ([]models.Event, error) {
 		SELECT e.Id, e.Title, e.Status, e.RatingReward, e.Description, e.CreatedAt, e.StartedAt, e.Players, e.Classes
 		FROM events e
 		JOIN event_players ep ON ep.event_id = e.Id
-		WHERE ep.player_id = ?
+		WHERE ep.player_id = $1
 		ORDER BY e.Id
 	`, userID)
 	if err != nil {
@@ -587,7 +579,7 @@ func (s *Storage) GetEventsByClassID(classID int) ([]models.Event, error) {
 		SELECT e.Id, e.Title, e.Status, e.RatingReward, e.Description, e.CreatedAt, e.StartedAt, e.Players, e.Classes
 		FROM events e
 		JOIN event_classes ec ON ec.event_id = e.Id
-		WHERE ec.class_id = ?
+		WHERE ec.class_id = $1
 		ORDER BY e.Id
 	`, classID)
 	if err != nil {
@@ -619,7 +611,7 @@ func (s *Storage) DeleteEvent(eventID int) error {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`DELETE FROM event_players WHERE event_id = ?`, eventID); err != nil {
+	if _, err := tx.Exec(`DELETE FROM event_players WHERE event_id = $1`, eventID); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_event",
@@ -627,7 +619,7 @@ func (s *Storage) DeleteEvent(eventID int) error {
 		})
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM event_classes WHERE event_id = ?`, eventID); err != nil {
+	if _, err := tx.Exec(`DELETE FROM event_classes WHERE event_id = $1`, eventID); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_event",
@@ -636,7 +628,7 @@ func (s *Storage) DeleteEvent(eventID int) error {
 		return err
 	}
 
-	result, err := tx.Exec(`DELETE FROM events WHERE Id = ?`, eventID)
+	result, err := tx.Exec(`DELETE FROM events WHERE Id = $1`, eventID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -754,7 +746,7 @@ func (s *Storage) AddPlayersToEvent(eventID int, playerIDs []int, login string) 
 	}
 
 	if _, err := tx.Exec(
-		`UPDATE events SET Players = ?, Classes = ? WHERE Id = ?`,
+		`UPDATE events SET Players = $1, Classes = $2 WHERE Id = $3`,
 		playersJSON, classesJSON, eventID,
 	); err != nil {
 		return err
@@ -788,8 +780,8 @@ func (s *Storage) UpdateEventParams(eventID int, params *models.EventParams) err
 
 	result, err := tx.Exec(`
 		UPDATE event_params
-		SET ExtraRatingReward = ?, Reason = ?, ClassID = ?
-		WHERE EventID = ? AND ClassID = ?
+		SET ExtraRatingReward = $1, Reason = $2, ClassID = $3
+		WHERE EventID = $4 AND ClassID = $5
 	`, params.ExtraRatingReward, params.Reason, params.ClassID, eventID, params.ClassID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -876,8 +868,8 @@ func (s *Storage) UpdateEvent(eventID int, updatedEvent *models.Event) error {
 
 	if _, err := tx.Exec(`
 		UPDATE events
-		SET Title = ?, Status = ?, RatingReward = ?, Description = ?, CreatedAt = ?, StartedAt = ?, Players = ?, Classes = ?
-		WHERE Id = ?
+		SET Title = $1, Status = $2, RatingReward = $3, Description = $4, CreatedAt = $5, StartedAt = $6, Players = $7, Classes = $8
+		WHERE Id = $9
 	`, updatedEvent.Title, updatedEvent.Status, updatedEvent.BaseRatingReward, updatedEvent.Description, updatedEvent.CreatedAt.Format(time.RFC3339), updatedEvent.StartedAt, updatedEvent.Players, updatedEvent.Classes, eventID); err != nil {
 		return err
 	}
@@ -930,7 +922,7 @@ func (s *Storage) DeletePlayersFromEvent(eventID int, playerIDs []int) error {
 	for _, playerID := range playerIDs {
 		if _, err := tx.Exec(`
 			DELETE FROM event_players
-			WHERE event_id = ? AND player_id = ?
+			WHERE event_id = $1 AND player_id = $2
 		`, eventID, playerID); err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
@@ -941,7 +933,7 @@ func (s *Storage) DeletePlayersFromEvent(eventID int, playerIDs []int) error {
 		}
 	}
 
-	if _, err := tx.Exec(`UPDATE events SET Players = ? WHERE Id = ?`, playersJSON, eventID); err != nil {
+	if _, err := tx.Exec(`UPDATE events SET Players = $1 WHERE Id = $2`, playersJSON, eventID); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_event_players",
@@ -972,7 +964,7 @@ func (s *Storage) getEventPlayersLocked(eventID int) ([]int, error) {
 	err := s.db.QueryRow(`
 		SELECT Players
 		FROM events
-		WHERE Id = ?
+		WHERE Id = $1
 	`, eventID).Scan(&playersJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -989,7 +981,7 @@ func (s *Storage) getEventClassesLocked(eventID int) ([]int, error) {
 	err := s.db.QueryRow(`
 		SELECT Classes
 		FROM events
-		WHERE Id = ?
+		WHERE Id = $1
 	`, eventID).Scan(&classesJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -1006,11 +998,11 @@ func (s *Storage) getEventClassIDsForRatingLocked(eventID int) ([]int, error) {
 		SELECT DISTINCT u.ClassID
 		FROM users u
 		JOIN event_players ep ON ep.player_id = u.Id
-		WHERE ep.event_id = ? AND u.ClassID > 0
+		WHERE ep.event_id = $1 AND u.ClassID > 0
 		UNION
 		SELECT class_id
 		FROM event_classes
-		WHERE event_id = ?
+		WHERE event_id = $2
 	`, eventID, eventID)
 	if err != nil {
 		return nil, err
@@ -1044,7 +1036,7 @@ func (s *Storage) getClassIDsByPlayerIDsLocked(playerIDs []int) ([]int, error) {
 		err := s.db.QueryRow(`
 			SELECT ClassID
 			FROM users
-			WHERE Id = ? AND ClassID > 0
+			WHERE Id = $1 AND ClassID > 0
 		`, playerID).Scan(&classID)
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -1064,8 +1056,9 @@ func insertEventPlayers(tx *sql.Tx, eventID int, playerIDs []int) error {
 			continue
 		}
 		if _, err := tx.Exec(`
-			INSERT OR IGNORE INTO event_players (event_id, player_id)
-			VALUES (?, ?)
+			INSERT INTO event_players (event_id, player_id)
+			VALUES ($1, $2)
+			ON CONFLICT DO NOTHING
 		`, eventID, playerID); err != nil {
 			return err
 		}
@@ -1080,8 +1073,9 @@ func insertEventClasses(tx *sql.Tx, eventID int, classIDs []int) error {
 			continue
 		}
 		if _, err := tx.Exec(`
-			INSERT OR IGNORE INTO event_classes (event_id, class_id)
-			VALUES (?, ?)
+			INSERT INTO event_classes (event_id, class_id)
+			VALUES ($1, $2)
+			ON CONFLICT DO NOTHING
 		`, eventID, classID); err != nil {
 			return err
 		}

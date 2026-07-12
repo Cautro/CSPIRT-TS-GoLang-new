@@ -5,7 +5,7 @@ import type {ClassType} from "../../../../shared/entities/class/types/class_type
 
 export function ClassesWidget() {
     const navigate = useNavigate();
-    const {data, isLoading, error} = useClasses();
+    const {data, isLoading, error}   = useClasses();
     const classes = data as ClassType[];
     
     return (

@@ -28,7 +28,7 @@ export class ApiClient {
             target.hostname === "127.0.0.1";
 
         if (AppConfig.IS_PROD && target.protocol !== "https:" && !isLocalhost) {
-            throw new Error("Небезопасное HTTP-соединение запрещено в production");
+            throw new Error("Небезопасное HTTP-соединение");
         }
     }
 

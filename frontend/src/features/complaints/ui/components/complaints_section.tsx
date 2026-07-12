@@ -12,9 +12,11 @@ export const ComplaintsSection = ({complaints, isYou, user, currentUser, setForm
     const deleteComplaint = useDeleteComplaint();
     const getUser = useUser(user.Id);
     const addComplaint = useAddComplaint();
+    const [isSubmiting, setIsSubmitting] = useState(false);
 
     async function handleComplaintAdd() {
         setFormError(null);
+        setIsSubmitting(true);
 
         if (!user || !currentUser) {
             setFormError("Не удалось определить пользователя");
@@ -35,6 +37,7 @@ export const ComplaintsSection = ({complaints, isYou, user, currentUser, setForm
         } catch (e) {
             setFormError(e instanceof Error ? e.message : "Неизвестная ошибка");
         }
+        setIsSubmitting(false); 
     }
     
     return (
@@ -79,10 +82,10 @@ export const ComplaintsSection = ({complaints, isYou, user, currentUser, setForm
                     <button
                         className="btn btn--danger"
                         type="button"
-                        disabled={!complaintText.trim()}
+                        disabled={!complaintText.trim() || isSubmiting}
                         onClick={() => void handleComplaintAdd()}
                     >
-                        Отправить жалобу
+                        {!isSubmiting ? "Отправить жалобу" : "Жалоба отправляется..."}
                     </button>
                 </div>
             </div>)}

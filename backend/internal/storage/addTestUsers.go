@@ -63,9 +63,10 @@ func (s *Storage) SeedTestUsers() error {
 	defer tx.Rollback()
 
 	query := `
-		INSERT OR IGNORE INTO users
+		INSERT INTO users
 		(Avatar, Name, FullName, LastName, Login, Password, Rating, Role, Class)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT DO NOTHING
 	`
 
 	for _, user := range users {
