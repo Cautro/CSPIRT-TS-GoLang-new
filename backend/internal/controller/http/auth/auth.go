@@ -6,6 +6,7 @@ import (
 	sr "cspirt/internal/usecase/auth"
 	"cspirt/pkg/logger"
 	"cspirt/internal/controller/http/middleware-JWT"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -42,6 +43,17 @@ func LoginHandler(authService *sr.AuthUsecase) gin.HandlerFunc {
 
 		result, err := authService.Login(input)
 		if err != nil {
+			if errors.Is(err, sr.ErrTooManyLoginAttempts) {
+				logger.WriteSafe(logger.LogEntry{
+					Level:   "info",
+					Action:  "login",
+					Login:   input.Login,
+					Message: "rate limited: too many attempts",
+				})
+				c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+				return
+			}
+
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "login",

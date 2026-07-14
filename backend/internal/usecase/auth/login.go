@@ -3,6 +3,7 @@ package service
 import (
 	// "cspirt/internal/logger"
 	"cspirt/internal/domain/auth"
+	cacheRepo "cspirt/internal/domain/cache/repo"
 	"cspirt/internal/domain/user/repo"
 	"cspirt/internal/controller/http/middleware-JWT"
 	// "crypto/rand"
@@ -14,6 +15,7 @@ import (
 
 type AuthUsecase struct {
 	users     repo.UserRepository
+	cache     cacheRepo.CacheRepository
 	jwtSecret string
 }
 
@@ -22,9 +24,13 @@ type LoginResult struct {
 	RefreshToken string
 }
 
-func NewAuthService(users repo.UserRepository, jwtSecret string) *AuthUsecase {
+// NewAuthService builds the auth usecase. cache may be nil, in which case
+// rate limiting and token revocation are silently disabled (see
+// internal/adapter/redis/README.md).
+func NewAuthService(users repo.UserRepository, jwtSecret string, cache cacheRepo.CacheRepository) *AuthUsecase {
 	return &AuthUsecase{
 		users:     users,
+		cache:     cache,
 		jwtSecret: jwtSecret,
 	}
 }
@@ -33,6 +39,10 @@ func (s *AuthUsecase) Login(in entity.LoginInput) (LoginResult, error) {
 	in.Login = strings.TrimSpace(in.Login)
 	if in.Login == "" || in.Password == "" {
 		return LoginResult{}, nil
+	}
+
+	if s.checkLoginRateLimit(in.Login) {
+		return LoginResult{}, ErrTooManyLoginAttempts
 	}
 
 	user, err := s.users.GetUserByLogin(in.Login)
@@ -63,6 +73,8 @@ func (s *AuthUsecase) Login(in entity.LoginInput) (LoginResult, error) {
 	if err := s.users.SaveRefreshToken(user.ID, refreshToken, expiresAt); err != nil {
 		return LoginResult{}, err
 	}
+
+	s.resetLoginRateLimit(in.Login)
 
 	return LoginResult{
 		Token:        accessToken,

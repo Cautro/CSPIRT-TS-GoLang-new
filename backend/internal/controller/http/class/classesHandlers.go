@@ -159,7 +159,7 @@ func UpdateClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 // @Router /api/classes/parallel [get]
 func GetParallelClassesHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		parallelClasses, err := ClassUsecase.GetParallelClasses()
+		parallelClasses, err := ClassUsecase.GetParallelClass()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
 			return
@@ -216,7 +216,7 @@ func GetParallelClassByIDHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc 
 			return
 		}
 
-		parallelClasses, err := ClassUsecase.GetParallelClasses()
+		parallelClasses, err := ClassUsecase.GetParallelClass()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
 			return
@@ -259,7 +259,7 @@ func GetParallelClassUsersHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc
 			return
 		}
 
-		parallelClasses, err := ClassUsecase.GetParallelClasses()
+		parallelClasses, err := ClassUsecase.GetParallelClass()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
 			return
@@ -315,7 +315,8 @@ func CompleteQuarterHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			return
 		}
 
-		classes, err := ClassUsecase.CompleteQuarter(parallelClassId)
+		login := c.GetString("Login"); if login == "" { c.JSON(400, gin.H{"Error": "Error to take you're login"}); return }
+		classes, err := ClassUsecase.CompleteQuarter(parallelClassId, login)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete quarter"})
 			return
@@ -337,7 +338,9 @@ func YearComplete(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var classes []*classModels.Class
 		var err error
-		if classes, err = ClassUsecase.YearComplete(); err != nil {
+
+		login := c.GetString("Login"); if login == "" { c.JSON(400, gin.H{"Error": "Error to take you're login"}); return }
+		if classes, err = ClassUsecase.YearComplete(login); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete year"})
 			return
 		}
@@ -399,7 +402,7 @@ func GetClassesInParallelHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc 
 			return
 		}
 
-		classes, err := ClassUsecase.GetClassesInParallel(parallelClassId)
+		classes, err := ClassUsecase.GetClassInParallel(parallelClassId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve classes in parallel"})
 			return

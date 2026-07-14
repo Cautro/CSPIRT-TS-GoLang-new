@@ -7,11 +7,10 @@ import (
 
 var ErrPermissionDenied = errors.New("permission denied")
 
-func (s *UsersUsecase) DeleteUserHandlerService(id int) error {
-	user, err := s.userRepo.GetUserByID(id); if err != nil { return err }
-	check := s.checkUserRole(user.Login, string(ratingModels.RoleOwner)); if check != nil { return check }
+func (s *UsersUsecase) DeleteUserHandlerService(id int, login string) error {
+	check := s.checkUserRole(login, string(ratingModels.RoleOwner)); if check != nil { return check }
 
-	err = s.userRepo.DeleteUser(id)
+	err := s.userRepo.DeleteUser(id)
 	if err == errors.New("user not found") {
 		return errors.New("user not found")
 	} else if err != nil {

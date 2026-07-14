@@ -1,25 +1,29 @@
 package usecase
 
 import (
+	config "cspirt/internal/controller/http/class/config"
+	permission "cspirt/internal/controller/permission/usecase"
 	classModels "cspirt/internal/domain/class"
 	"cspirt/internal/domain/class/repo"
 	userModels "cspirt/internal/domain/user"
-	config "cspirt/internal/controller/http/class/config"
+	userRepo "cspirt/internal/domain/user/repo"
 	"fmt"
 )
 
 type ClassUsecase struct { 
-	classes repo.ClassRepository
+	classRepo repo.ClassRepository
+	userRepo  userRepo.UserRepository
 }
 
-func NewClassUsecase(classes repo.ClassRepository) *ClassUsecase {
+func NewClassUsecase(classRepo repo.ClassRepository, user userRepo.UserRepository) *ClassUsecase {
 	return &ClassUsecase{
-		classes: classes,
+		classRepo: classRepo,
+		userRepo: user,
 	}
 }
 
 func (s *ClassUsecase) InitializeParallelsFromConfig(targetConfigs []config.ParallelConfig) error {
-	existingParallels, err := s.GetParallelClasses()
+	existingParallels, err := s.GetParallelClass()
 	if err != nil {
 		return fmt.Errorf("failed to fetch existing parallels: %w", err)
 	}
@@ -53,13 +57,13 @@ func (s *ClassUsecase) InitializeParallelsFromConfig(targetConfigs []config.Para
 }
 
 func (s *ClassUsecase) GetClassIDsByRange(minGrade, maxGrade int) ([]int, error) {
-	classes, err := s.classes.GetAllClasses()
+	classRepo, err := s.classRepo.GetAllClasses()
 	if err != nil {
 		return nil, err
 	}
 
 	var ids []int
-	for _, class := range classes {
+	for _, class := range classRepo {
 		if class.Grade >= minGrade && class.Grade <= maxGrade {
 			ids = append(ids, class.ID)
 		}
@@ -73,88 +77,107 @@ func (s *ClassUsecase) AddParallelByGradeRange(name string, minGrade, maxGrade i
 		return err
 	}
 	
-	return s.classes.AddParallel(name, ids)
+	return s.classRepo.AddParallel(name, ids)
 }
 
 func (s *ClassUsecase) GetAllClassTeachers() ([]userModels.SafeUser, error) {
-	return s.classes.GetAllClassTeachers()
+	return s.classRepo.GetAllClassTeachers()
 } 
 
-func (s *ClassUsecase) AddParallelClass(name string, classesIDs []int, login string) error {
-	return s.classes.AddParallel(name, classesIDs)
+func (s *ClassUsecase) AddParallelClass(name string, classRepoIDs []int, login string) error {
+	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return err }
+	check := permission.CanManageClasses(user.Role); if !check { return err }
+
+	return s.classRepo.AddParallel(name, classRepoIDs)
 }
 
-func (s *ClassUsecase) GetParallelClasses() ([]classModels.ParallelClass, error) {
-	parallelClasses, err := s.classes.GetParallelClasses()
+func (s *ClassUsecase) GetParallelClass() ([]classModels.ParallelClass, error) {
+	parallelclassRepo, err := s.classRepo.GetParallelClasses()
 	if err != nil {
 		return nil, err
 	}
-	if parallelClasses == nil {
+	if parallelclassRepo == nil {
 		return []classModels.ParallelClass{}, nil
 	}
 
-	return parallelClasses, nil
+	return parallelclassRepo, nil
 }
 
 func (s *ClassUsecase) UpdateClass(classID int, input classModels.ClassInput, login string) error {
-	return s.classes.UpdateClass(classID, input, login)
+	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return err }
+	check := permission.CanManageClasses(user.Role); if !check { return err }
+	
+	return s.classRepo.UpdateClass(classID, input, login)
 }
 
-func (s *ClassUsecase) GetClassesInParallel(parallelID int) ([]classModels.Class, error) {
-	return s.classes.GetClassesInParallel(parallelID)
+func (s *ClassUsecase) GetClassInParallel(parallelID int) ([]classModels.Class, error) {
+	return s.classRepo.GetClassesInParallel(parallelID)
 }
 
 func (s *ClassUsecase) GetBestClassInParallel(parallelID int) (*classModels.Class, error) {
-	parallelClasses, err := s.classes.GetParallelClasses()
+	parallelclassRepo, err := s.classRepo.GetParallelClasses()
 	if err != nil {
 		return nil, err
 	}
-	for _, parallelClass := range parallelClasses {
+	for _, parallelClass := range parallelclassRepo {
 		if parallelClass.ID == parallelID {
-			return s.classes.GetClassByID(parallelClass.BestClassID)
+			return s.classRepo.GetClassByID(parallelClass.BestClassID)
 		}
 	}
 	return nil, nil
 }
 
-func (s *ClassUsecase) YearComplete() ([]*classModels.Class, error) {
-	return s.classes.YearComplete()
+func (s *ClassUsecase) YearComplete(login string) ([]*classModels.Class, error) {
+	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return []*classModels.Class{}, err }
+	check := permission.CanManageClasses(user.Role); if !check { return []*classModels.Class{}, err }
+
+	return s.classRepo.YearComplete()
 }
 
-func (s *ClassUsecase) CompleteQuarter(parallelClassId int) ([]*classModels.Class, error) {
-	return s.classes.QuarterComplete(parallelClassId)
+func (s *ClassUsecase) CompleteQuarter(parallelClassId int, login string) ([]*classModels.Class, error) {
+	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return []*classModels.Class{}, err }
+	check := permission.CanManageClasses(user.Role); if !check { return []*classModels.Class{}, err }
+
+	return s.classRepo.QuarterComplete(parallelClassId)
 }
 
 func (s *ClassUsecase) DeleteParallelClass(parallelClassID int, login string) error {
-	return s.classes.DeleteParallelClassByID(parallelClassID, login)
+	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return err }
+	check := permission.CanManageClasses(user.Role); if !check { return err }
+
+
+	return s.classRepo.DeleteParallelClassByID(parallelClassID, login)
 }
 
 func (s *ClassUsecase) AddClass(input classModels.ClassInput, login string) error {
-	return s.classes.AddClass(input, login)
+	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return err }
+	check := permission.CanManageClasses(user.Role); if !check { return err }
+
+	return s.classRepo.AddClass(input, login)
 }
 
 func (s *ClassUsecase) DeleteClass(classID int, login string) error {
-	return s.classes.DeleteClassByID(classID, login)
+	return s.classRepo.DeleteClassByID(classID, login)
 }
 
 func (s *ClassUsecase) GetAllClasses() ([]classModels.Class, error) {
-	classes, err := s.classes.GetAllClasses()
+	classRepo, err := s.classRepo.GetAllClasses()
 	if err != nil {
 		return nil, err
 	}
-	if classes == nil {
+	if classRepo == nil {
 		return []classModels.Class{}, nil
 	}
 
-	return classes, nil
+	return classRepo, nil
 }
 
 func (s *ClassUsecase) GetClassByID(classID int) (*classModels.Class, error) {
-	return s.classes.GetClassByID(classID)
+	return s.classRepo.GetClassByID(classID)
 }
 
 func (s *ClassUsecase) GetUsersByClassID(classID int) ([]userModels.SafeUser, error) {
-	users, err := s.classes.GetUsersByClassID(classID)
+	users, err := s.classRepo.GetUsersByClassID(classID)
 	if err != nil {
 		return nil, err
 	}
@@ -166,9 +189,9 @@ func (s *ClassUsecase) GetUsersByClassID(classID int) ([]userModels.SafeUser, er
 }
 
 func (s *ClassUsecase) GetClassTeacher(classID int) (*userModels.SafeUser, error) {
-	return s.classes.GetClassTeacherByID(classID)
+	return s.classRepo.GetClassTeacherByID(classID)
 }
 
 func (s *ClassUsecase) SetClassTeacher(classID int, teacherLogin string) error {
-	return s.classes.SaveClassTeacherByID(classID, teacherLogin)
+	return s.classRepo.SaveClassTeacherByID(classID, teacherLogin)
 }

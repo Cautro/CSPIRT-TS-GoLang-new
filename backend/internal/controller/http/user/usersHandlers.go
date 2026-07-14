@@ -5,6 +5,7 @@ import (
 	permissionService "cspirt/internal/controller/permission/usecase"
 	ratMod "cspirt/internal/domain/rating"
 	models "cspirt/internal/domain/user"
+	authUsecase "cspirt/internal/usecase/auth"
 	sr "cspirt/internal/usecase/user"
 
 	"net/http"
@@ -120,7 +121,7 @@ func UpdateAvatarHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 // @Produce json
 // @Success 200 {object} map[string]string
 // @Router /api/user/logout [patch]
-func LogoutHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
+func LogoutHandler(userService *sr.UsersUsecase, authService *authUsecase.AuthUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if token, err := c.Cookie("refresh_token"); err == nil {
 			if err := userService.DeleteRefreshToken(token); err != nil {
@@ -128,6 +129,16 @@ func LogoutHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 					Level:   "error",
 					Action:  "logout",
 					Message: "failed to delete refresh token from db: " + err.Error(),
+				})
+			}
+		}
+
+		if token, err := c.Cookie("access_token"); err == nil {
+			if err := authService.Logout(token); err != nil {
+				logger.WriteSafe(logger.LogEntry{
+					Level:   "error",
+					Action:  "logout",
+					Message: "failed to blacklist access token: " + err.Error(),
 				})
 			}
 		}
@@ -336,16 +347,12 @@ func DeleteUserHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 		}
 
 		if login == "" {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "delete_user",
-				Message: "invalid login or token",
-			})
+			logger.WriteSafe(logger.LogEntry{ Level: "info", Action: "delete_user", Message: "invalid login or token" })
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
-		if err := userService.DeleteUserHandlerService(idInt); err != nil {
+		if err := userService.DeleteUserHandlerService(idInt, login); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

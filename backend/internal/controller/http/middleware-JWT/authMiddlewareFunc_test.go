@@ -19,7 +19,7 @@ func TestAuthMiddlewareAcceptsAccessTokenCookie(t *testing.T) {
 	}
 
 	router := gin.New()
-	router.GET("/api/private", AuthMiddleware(secret), func(c *gin.Context) {
+	router.GET("/api/private", AuthMiddleware(secret, nil), func(c *gin.Context) {
 		login, ok := c.Get("Login")
 		if !ok {
 			t.Fatal("login was not set in context")
@@ -49,7 +49,7 @@ func TestAuthMiddlewareRequiresBearerOrAccessTokenCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.GET("/api/private", AuthMiddleware("test-secret"), func(c *gin.Context) {
+	router.GET("/api/private", AuthMiddleware("test-secret", nil), func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 

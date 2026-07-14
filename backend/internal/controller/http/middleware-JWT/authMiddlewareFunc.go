@@ -1,10 +1,14 @@
 package utils
 
 import (
+	entity "cspirt/internal/domain/auth"
+	cacheRepo "cspirt/internal/domain/cache/repo"
 	"cspirt/pkg/logger"
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -17,7 +21,10 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
+// AuthMiddleware validates the JWT on every request. cache may be nil, in
+// which case revoked-token checking is silently disabled (see
+// internal/adapter/redis/README.md).
+func AuthMiddleware(jwtSecret string, cache cacheRepo.CacheRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString, errMessage := accessTokenFromRequest(c)
 		if errMessage != "" {
@@ -70,9 +77,45 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
+		if isTokenBlacklisted(cache, tokenString) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "token revoked"})
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "info",
+				Action:  "auth_middleware",
+				Login:   claims.Login,
+				Message: "token revoked",
+			})
+			c.Abort()
+			return
+		}
+
 		c.Set("Login", claims.Login)
 		c.Next()
 	}
+}
+
+// isTokenBlacklisted reports whether tokenString was revoked via logout.
+// Fails open (returns false) on a nil cache or a Redis error so an outage
+// never locks every user out - see internal/adapter/redis/README.md.
+func isTokenBlacklisted(cache cacheRepo.CacheRepository, tokenString string) bool {
+	if cache == nil {
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	exists, err := cache.Exists(ctx, entity.BlacklistTokenKey(tokenString))
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "auth_middleware",
+			Message: "redis unavailable, failing open: " + err.Error(),
+		})
+		return false
+	}
+
+	return exists
 }
 
 func accessTokenFromRequest(c *gin.Context) (string, string) {

@@ -23,6 +23,7 @@ import (
 	scheduleUsecase "cspirt/internal/usecase/schedule"
 	classUsecase "cspirt/internal/usecase/class"
 	usersUsecase "cspirt/internal/usecase/user"
+	cacheRepo "cspirt/internal/domain/cache/repo"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,6 +38,7 @@ type Usecases struct {
 	Rating     *ratingUsecase.RatingsUsecase
 	Schedule   *scheduleUsecase.ScheduleUsecase
 	Permission *permissionUsecase.Usecase
+	Cache      cacheRepo.CacheRepository
 	JWTSecret  string
 }
 
@@ -56,7 +58,7 @@ func registerPublicRoutes(router *gin.Engine, s Usecases) {
 }
 
 func registerAuthenticatedRoutes(router *gin.Engine, s Usecases) {
-	auth := router.Group("/api", utils.AuthMiddleware(s.JWTSecret))
+	auth := router.Group("/api", utils.AuthMiddleware(s.JWTSecret, s.Cache))
 
 	registerUserRoutes(auth, s)
 	registerClassRoutes(auth, s)
@@ -73,7 +75,7 @@ func registerUserRoutes(auth *gin.RouterGroup, s Usecases) {
 	auth.PATCH("/user/add", userHandlers.AddUserHandler(s.Users))
 	auth.DELETE("/user/delete/:id", userHandlers.DeleteUserHandler(s.Users))
 	auth.GET("/me", userHandlers.GetMeHandler(s.Users))
-	auth.PATCH("/user/logout", userHandlers.LogoutHandler(s.Users))
+	auth.PATCH("/user/logout", userHandlers.LogoutHandler(s.Users, s.Auth))
 	auth.PATCH("/user/update", userHandlers.UpdateUserHandler(s.Users, s.Permission))
 	auth.PATCH("/user/update/avatar", userHandlers.UpdateAvatarHandler(s.Users))
 }
