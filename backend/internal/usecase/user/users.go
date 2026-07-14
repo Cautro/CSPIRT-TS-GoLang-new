@@ -7,7 +7,7 @@ import (
 	notesRepo "cspirt/internal/domain/note/repo"
 	userRepo "cspirt/internal/domain/user/repo"
 	models "cspirt/internal/domain/user"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/utils"
 	eventDomain "cspirt/internal/domain/event"
 )
 

@@ -4,7 +4,8 @@ import (
 	entity "cspirt/internal/domain/user"
 	ratMod "cspirt/internal/domain/rating"
 	"cspirt/internal/domain/user/repo" 
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/utils"
+	middleware "cspirt/internal/controller/http/middleware-JWT"
 	"database/sql"
 	"cspirt/pkg/logger"
 	"encoding/json"
@@ -106,7 +107,7 @@ func (r *postgresRepository) AddUser(user entity.User) error {
 		return err
 	}
 
-	passwordHash, err := utils.HashPassword(user.Password)
+	passwordHash, err := middleware.HashPassword(user.Password)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",

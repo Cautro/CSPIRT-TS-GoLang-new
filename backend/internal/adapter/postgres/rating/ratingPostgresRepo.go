@@ -3,7 +3,7 @@ package repo
 import (
 	userModels "cspirt/internal/domain/user"
 	"cspirt/internal/domain/rating/repo"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/utils"
 	"database/sql"
 	"encoding/json"
 	"errors"

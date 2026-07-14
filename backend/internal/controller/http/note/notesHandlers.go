@@ -9,7 +9,7 @@ import (
 	ratingModels "cspirt/internal/domain/rating"
 	models "cspirt/internal/domain/user"
 	usersvc "cspirt/internal/usecase/user"
-	u "cspirt/internal/utils"
+	u "cspirt/internal/controller/utils"
 	"errors"
 
 	"net/http"

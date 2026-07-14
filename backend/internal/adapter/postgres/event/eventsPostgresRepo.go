@@ -12,7 +12,7 @@ import (
 	"cspirt/internal/domain/event/repo"
 	ratingModels "cspirt/internal/domain/rating"
 	userModels "cspirt/internal/domain/user"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/utils"
 	"cspirt/pkg/logger"
 )
 

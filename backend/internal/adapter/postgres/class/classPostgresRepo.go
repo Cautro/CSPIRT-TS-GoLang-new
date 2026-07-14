@@ -7,7 +7,7 @@ import (
 	"cspirt/pkg/logger"
 	ratingModels "cspirt/internal/domain/rating"
 	userModels "cspirt/internal/domain/user"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/utils"
 	"database/sql"
 	"encoding/json"
 	"errors"

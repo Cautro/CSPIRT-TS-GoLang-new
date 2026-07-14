@@ -2,7 +2,7 @@ package storage
 
 import (
 	models "cspirt/internal/domain/user"
-	utils "cspirt/internal/utils"
+	utils "cspirt/internal/controller/http/middleware-JWT"
 	"database/sql"
 	"encoding/json"
 )

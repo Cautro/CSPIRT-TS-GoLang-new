@@ -8,11 +8,13 @@ import (
 
 const AccessTokenTTL = 72 * time.Hour
 
-func GenerateToken(login, jwtSecret string) (string, error) {
+func GenerateToken(id int, login, role, jwtSecret string) (string, error) {
 	now := time.Now()
 
 	claims := Claims{
+		Id: id,
 		Login: login,
+		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(AccessTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),

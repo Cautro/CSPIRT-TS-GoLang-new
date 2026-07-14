@@ -11,7 +11,7 @@ import (
 	ratingHandlers "cspirt/internal/controller/http/rating"
 	scheduleHandlers "cspirt/internal/controller/http/schedule"
 	userHandlers "cspirt/internal/controller/http/user"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/http/middleware-JWT"
 
 	// usecase
 	ratingUsecase "cspirt/internal/usecase/rating"

@@ -4,7 +4,7 @@ import (
 	ratingModels "cspirt/internal/domain/rating"
 	"cspirt/internal/domain/complaint/repo"
 	models "cspirt/internal/domain/user"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/utils"
 	"cspirt/pkg/logger"
 	"database/sql"
 	"errors"

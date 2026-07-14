@@ -13,7 +13,7 @@ func TestAuthMiddlewareAcceptsAccessTokenCookie(t *testing.T) {
 
 	const secret = "test-secret"
 
-	token, err := GenerateToken("cookie-user", secret)
+	token, err := GenerateToken(12, "cookie-user", "test", secret)
 	if err != nil {
 		t.Fatalf("generate token returned error: %v", err)
 	}

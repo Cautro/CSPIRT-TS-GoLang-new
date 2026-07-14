@@ -2,7 +2,7 @@ package storage
 
 import (
 	userModels "cspirt/internal/domain/user"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/utils"
 	"database/sql"
 	"encoding/json"
 )

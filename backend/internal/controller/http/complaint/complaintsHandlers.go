@@ -8,7 +8,7 @@ import (
 	permissionService "cspirt/internal/controller/permission/usecase"
 	ratingModels "cspirt/internal/domain/rating"
 	usersvc "cspirt/internal/usecase/user"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/utils"
 	"errors"
 
 	"net/http"

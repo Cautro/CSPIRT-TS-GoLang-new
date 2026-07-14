@@ -5,7 +5,7 @@ import (
 	models "cspirt/internal/domain/auth"
 	sr "cspirt/internal/usecase/auth"
 	"cspirt/pkg/logger"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/http/middleware-JWT"
 	"fmt"
 	"net/http"
 	"os"

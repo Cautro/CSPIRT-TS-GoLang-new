@@ -4,7 +4,7 @@ import (
 	// "cspirt/internal/logger"
 	"cspirt/internal/domain/auth"
 	"cspirt/internal/domain/user/repo"
-	"cspirt/internal/utils"
+	"cspirt/internal/controller/http/middleware-JWT"
 	// "crypto/rand"
 	// "strings"
 	"errors"
@@ -48,7 +48,7 @@ func (s *AuthUsecase) Login(in entity.LoginInput) (LoginResult, error) {
 		return LoginResult{}, nil
 	}
 
-	accessToken, err := utils.GenerateToken(in.Login, s.jwtSecret)
+	accessToken, err := utils.GenerateToken(user.ID, in.Login, user.Role, s.jwtSecret)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -94,7 +94,7 @@ func (s *AuthUsecase) Refresh(refreshToken string) (LoginResult, error) {
 		return LoginResult{}, errors.New("user not found")
 	}
 
-	token, err := utils.GenerateToken(user.Login, s.jwtSecret)
+	token, err := utils.GenerateToken(user.ID, user.Login, user.Role, s.jwtSecret)
 	if err != nil {
 		return LoginResult{}, err
 	}
