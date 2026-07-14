@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"cspirt/internal/logger"
+	"cspirt/pkg/logger"
 	"fmt"
 	"net/http"
 	"strings"

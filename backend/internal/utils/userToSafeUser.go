@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"cspirt/internal/users/models"
+	models "cspirt/internal/domain/user"
 )
 
 func UserToSafeUser(u models.User) *models.SafeUser {
