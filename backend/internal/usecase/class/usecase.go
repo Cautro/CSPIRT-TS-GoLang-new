@@ -8,6 +8,7 @@ import (
 	userModels "cspirt/internal/domain/user"
 	userRepo "cspirt/internal/domain/user/repo"
 	"fmt"
+	"context"
 )
 
 type ClassUsecase struct { 
@@ -22,8 +23,8 @@ func NewClassUsecase(classRepo repo.ClassRepository, user userRepo.UserRepositor
 	}
 }
 
-func (s *ClassUsecase) InitializeParallelsFromConfig(targetConfigs []config.ParallelConfig) error {
-	existingParallels, err := s.GetParallelClass()
+func (s *ClassUsecase) InitializeParallelsFromConfig(ctx context.Context, targetConfigs []config.ParallelConfig) error {
+	existingParallels, err := s.GetParallelClass(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch existing parallels: %w", err)
 	}
@@ -38,7 +39,7 @@ func (s *ClassUsecase) InitializeParallelsFromConfig(targetConfigs []config.Para
 			continue
 		}
 
-		classIDs, err := s.GetClassIDsByRange(pc.MinGrade, pc.MaxGrade)
+		classIDs, err := s.GetClassIDsByRange(ctx, pc.MinGrade, pc.MaxGrade)
 		if err != nil {
 			return fmt.Errorf("failed to get class IDs for range %d-%d: %w", pc.MinGrade, pc.MaxGrade, err)
 		}
@@ -47,7 +48,7 @@ func (s *ClassUsecase) InitializeParallelsFromConfig(targetConfigs []config.Para
 			continue
 		}
 
-		err = s.AddParallelClass(pc.Name, classIDs, "system")
+		err = s.AddParallelClass(ctx, pc.Name, classIDs, "system")
 		if err != nil {
 			return fmt.Errorf("failed to auto-create parallel %s: %w", pc.Name, err)
 		}
@@ -56,8 +57,8 @@ func (s *ClassUsecase) InitializeParallelsFromConfig(targetConfigs []config.Para
 	return nil
 }
 
-func (s *ClassUsecase) GetClassIDsByRange(minGrade, maxGrade int) ([]int, error) {
-	classRepo, err := s.classRepo.GetAllClasses()
+func (s *ClassUsecase) GetClassIDsByRange(ctx context.Context, minGrade, maxGrade int) ([]int, error) {
+	classRepo, err := s.classRepo.GetAllClasses(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -71,28 +72,28 @@ func (s *ClassUsecase) GetClassIDsByRange(minGrade, maxGrade int) ([]int, error)
 	return ids, nil
 }
 
-func (s *ClassUsecase) AddParallelByGradeRange(name string, minGrade, maxGrade int) error {
-	ids, err := s.GetClassIDsByRange(minGrade, maxGrade)
+func (s *ClassUsecase) AddParallelByGradeRange(ctx context.Context, name string, minGrade, maxGrade int) error {
+	ids, err := s.GetClassIDsByRange(ctx, minGrade, maxGrade)
 	if err != nil {
 		return err
 	}
 	
-	return s.classRepo.AddParallel(name, ids)
+	return s.classRepo.AddParallel(ctx, name, ids)
 }
 
-func (s *ClassUsecase) GetAllClassTeachers() ([]userModels.SafeUser, error) {
-	return s.classRepo.GetAllClassTeachers()
+func (s *ClassUsecase) GetAllClassTeachers(ctx context.Context) ([]userModels.SafeUser, error) {
+	return s.classRepo.GetAllClassTeachers(ctx)
 } 
 
-func (s *ClassUsecase) AddParallelClass(name string, classRepoIDs []int, login string) error {
-	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return err }
+func (s *ClassUsecase) AddParallelClass(ctx context.Context, name string, classRepoIDs []int, login string) error {
+	user, err := s.userRepo.GetUserByLogin(ctx, login); if err != nil { return err }
 	check := permission.CanManageClasses(user.Role); if !check { return err }
 
-	return s.classRepo.AddParallel(name, classRepoIDs)
+	return s.classRepo.AddParallel(ctx, name, classRepoIDs)
 }
 
-func (s *ClassUsecase) GetParallelClass() ([]classModels.ParallelClass, error) {
-	parallelclassRepo, err := s.classRepo.GetParallelClasses()
+func (s *ClassUsecase) GetParallelClass(ctx context.Context) ([]classModels.ParallelClass, error) {
+	parallelclassRepo, err := s.classRepo.GetParallelClasses(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -103,65 +104,65 @@ func (s *ClassUsecase) GetParallelClass() ([]classModels.ParallelClass, error) {
 	return parallelclassRepo, nil
 }
 
-func (s *ClassUsecase) UpdateClass(classID int, input classModels.ClassInput, login string) error {
-	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return err }
+func (s *ClassUsecase) UpdateClass(ctx context.Context, classID int, input classModels.ClassInput, login string) error {
+	user, err := s.userRepo.GetUserByLogin(ctx, login); if err != nil { return err }
 	check := permission.CanManageClasses(user.Role); if !check { return err }
 	
-	return s.classRepo.UpdateClass(classID, input, login)
+	return s.classRepo.UpdateClass(ctx, classID, input, login)
 }
 
-func (s *ClassUsecase) GetClassInParallel(parallelID int) ([]classModels.Class, error) {
-	return s.classRepo.GetClassesInParallel(parallelID)
+func (s *ClassUsecase) GetClassInParallel(ctx context.Context, parallelID int) ([]classModels.Class, error) {
+	return s.classRepo.GetClassesInParallel(ctx, parallelID)
 }
 
-func (s *ClassUsecase) GetBestClassInParallel(parallelID int) (*classModels.Class, error) {
-	parallelclassRepo, err := s.classRepo.GetParallelClasses()
+func (s *ClassUsecase) GetBestClassInParallel(ctx context.Context, parallelID int) (*classModels.Class, error) {
+	parallelclassRepo, err := s.classRepo.GetParallelClasses(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for _, parallelClass := range parallelclassRepo {
 		if parallelClass.ID == parallelID {
-			return s.classRepo.GetClassByID(parallelClass.BestClassID)
+			return s.classRepo.GetClassByID(ctx, parallelClass.BestClassID)
 		}
 	}
 	return nil, nil
 }
 
-func (s *ClassUsecase) YearComplete(login string) ([]*classModels.Class, error) {
-	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return []*classModels.Class{}, err }
+func (s *ClassUsecase) YearComplete(ctx context.Context, login string) ([]*classModels.Class, error) {
+	user, err := s.userRepo.GetUserByLogin(ctx, login); if err != nil { return []*classModels.Class{}, err }
 	check := permission.CanManageClasses(user.Role); if !check { return []*classModels.Class{}, err }
 
-	return s.classRepo.YearComplete()
+	return s.classRepo.YearComplete(ctx)
 }
 
-func (s *ClassUsecase) CompleteQuarter(parallelClassId int, login string) ([]*classModels.Class, error) {
-	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return []*classModels.Class{}, err }
+func (s *ClassUsecase) CompleteQuarter(ctx context.Context, parallelClassId int, login string) ([]*classModels.Class, error) {
+	user, err := s.userRepo.GetUserByLogin(ctx, login); if err != nil { return []*classModels.Class{}, err }
 	check := permission.CanManageClasses(user.Role); if !check { return []*classModels.Class{}, err }
 
-	return s.classRepo.QuarterComplete(parallelClassId)
+	return s.classRepo.QuarterComplete(ctx, parallelClassId)
 }
 
-func (s *ClassUsecase) DeleteParallelClass(parallelClassID int, login string) error {
-	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return err }
+func (s *ClassUsecase) DeleteParallelClass(ctx context.Context, parallelClassID int, login string) error {
+	user, err := s.userRepo.GetUserByLogin(ctx, login); if err != nil { return err }
 	check := permission.CanManageClasses(user.Role); if !check { return err }
 
 
-	return s.classRepo.DeleteParallelClassByID(parallelClassID, login)
+	return s.classRepo.DeleteParallelClassByID(ctx, parallelClassID, login)
 }
 
-func (s *ClassUsecase) AddClass(input classModels.ClassInput, login string) error {
-	user, err := s.userRepo.GetUserByLogin(login); if err != nil { return err }
+func (s *ClassUsecase) AddClass(ctx context.Context, input classModels.ClassInput, login string) error {
+	user, err := s.userRepo.GetUserByLogin(ctx, login); if err != nil { return err }
 	check := permission.CanManageClasses(user.Role); if !check { return err }
 
-	return s.classRepo.AddClass(input, login)
+	return s.classRepo.AddClass(ctx, input, login)
 }
 
-func (s *ClassUsecase) DeleteClass(classID int, login string) error {
-	return s.classRepo.DeleteClassByID(classID, login)
+func (s *ClassUsecase) DeleteClass(ctx context.Context, classID int, login string) error {
+	return s.classRepo.DeleteClassByID(ctx, classID, login)
 }
 
-func (s *ClassUsecase) GetAllClasses() ([]classModels.Class, error) {
-	classRepo, err := s.classRepo.GetAllClasses()
+func (s *ClassUsecase) GetAllClasses(ctx context.Context) ([]classModels.Class, error) {
+	classRepo, err := s.classRepo.GetAllClasses(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -172,12 +173,12 @@ func (s *ClassUsecase) GetAllClasses() ([]classModels.Class, error) {
 	return classRepo, nil
 }
 
-func (s *ClassUsecase) GetClassByID(classID int) (*classModels.Class, error) {
-	return s.classRepo.GetClassByID(classID)
+func (s *ClassUsecase) GetClassByID(ctx context.Context, classID int) (*classModels.Class, error) {
+	return s.classRepo.GetClassByID(ctx, classID)
 }
 
-func (s *ClassUsecase) GetUsersByClassID(classID int) ([]userModels.SafeUser, error) {
-	users, err := s.classRepo.GetUsersByClassID(classID)
+func (s *ClassUsecase) GetUsersByClassID(ctx context.Context, classID int) ([]userModels.SafeUser, error) {
+	users, err := s.classRepo.GetUsersByClassID(ctx, classID)
 	if err != nil {
 		return nil, err
 	}
@@ -188,10 +189,10 @@ func (s *ClassUsecase) GetUsersByClassID(classID int) ([]userModels.SafeUser, er
 	return users, nil
 }
 
-func (s *ClassUsecase) GetClassTeacher(classID int) (*userModels.SafeUser, error) {
-	return s.classRepo.GetClassTeacherByID(classID)
+func (s *ClassUsecase) GetClassTeacher(ctx context.Context, classID int) (*userModels.SafeUser, error) {
+	return s.classRepo.GetClassTeacherByID(ctx, classID)
 }
 
-func (s *ClassUsecase) SetClassTeacher(classID int, teacherLogin string) error {
-	return s.classRepo.SaveClassTeacherByID(classID, teacherLogin)
+func (s *ClassUsecase) SetClassTeacher(ctx context.Context, classID int, teacherLogin string) error {
+	return s.classRepo.SaveClassTeacherByID(ctx, classID, teacherLogin)
 }

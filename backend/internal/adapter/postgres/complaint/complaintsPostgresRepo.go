@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"context"
 	"time"
 )
 
@@ -21,7 +22,7 @@ func New(db *sql.DB) repo.ComplaintRepository {
 	return &postgresRepository{db: db}
 }
 
-func (r *postgresRepository) AddComplaint(login string, complaint models.Complaint, user models.SafeUser) error {
+func (r *postgresRepository) AddComplaint(ctx context.Context, login string, complaint models.Complaint, user models.SafeUser) error {
 	if login == "" {
 		return errors.New("invalid login or token")
 	}
@@ -103,7 +104,7 @@ func (r *postgresRepository) AddComplaint(login string, complaint models.Complai
 	return nil
 }
 
-func (r *postgresRepository) DeleteComplaint(id int, user models.SafeUser) error {
+func (r *postgresRepository) DeleteComplaint(ctx context.Context, id int, user models.SafeUser) error {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_complaint",
@@ -148,7 +149,7 @@ func (r *postgresRepository) DeleteComplaint(id int, user models.SafeUser) error
 	return nil
 }
 
-func (r *postgresRepository) GetAllComplaints() ([]models.Complaint, error) {
+func (r *postgresRepository) GetAllComplaints(ctx context.Context) ([]models.Complaint, error) {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_all_complaints",
@@ -213,7 +214,7 @@ func (r *postgresRepository) GetAllComplaints() ([]models.Complaint, error) {
 	return complaints, nil
 }
 
-func (r *postgresRepository) GetComplaintByID(id int) ([]models.Complaint, error) {
+func (r *postgresRepository) GetComplaintByID(ctx context.Context, id int) ([]models.Complaint, error) {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_complaint_by_id",
@@ -279,14 +280,14 @@ func (r *postgresRepository) GetComplaintByID(id int) ([]models.Complaint, error
 	return complaints, nil
 }
 
-func (r *postgresRepository) GetComplaintsByUserId(User_id int) ([]models.Complaint, error) {
+func (r *postgresRepository) GetComplaintsByUserId(ctx context.Context, User_id int) ([]models.Complaint, error) {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_complaint_by_user_id",
 		Message: "getting needed complaint by user id",
 	})
 
-	rows, err := r.db.Query(`
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM complaints
 		WHERE TargetID = $1
@@ -337,7 +338,7 @@ func (r *postgresRepository) GetComplaintsByUserId(User_id int) ([]models.Compla
 	if err := rows.Err(); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
-			Action:  "get_note_by_user_id",
+			Action:  "get_complaints_by_user_id",
 			Message: "row iteration failed: " + err.Error(),
 		})
 		return nil, err
@@ -346,7 +347,7 @@ func (r *postgresRepository) GetComplaintsByUserId(User_id int) ([]models.Compla
 	return complaints, nil
 }
 
-func (r *postgresRepository) GetComplaintsByClassID(classID int) ([]models.Complaint, error) {
+func (r *postgresRepository) GetComplaintsByClassID(ctx context.Context, classID int) ([]models.Complaint, error) {
 	if classID <= 0 {
 		return nil, errors.New("invalid class id")
 	}

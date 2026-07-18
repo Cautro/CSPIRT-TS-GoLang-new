@@ -8,6 +8,7 @@ import (
 	userModels "cspirt/internal/domain/user"
 	usersRepo "cspirt/internal/domain/user/repo"
 	"errors"
+	"context"
 )
 
 type RatingsUsecase struct {
@@ -30,7 +31,7 @@ func NewRatingsUsecase(rating repo.RatingRepository, users usersRepo.UserReposit
 	}
 }
 
-func (s *RatingsUsecase) UpdateRating(login string, in *models.RatingInput, user *userModels.SafeUser) error {
+func (s *RatingsUsecase) UpdateRating(ctx context.Context, login string, in *models.RatingInput, user *userModels.SafeUser) error {
 	if in == nil {
 		return errors.New("invalid input")
 	}
@@ -38,7 +39,7 @@ func (s *RatingsUsecase) UpdateRating(login string, in *models.RatingInput, user
 		return errors.New("rating change must be between -5000 and 5000")
 	}
 
-	targetUser, err := s.users.GetUserByLogin(in.TargetLogin)
+	targetUser, err := s.users.GetUserByLogin(ctx, in.TargetLogin)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -100,7 +101,7 @@ func (s *RatingsUsecase) UpdateRating(login string, in *models.RatingInput, user
 		Rating:   targetUser.Rating,
 	}
 
-	if err := s.users.SaveUser(*needTargetUser); err != nil {
+	if err := s.users.SaveUser(ctx, *needTargetUser); err != nil {
 		return err
 	}
 

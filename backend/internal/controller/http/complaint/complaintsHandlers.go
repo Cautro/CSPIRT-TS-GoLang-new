@@ -13,6 +13,8 @@ import (
 
 	"net/http"
 	"strconv"
+	"time"
+	"context"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,12 +33,15 @@ import (
 // @Router /api/complaints [get]
 func GetComplaintsHandler(complaintService *complaintsservice.ComplaintUsecase, classService *srClass.ClassUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := perm.AuthenticatedUser(c, "get_notes")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, ok := perm.AuthenticatedUser(ctx, c, "get_notes")
 		if !ok {
 			return
 		}
 
-		err := perm.CheckUserRole(user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner), string(ratingModels.RoleHelper))
+		err := perm.CheckUserRole(ctx, user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner), string(ratingModels.RoleHelper))
 		if err != nil {
 			if errors.Is(err, permissionService.ErrAccessDenied) || errors.Is(err, permissionService.ErrUserNotFound) {
 				c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
@@ -54,7 +59,7 @@ func GetComplaintsHandler(complaintService *complaintsservice.ComplaintUsecase, 
 				return
 			}
 
-			class, err := classService.GetClassByID(classID)
+			class, err := classService.GetClassByID(ctx, classID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
 				return
@@ -69,7 +74,7 @@ func GetComplaintsHandler(complaintService *complaintsservice.ComplaintUsecase, 
 				return
 			}
 
-			result, err := complaintService.GetComplaintsByClassID(classID)
+			result, err := complaintService.GetComplaintsByClassID(ctx, classID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 				return
@@ -85,7 +90,7 @@ func GetComplaintsHandler(complaintService *complaintsservice.ComplaintUsecase, 
 				return
 			}
 
-			result, err := complaintService.GetComplaintsByClassID(user.ClassID)
+			result, err := complaintService.GetComplaintsByClassID(ctx, user.ClassID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 				return
@@ -95,7 +100,7 @@ func GetComplaintsHandler(complaintService *complaintsservice.ComplaintUsecase, 
 			return
 		}
 
-		result, err := complaintService.GetAllComplaints()
+		result, err := complaintService.GetAllComplaints(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 			return
@@ -120,13 +125,16 @@ func GetComplaintsHandler(complaintService *complaintsservice.ComplaintUsecase, 
 // @Router /api/complaint/add [patch]
 func AddcomplaintHandler(complaintService *complaintsservice.ComplaintUsecase, users *usersvc.UsersUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		login := c.GetString("Login")
 		if login == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
-		check := perm.CheckPublicRole(login)
+		check := perm.CheckPublicRole(ctx, login)
 		if check != nil {
 			if errors.Is(check, permissionService.ErrAccessDenied) || errors.Is(check, permissionService.ErrUserNotFound) {
 				c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
@@ -136,7 +144,7 @@ func AddcomplaintHandler(complaintService *complaintsservice.ComplaintUsecase, u
 			return
 		}
 
-		user, err := users.GetUserByLogin(login)
+		user, err := users.GetUserByLogin(ctx, login)
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
@@ -163,7 +171,7 @@ func AddcomplaintHandler(complaintService *complaintsservice.ComplaintUsecase, u
 		}
 
 		needUser := utils.UserToSafeUser(*user)
-		if err := complaintService.AddNewComplaint(login, &in, needUser); err != nil {
+		if err := complaintService.AddNewComplaint(ctx, login, &in, needUser); err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
@@ -194,6 +202,9 @@ func AddcomplaintHandler(complaintService *complaintsservice.ComplaintUsecase, u
 // @Router /api/complaint/delete/{id} [delete]
 func DeletecomplaintHandler(complaintService *complaintsservice.ComplaintUsecase, users *usersvc.UsersUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		login := c.GetString("Login")
 		idStr := c.Param("id")
 		idInt, err := strconv.Atoi(idStr)
@@ -202,7 +213,7 @@ func DeletecomplaintHandler(complaintService *complaintsservice.ComplaintUsecase
 			return
 		}
 
-		check := perm.CheckPublicRole(login)
+		check := perm.CheckPublicRole(ctx, login)
 		if check != nil {
 			if errors.Is(check, permissionService.ErrAccessDenied) || errors.Is(check, permissionService.ErrUserNotFound) {
 				c.JSON(http.StatusForbidden, gin.H{"error": "You dont have permissions for this action"})
@@ -212,7 +223,7 @@ func DeletecomplaintHandler(complaintService *complaintsservice.ComplaintUsecase
 			return
 		}
 
-		foundUser, err := users.GetUserByLogin(login)
+		foundUser, err := users.GetUserByLogin(ctx, login)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
 			return
@@ -243,7 +254,7 @@ func DeletecomplaintHandler(complaintService *complaintsservice.ComplaintUsecase
 		}
 
 		needUser := utils.UserToSafeUser(*foundUser)
-		if err := complaintService.DeleteComplaint(idInt, *needUser); err != nil {
+		if err := complaintService.DeleteComplaint(ctx, idInt, *needUser); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

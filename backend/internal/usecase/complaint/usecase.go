@@ -7,6 +7,7 @@ import (
 	userModels "cspirt/internal/domain/user"
 	"errors"
 	"time"
+	"context"
 )
 
 type ComplaintUsecase struct {
@@ -19,12 +20,12 @@ func NewComplaintsUsecase(complaints repo.ComplaintRepository) *ComplaintUsecase
 	}
 }
 
-func (s *ComplaintUsecase) GetComplaintsByClassID(classID int) ([]userModels.Complaint, error) {
+func (s *ComplaintUsecase) GetComplaintsByClassID(ctx context.Context, classID int) ([]userModels.Complaint, error) {
 	if classID <= 0 {
 		return nil, errors.New("invalid class id")
 	}
 
-	result, err := s.complaints.GetComplaintsByClassID(classID)
+	result, err := s.complaints.GetComplaintsByClassID(ctx, classID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -41,8 +42,8 @@ func (s *ComplaintUsecase) GetComplaintsByClassID(classID int) ([]userModels.Com
 	return result, nil
 }
 
-func (s *ComplaintUsecase) GetAllComplaints() ([]userModels.Complaint, error) {
-	result, err := s.complaints.GetAllComplaints()
+func (s *ComplaintUsecase) GetAllComplaints(ctx context.Context) ([]userModels.Complaint, error) {
+	result, err := s.complaints.GetAllComplaints(ctx)
 
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -59,7 +60,7 @@ func (s *ComplaintUsecase) GetAllComplaints() ([]userModels.Complaint, error) {
 	return result, nil
 }
 
-func (s *ComplaintUsecase) AddNewComplaint(login string, in *complaintModels.AddNewComplaintResponse, user *userModels.SafeUser) error {
+func (s *ComplaintUsecase) AddNewComplaint(ctx context.Context, login string, in *complaintModels.AddNewComplaintResponse, user *userModels.SafeUser) error {
 	if in == nil {
 		return errors.New("invalid input")
 	}
@@ -67,7 +68,7 @@ func (s *ComplaintUsecase) AddNewComplaint(login string, in *complaintModels.Add
 		return errors.New("user not found")
 	}
 
-	err := s.complaints.AddComplaint(login, userModels.Complaint{
+	err := s.complaints.AddComplaint(ctx, login, userModels.Complaint{
 		ID:        in.ID,
 		TargetID:  in.TargetID,
 		Content:   in.Content,
@@ -81,8 +82,8 @@ func (s *ComplaintUsecase) AddNewComplaint(login string, in *complaintModels.Add
 	return nil
 }
 
-func (s *ComplaintUsecase) DeleteComplaint(id int, user userModels.SafeUser) error {
-	err := s.complaints.DeleteComplaint(id, user)
+func (s *ComplaintUsecase) DeleteComplaint(ctx context.Context, id int, user userModels.SafeUser) error {
+	err := s.complaints.DeleteComplaint(ctx, id, user)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",

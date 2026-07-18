@@ -9,6 +9,8 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +25,10 @@ import (
 // @Router /api/classes/teacher [get]
 func GetClassTeachersHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		teachers, err := ClassUsecase.GetAllClassTeachers()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		teachers, err := ClassUsecase.GetAllClassTeachers(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class teachers"})
 			return
@@ -46,6 +51,9 @@ func GetClassTeachersHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 // @Router /api/classes/parallel/add [patch]
 func AddParallelClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		var input classModels.AddParallelRequest
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -56,7 +64,7 @@ func AddParallelClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 		classesIDs := input.ClassIDs
 
 		if input.MinGrade > 0 && input.MaxGrade > 0 {
-			ids, err := ClassUsecase.GetClassIDsByRange(input.MinGrade, input.MaxGrade)
+			ids, err := ClassUsecase.GetClassIDsByRange(ctx, input.MinGrade, input.MaxGrade)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch classes by range"})
 				return
@@ -82,14 +90,14 @@ func AddParallelClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 		}
 
 		if input.MinGrade != 0 {
-			err := ClassUsecase.AddParallelByGradeRange(input.Name, input.MinGrade, input.MaxGrade)
+			err := ClassUsecase.AddParallelByGradeRange(ctx, input.Name, input.MinGrade, input.MaxGrade)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 		}
 
-		if err := ClassUsecase.AddParallelClass(input.Name, classesIDs, c.GetString("Login")); err != nil {
+		if err := ClassUsecase.AddParallelClass(ctx, input.Name, classesIDs, c.GetString("Login")); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -138,7 +146,10 @@ func UpdateClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			Message: "Update class input: " + input.Name + ", " + input.TeacherLogin,
 		})
 
-		if err := ClassUsecase.UpdateClass(classId, input, c.GetString("Login")); err != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		if err := ClassUsecase.UpdateClass(ctx, classId, input, c.GetString("Login")); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})
@@ -159,7 +170,10 @@ func UpdateClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 // @Router /api/classes/parallel [get]
 func GetParallelClassesHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		parallelClasses, err := ClassUsecase.GetParallelClass()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		parallelClasses, err := ClassUsecase.GetParallelClass(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
 			return
@@ -188,7 +202,10 @@ func DeleteParallelClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			return
 		}
 
-		if err := ClassUsecase.DeleteParallelClass(parallelClassId, c.GetString("Login")); err != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		if err := ClassUsecase.DeleteParallelClass(ctx, parallelClassId, c.GetString("Login")); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete parallel class"})
 			return
 		}
@@ -216,7 +233,10 @@ func GetParallelClassByIDHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc 
 			return
 		}
 
-		parallelClasses, err := ClassUsecase.GetParallelClass()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		parallelClasses, err := ClassUsecase.GetParallelClass(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
 			return
@@ -259,7 +279,10 @@ func GetParallelClassUsersHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc
 			return
 		}
 
-		parallelClasses, err := ClassUsecase.GetParallelClass()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		parallelClasses, err := ClassUsecase.GetParallelClass(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve parallel classes"})
 			return
@@ -280,7 +303,7 @@ func GetParallelClassUsersHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc
 
 		var allUsers []userModels.SafeUser
 		for _, classID := range parallelClass.ClassesIDs {
-			users, err := ClassUsecase.GetUsersByClassID(classID)
+			users, err := ClassUsecase.GetUsersByClassID(ctx, classID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users for class ID " + strconv.Itoa(classID)})
 				return
@@ -315,8 +338,11 @@ func CompleteQuarterHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			return
 		}
 
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		login := c.GetString("Login"); if login == "" { c.JSON(400, gin.H{"Error": "Error to take you're login"}); return }
-		classes, err := ClassUsecase.CompleteQuarter(parallelClassId, login)
+		classes, err := ClassUsecase.CompleteQuarter(ctx, parallelClassId, login)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete quarter"})
 			return
@@ -340,7 +366,11 @@ func YearComplete(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 		var err error
 
 		login := c.GetString("Login"); if login == "" { c.JSON(400, gin.H{"Error": "Error to take you're login"}); return }
-		if classes, err = ClassUsecase.YearComplete(login); err != nil {
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+		
+		if classes, err = ClassUsecase.YearComplete(ctx, login); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete year"})
 			return
 		}
@@ -362,6 +392,9 @@ func YearComplete(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 // @Router /api/classes/parallel/{parallel_class_id}/best [get]
 func GetBestClassInParallelHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		parallelClassIdStr := c.Param("parallel_class_id")
 		parallelClassId, err := strconv.Atoi(parallelClassIdStr)
 		if err != nil {
@@ -369,7 +402,7 @@ func GetBestClassInParallelHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFun
 			return
 		}
 
-		bestClass, err := ClassUsecase.GetBestClassInParallel(parallelClassId)
+		bestClass, err := ClassUsecase.GetBestClassInParallel(ctx, parallelClassId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve best class in parallel"})
 			return
@@ -402,7 +435,10 @@ func GetClassesInParallelHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc 
 			return
 		}
 
-		classes, err := ClassUsecase.GetClassInParallel(parallelClassId)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		classes, err := ClassUsecase.GetClassInParallel(ctx, parallelClassId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve classes in parallel"})
 			return
@@ -444,7 +480,10 @@ func AddClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			Message: "Add class input: " + input.Name + ", " + input.TeacherLogin,
 		})
 
-		if err := ClassUsecase.AddClass(input, c.GetString("Login")); err != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		if err := ClassUsecase.AddClass(ctx, input, c.GetString("Login")); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})
@@ -484,7 +523,10 @@ func DeleteClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			return
 		}
 
-		if err := ClassUsecase.DeleteClass(classId, c.GetString("Login")); err != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		if err := ClassUsecase.DeleteClass(ctx, classId, c.GetString("Login")); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete class"})
 			return
 		}
@@ -506,7 +548,10 @@ func DeleteClassHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 // @Router /api/classes [get]
 func GetClassesHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		classes, err := ClassUsecase.GetAllClasses()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		classes, err := ClassUsecase.GetAllClasses(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve classes"})
 			return
@@ -552,6 +597,9 @@ func GetClassesHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 // @Router /api/classes/{class_id}/users [get]
 func GetClassUsersHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		classIdStr := c.Param("class_id")
 		classId, err := strconv.Atoi(classIdStr)
 
@@ -560,7 +608,7 @@ func GetClassUsersHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			return
 		}
 
-		class, err := ClassUsecase.GetClassByID(classId)
+		class, err := ClassUsecase.GetClassByID(ctx, classId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
 			return
@@ -570,7 +618,7 @@ func GetClassUsersHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			return
 		}
 
-		users, err := ClassUsecase.GetUsersByClassID(classId)
+		users, err := ClassUsecase.GetUsersByClassID(ctx, classId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
 			return
@@ -600,7 +648,10 @@ func GetClassTeacherHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			return
 		}
 
-		class, err := ClassUsecase.GetClassByID(classId)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		class, err := ClassUsecase.GetClassByID(ctx, classId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
 			return
@@ -610,7 +661,7 @@ func GetClassTeacherHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 			return
 		}
 
-		teacher, err := ClassUsecase.GetClassTeacher(classId)
+		teacher, err := ClassUsecase.GetClassTeacher(ctx, classId)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class teacher"})
 			return
@@ -638,7 +689,10 @@ func GetClassTeacherHandler(ClassUsecase *sr.ClassUsecase) gin.HandlerFunc {
 // @Router /api/classes/{class_id}/teacher [patch]
 func SetClassTeacherHandler(ClassUsecase *sr.ClassUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := perm.AuthenticatedUser(c, "set_class_teacher")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, ok := perm.AuthenticatedUser(ctx, c, "set_class_teacher")
 		if !ok {
 			return
 		}
@@ -660,7 +714,7 @@ func SetClassTeacherHandler(ClassUsecase *sr.ClassUsecase, perm *permissionServi
 			return
 		}
 
-		if err := ClassUsecase.SetClassTeacher(classId, input.TeacherLogin); err != nil {
+		if err := ClassUsecase.SetClassTeacher(ctx, classId, input.TeacherLogin); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

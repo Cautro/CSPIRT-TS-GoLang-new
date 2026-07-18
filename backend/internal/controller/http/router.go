@@ -25,6 +25,11 @@ import (
 	usersUsecase "cspirt/internal/usecase/user"
 	cacheRepo "cspirt/internal/domain/cache/repo"
 
+	//ginLog "cspirt/internal/controller/http/ginLogger"
+
+	"database/sql"
+	"os"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -40,10 +45,16 @@ type Usecases struct {
 	Permission *permissionUsecase.Usecase
 	Cache      cacheRepo.CacheRepository
 	JWTSecret  string
+	DB         *sql.DB
 }
 
 func NewRouter(s Usecases) *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
+
+	if os.Getenv("PROFILE") == "1" {
+		router.Use(DiagnosticsMiddleware(s.DB))
+	}
 
 	registerPublicRoutes(router, s)
 	registerAuthenticatedRoutes(router, s)

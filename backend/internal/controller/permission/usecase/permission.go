@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"context"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,8 +26,8 @@ func New(users userRepo.UserRepository) *Usecase {
 	return &Usecase{users: users}
 }
 
-func (s *Usecase) CheckUserRole(login string, roles ...string) error {
-	user, err := s.users.GetUserByLogin(login)
+func (s *Usecase) CheckUserRole(ctx context.Context, login string, roles ...string) error {
+	user, err := s.users.GetUserByLogin(ctx, login)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -68,8 +69,8 @@ func (s *Usecase) CheckUserRole(login string, roles ...string) error {
 	return ErrAccessDenied
 }
 
-func (s *Usecase) CheckPublicRole(login string) error {
-	user, err := s.users.GetUserByLogin(login)
+func (s *Usecase) CheckPublicRole(ctx context.Context, login string) error {
+	user, err := s.users.GetUserByLogin(ctx, login)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -93,7 +94,7 @@ func (s *Usecase) CheckPublicRole(login string) error {
 	return nil
 }
 
-func (s *Usecase) AuthenticatedUser(c *gin.Context, action string) (*userModels.User, bool) {
+func (s *Usecase) AuthenticatedUser(ctx context.Context, c *gin.Context, action string) (*userModels.User, bool) {
 	login := c.GetString("Login")
 	if login == "" {
 		logger.WriteSafe(logger.LogEntry{
@@ -105,7 +106,7 @@ func (s *Usecase) AuthenticatedUser(c *gin.Context, action string) (*userModels.
 		return nil, false
 	}
 
-	user, err := s.users.GetUserByLogin(login)
+	user, err := s.users.GetUserByLogin(ctx, login)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
 		return nil, false

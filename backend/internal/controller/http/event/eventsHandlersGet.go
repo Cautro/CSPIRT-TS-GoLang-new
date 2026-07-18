@@ -5,6 +5,8 @@ import (
 	"cspirt/pkg/logger"
 	"net/http"
 	"strconv"
+	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,17 +24,20 @@ import (
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/events [get]
-func GetEventsHandler(eventService *sr.EventsUsecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
+func GetEventsHandler(eventService *sr.EventsUsecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		if err := eventService.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		userIdStr := ctx.Query("user_id")
-		classIdStr := ctx.Query("class_id")
+		userIdStr := c.Query("user_id")
+		classIdStr := c.Query("class_id")
 		if classIdStr == "" {
-			classIdStr = ctx.Query("class")
+			classIdStr = c.Query("class")
 		}
 
 		if userIdStr != "" {
@@ -41,18 +46,18 @@ func GetEventsHandler(eventService *sr.EventsUsecase) func(ctx *gin.Context) {
 				logger.WriteSafe(logger.LogEntry{
 					Level:   "info",
 					Action:  "get_events",
-					Login:   ctx.GetString("Login"),
+					Login:   c.GetString("Login"),
 					Message: "invalid user id: " + err.Error(),
 				})
-				ctx.JSON(400, gin.H{"error": "Invalid user ID"})
+				c.JSON(400, gin.H{"error": "Invalid user ID"})
 				return
 			}
-			events, err := eventService.GetEventsByUserID(userID)
+			events, err := eventService.GetEventsByUserID(ctx, userID)
 			if err != nil {
-				ctx.JSON(500, gin.H{"error": "Failed to get events"})
+				c.JSON(500, gin.H{"error": "Failed to get events"})
 				return
 			}
-			ctx.JSON(200, events)
+			c.JSON(200, events)
 			return
 		}
 		if classIdStr != "" {
@@ -61,50 +66,50 @@ func GetEventsHandler(eventService *sr.EventsUsecase) func(ctx *gin.Context) {
 				logger.WriteSafe(logger.LogEntry{
 					Level:   "info",
 					Action:  "get_events",
-					Login:   ctx.GetString("Login"),
+					Login:   c.GetString("Login"),
 					Message: "invalid class id: " + err.Error(),
 				})
-				ctx.JSON(400, gin.H{"error": "Invalid class ID"})
+				c.JSON(400, gin.H{"error": "Invalid class ID"})
 				return
 			}
-			events, err := eventService.GetEventsByClassID(classID)
+			events, err := eventService.GetEventsByClassID(ctx, classID)
 			if err != nil {
-				ctx.JSON(500, gin.H{"error": "Failed to get events"})
+				c.JSON(500, gin.H{"error": "Failed to get events"})
 				return
 			}
-			ctx.JSON(200, events)
+			c.JSON(200, events)
 			return
 		}
 
-		eventId := ctx.Query("event_id")
+		eventId := c.Query("event_id")
 		if eventId != "" {
 			eventIdInt, err := strconv.Atoi(eventId)
 			if err != nil {
-				ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Event ID format"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Event ID format"})
 				return
 			}
 
-			event, err := eventService.GetEventsByEventID(eventIdInt)
+			event, err := eventService.GetEventsByEventID(ctx, eventIdInt)
 			if err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event"})
 				return
 			}
 
 			if event == nil {
-				ctx.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+				c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
 				return
 			}
 
-			ctx.JSON(http.StatusOK, event)
+			c.JSON(http.StatusOK, event)
 			return
 		}
 
-		events, err := eventService.GetEvents()
+		events, err := eventService.GetEvents(ctx)
 		if err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to get events"})
+			c.JSON(500, gin.H{"error": "Failed to get events"})
 			return
 		}
-		ctx.JSON(200, events)
+		c.JSON(200, events)
 	}
 }
 
@@ -118,21 +123,28 @@ func GetEventsHandler(eventService *sr.EventsUsecase) func(ctx *gin.Context) {
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/{eventId}/params [get]
-func GetEventParamsHandler(eventService *sr.EventsUsecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+func GetEventParamsHandler(eventService *sr.EventsUsecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+		
+		if err := eventService.ActivateDueEvents(); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
+			return
+		}
+		eventID, err := strconv.Atoi(c.Param("eventId"))
 		if err != nil {
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(400, gin.H{"error": "Invalid event ID"})
 			return
 		}
 
-		params, err := eventService.GetEventParams(eventID)
+		params, err := eventService.GetEventParams(ctx, eventID)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event params"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get event params"})
 			return
 		}
 
-		ctx.JSON(200, params)
+		c.JSON(200, params)
 	}
 }
 
@@ -146,32 +158,35 @@ func GetEventParamsHandler(eventService *sr.EventsUsecase) func(ctx *gin.Context
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/{eventId}/players [get]
-func GetEventPlayersHandler(eventService *sr.EventsUsecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
+func GetEventPlayersHandler(eventService *sr.EventsUsecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		if err := eventService.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		eventID, err := strconv.Atoi(c.Param("eventId"))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "get_event_players",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid event id: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(400, gin.H{"error": "Invalid event ID"})
 			return
 		}
 
-		players, err := eventService.GetEventPlayers(eventID)
+		players, err := eventService.GetEventPlayers(ctx, eventID)
 		if err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to get event players"})
+			c.JSON(500, gin.H{"error": "Failed to get event players"})
 			return
 		}
 
-		ctx.JSON(200, players)
+		c.JSON(200, players)
 	}
 }
 
@@ -185,31 +200,34 @@ func GetEventPlayersHandler(eventService *sr.EventsUsecase) func(ctx *gin.Contex
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/{eventId}/players/count [get]
-func GetEventPlayersCountHandler(eventService *sr.EventsUsecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
+func GetEventPlayersCountHandler(eventService *sr.EventsUsecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		if err := eventService.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		eventID, err := strconv.Atoi(c.Param("eventId"))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "get_event_players_count",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid event id: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(400, gin.H{"error": "Invalid event ID"})
 			return
 		}
 
-		count, err := eventService.GetEventPlayersCount(eventID)
+		count, err := eventService.GetEventPlayersCount(ctx, eventID)
 		if err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to get event players count"})
+			c.JSON(500, gin.H{"error": "Failed to get event players count"})
 			return
 		}
 
-		ctx.JSON(200, gin.H{"count": count})
+		c.JSON(200, gin.H{"count": count})
 	}
 }

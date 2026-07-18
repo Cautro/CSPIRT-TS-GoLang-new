@@ -8,6 +8,8 @@ import (
 	ratingModels "cspirt/internal/domain/rating"
 	usersvc "cspirt/internal/usecase/user"
 	"strconv"
+	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,49 +25,52 @@ import (
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/add [patch]
-func AddEventHandler(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
+func AddEventHandler(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		if err := eventService.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		err := perm.CheckUserRole(ctx.GetString("Login"), "owner")
+		err := perm.CheckUserRole(ctx, c.GetString("Login"), "owner")
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "add_event",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "failed to check user role: " + err.Error(),
 			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
+			c.JSON(500, gin.H{"error": "Failed to check user role"})
 			return
 		}
 
 		var event models.Event
-		if err := ctx.BindJSON(&event); err != nil {
+		if err := c.BindJSON(&event); err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "add_event",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid request body: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid request body"})
+			c.JSON(400, gin.H{"error": "Invalid request body"})
 			return
 		}
 
-		if err := eventService.AddEvent(event); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to add event"})
+		if err := eventService.AddEvent(ctx, event); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to add event"})
 			return
 		}
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_event",
-			Login:   ctx.GetString("Login"),
+			Login:   c.GetString("Login"),
 			Message: "event added successfully",
 		})
-		ctx.JSON(200, gin.H{"message": "Event added successfully"})
+		c.JSON(200, gin.H{"message": "Event added successfully"})
 	}
 }
 
@@ -81,62 +86,65 @@ func AddEventHandler(eventService *sr.EventsUsecase, perm *permissionService.Use
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/{eventId}/params/add [patch]
-func AddEventParams(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
+func AddEventParams(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		if err := eventService.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		err := perm.CheckUserRole(ctx.GetString("Login"), "owner")
+		err := perm.CheckUserRole(ctx, c.GetString("Login"), "owner")
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "add_event_params",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "failed to check user role: " + err.Error(),
 			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
+			c.JSON(500, gin.H{"error": "Failed to check user role"})
 			return
 		}
 
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		eventID, err := strconv.Atoi(c.Param("eventId"))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "add_event_params",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid event id: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(400, gin.H{"error": "Invalid event ID"})
 			return
 		}
 
 		var params models.EventParams
-		if err := ctx.BindJSON(&params); err != nil {
+		if err := c.BindJSON(&params); err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "add_event_params",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid request body: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid request body"})
+			c.JSON(400, gin.H{"error": "Invalid request body"})
 			return
 		}
 
-		if err := eventService.AddEventParams(eventID, &params); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to add event params"})
+		if err := eventService.AddEventParams(ctx, eventID, &params); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to add event params"})
 			return
 		}
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_event_params",
-			Login:   ctx.GetString("Login"),
+			Login:   c.GetString("Login"),
 			Message: "event params added successfully",
 		})
 
-		ctx.JSON(200, gin.H{"message": "Event params added successfully"})
+		c.JSON(200, gin.H{"message": "Event params added successfully"})
 	}
 }
 
@@ -152,15 +160,18 @@ func AddEventParams(eventService *sr.EventsUsecase, perm *permissionService.Usec
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/{eventId}/players/add [patch]
-func AddPlayersToEvent(eventService *sr.EventsUsecase, users *usersvc.UsersUsecase, perm *permissionService.Usecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
+func AddPlayersToEvent(eventService *sr.EventsUsecase, users *usersvc.UsersUsecase, perm *permissionService.Usecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		if err := eventService.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		login := ctx.GetString("Login")
-		user, err := users.GetUserByLogin(login)
+		login := c.GetString("Login")
+		user, err := users.GetUserByLogin(ctx, login)
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
@@ -168,32 +179,32 @@ func AddPlayersToEvent(eventService *sr.EventsUsecase, users *usersvc.UsersUseca
 				Login:   login,
 				Message: "failed to get user: " + err.Error(),
 			})
-			ctx.JSON(500, gin.H{"error": "Failed to get user"})
+			c.JSON(500, gin.H{"error": "Failed to get user"})
 			return
 		}
 
-		err = perm.CheckUserRole(ctx.GetString("Login"), string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
+		err = perm.CheckUserRole(ctx, c.GetString("Login"), string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "add_event_players",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Role:    user.Role,
 				Message: "failed to check user role: " + err.Error(),
 			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
+			c.JSON(500, gin.H{"error": "Failed to check user role"})
 			return
 		}
 
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		eventID, err := strconv.Atoi(c.Param("eventId"))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "add_event_players",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid event id: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(400, gin.H{"error": "Invalid event ID"})
 			return
 		}
 
@@ -201,28 +212,28 @@ func AddPlayersToEvent(eventService *sr.EventsUsecase, users *usersvc.UsersUseca
 			PlayerIDs []int `json:"playerIds"`
 		}
 
-		if err := ctx.BindJSON(&req); err != nil {
+		if err := c.BindJSON(&req); err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "add_event_players",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid request body: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid request body"})
+			c.JSON(400, gin.H{"error": "Invalid request body"})
 			return
 		}
 
-		if err := eventService.AddPlayersToEvent(eventID, req.PlayerIDs, ctx.GetString("Login")); err != nil {
-			ctx.JSON(500, gin.H{"error": err.Error()})
+		if err := eventService.AddPlayersToEvent(ctx, eventID, req.PlayerIDs, c.GetString("Login")); err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "add_event_players",
-			Login:   ctx.GetString("Login"),
+			Login:   c.GetString("Login"),
 			Message: "players added to event successfully",
 		})
-		ctx.JSON(200, gin.H{"message": "Players added to event successfully"})
+		c.JSON(200, gin.H{"message": "Players added to event successfully"})
 	}
 }

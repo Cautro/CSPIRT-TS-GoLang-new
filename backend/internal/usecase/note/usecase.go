@@ -7,6 +7,7 @@ import (
 	models "cspirt/internal/domain/user"
 	"errors"
 	"time"
+	"context"
 )
 
 type NoteUsecase struct {
@@ -19,8 +20,8 @@ func NewNoteUsecase(notes repo.NoteRepository) *NoteUsecase {
 	}
 }
 
-func (s *NoteUsecase) GetAllNotes() ([]models.Note, error) {
-	result, err := s.notes.GetAllNotes()
+func (s *NoteUsecase) GetAllNotes(ctx context.Context) ([]models.Note, error) {
+	result, err := s.notes.GetAllNotes(ctx)
 
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -37,12 +38,12 @@ func (s *NoteUsecase) GetAllNotes() ([]models.Note, error) {
 	return result, nil
 }
 
-func (s *NoteUsecase) GetNotesByClassID(classID int) ([]models.Note, error) {
+func (s *NoteUsecase) GetNotesByClassID(ctx context.Context, classID int) ([]models.Note, error) {
 	if classID <= 0 {
 		return nil, errors.New("invalid class id")
 	}
 
-	result, err := s.notes.GetNotesByClassID(classID)
+	result, err := s.notes.GetNotesByClassID(ctx, classID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -59,7 +60,7 @@ func (s *NoteUsecase) GetNotesByClassID(classID int) ([]models.Note, error) {
 	return result, nil
 }
 
-func (s *NoteUsecase) AddNewNote(login string, in *noteModels.AddNewNoteResponse, user *models.SafeUser) error {
+func (s *NoteUsecase) AddNewNote(ctx context.Context, login string, in *noteModels.AddNewNoteResponse, user *models.SafeUser) error {
 	if in == nil {
 		return errors.New("invalid input")
 	}
@@ -75,7 +76,7 @@ func (s *NoteUsecase) AddNewNote(login string, in *noteModels.AddNewNoteResponse
 
 	authorName := user.Name + " " + user.LastName
 
-	err := s.notes.AddNote(login, models.Note{
+	err := s.notes.AddNote(ctx, login, models.Note{
 		TargetID:  in.TargetID,
 		AuthorID:  user.ID,
 		AuthorName: authorName,
@@ -91,8 +92,8 @@ func (s *NoteUsecase) AddNewNote(login string, in *noteModels.AddNewNoteResponse
 	return nil
 }
 
-func (s *NoteUsecase) DeleteNote(id int, user models.SafeUser) error {
-	err := s.notes.DeleteNote(id, user)
+func (s *NoteUsecase) DeleteNote(ctx context.Context, id int, user models.SafeUser) error {
+	err := s.notes.DeleteNote(ctx, id, user)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",

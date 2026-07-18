@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -35,7 +37,10 @@ func GetUsersHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 			return
 		}
 
-		currentUser, err := userService.GetUserByLogin(login)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		currentUser, err := userService.GetUserByLogin(ctx, login)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve current user"})
 			return
@@ -48,7 +53,7 @@ func GetUsersHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 
 		userIDStr := c.Query("id")
 		if userIDStr == "" {
-			users, err := userService.GetUsersHandlerService()
+			users, err := userService.GetUsersHandlerService(ctx)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
 				return
@@ -63,7 +68,7 @@ func GetUsersHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 			return
 		}
 
-		fullUserInfo, err := userService.GetFullUserInfo(userID)
+		fullUserInfo, err := userService.GetFullUserInfo(ctx, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve full user info"})
 			return
@@ -104,7 +109,10 @@ func UpdateAvatarHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 			return
 		}
 
-		err = userService.UpdateAvatar(in, id)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		err = userService.UpdateAvatar(ctx, in, id)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 			return
@@ -123,8 +131,15 @@ func UpdateAvatarHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 // @Router /api/user/logout [patch]
 func LogoutHandler(userService *sr.UsersUsecase, authService *authUsecase.AuthUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		if login := c.GetString("Login"); login != "" {
+			userService.InvalidateUserFullInfo(ctx, login)
+		}
+
 		if token, err := c.Cookie("refresh_token"); err == nil {
-			if err := userService.DeleteRefreshToken(token); err != nil {
+			if err := userService.DeleteRefreshToken(ctx, token); err != nil {
 				logger.WriteSafe(logger.LogEntry{
 					Level:   "error",
 					Action:  "logout",
@@ -186,7 +201,10 @@ func AddUserHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 			return
 		}
 
-		targetUser, err := userService.GetUserByLogin(login)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		targetUser, err := userService.GetUserByLogin(ctx, login)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
@@ -221,7 +239,7 @@ func AddUserHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.AddUserHandlerService(user); err != nil {
+		if err := userService.AddUserHandlerService(ctx, user); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -271,7 +289,10 @@ func UpdateUserHandler(userService *sr.UsersUsecase, perm *permissionService.Use
 			return
 		}
 
-		targetUser, err := userService.GetUserByLogin(login)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		targetUser, err := userService.GetUserByLogin(ctx, login)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
@@ -301,13 +322,13 @@ func UpdateUserHandler(userService *sr.UsersUsecase, perm *permissionService.Use
 			return
 		}
 
-		check := perm.CheckUserRole(login, string(ratMod.RoleOwner))
+		check := perm.CheckUserRole(ctx, login, string(ratMod.RoleOwner))
 		if check != nil {
 			c.JSON(http.StatusForbidden, gin.H{"error": "only owner can update user"})
 			return
 		}
 
-		if err = userService.UpdateUserHandlerService(idInt, user, login); err != nil {
+		if err = userService.UpdateUserHandlerService(ctx, idInt, user, login); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -352,7 +373,10 @@ func DeleteUserHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.DeleteUserHandlerService(idInt, login); err != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		if err := userService.DeleteUserHandlerService(ctx, idInt, login); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -387,7 +411,10 @@ func GetMeHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 			return
 		}
 
-		fullInfo, err := userService.GetFullUserInfoByLogin(login)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		fullInfo, err := userService.GetFullUserInfoByLogin(ctx, login)
 		if err != nil {
 			c.JSON(403, gin.H{"error": "Bad request"})
 			return
@@ -407,7 +434,10 @@ func GetMeHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 // @Router /api/users/get/staff [get]
 func GetStaffHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		staff, err := userService.GetOnlyStaffUsers()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		staff, err := userService.GetOnlyStaffUsers(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve staff"})
 			return

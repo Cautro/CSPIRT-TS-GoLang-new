@@ -14,6 +14,8 @@ import (
 
 	"net/http"
 	"strconv"
+	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,12 +33,16 @@ import (
 // @Router /api/notes [get]
 func GetNotesHandler(noteService *sr.NoteUsecase, classService *srClass.ClassUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := perm.AuthenticatedUser(c, "get_notes")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, ok := perm.AuthenticatedUser(ctx, c, "get_notes")
 		if !ok {
 			return
 		}
 
 		err := perm.CheckUserRole(
+			ctx,
 			user.Login,
 			string(ratingModels.RoleAdmin),
 			string(ratingModels.RoleOwner),
@@ -59,7 +65,7 @@ func GetNotesHandler(noteService *sr.NoteUsecase, classService *srClass.ClassUse
 				return
 			}
 
-			class, err := classService.GetClassByID(classID)
+			class, err := classService.GetClassByID(ctx, classID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
 				return
@@ -74,7 +80,7 @@ func GetNotesHandler(noteService *sr.NoteUsecase, classService *srClass.ClassUse
 				return
 			}
 
-			result, err := noteService.GetNotesByClassID(classID)
+			result, err := noteService.GetNotesByClassID(ctx, classID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 				return
@@ -90,7 +96,7 @@ func GetNotesHandler(noteService *sr.NoteUsecase, classService *srClass.ClassUse
 				return
 			}
 
-			result, err := noteService.GetNotesByClassID(user.ClassID)
+			result, err := noteService.GetNotesByClassID(ctx, user.ClassID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 				return
@@ -100,7 +106,7 @@ func GetNotesHandler(noteService *sr.NoteUsecase, classService *srClass.ClassUse
 			return
 		}
 
-		result, err := noteService.GetAllNotes()
+		result, err := noteService.GetAllNotes(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 			return
@@ -130,13 +136,16 @@ func AddNoteHandler(noteService *sr.NoteUsecase, users *usersvc.UsersUsecase, pe
 			return
 		}
 
-		err := perm.CheckUserRole(login, string(ratingModels.RoleHelper), string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		err := perm.CheckUserRole(ctx, login, string(ratingModels.RoleHelper), string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
 		if err != nil {
 			c.JSON(500, gin.H{"error": "You dont have permisions for that action"})
 			return
 		}
 
-		user, err := users.GetUserByLogin(login)
+		user, err := users.GetUserByLogin(ctx, login)
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
@@ -174,7 +183,7 @@ func AddNoteHandler(noteService *sr.NoteUsecase, users *usersvc.UsersUsecase, pe
 			ClassID:  user.ClassID,
 		}
 
-		if err := noteService.AddNewNote(login, &in, needUser); err != nil {
+		if err := noteService.AddNewNote(ctx, login, &in, needUser); err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
@@ -213,7 +222,10 @@ func DeleteNoteHandler(noteService *sr.NoteUsecase, users *usersvc.UsersUsecase)
 			return
 		}
 
-		foundUser, err := users.GetUserByLogin(login)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		foundUser, err := users.GetUserByLogin(ctx, login)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
 			return
@@ -244,7 +256,7 @@ func DeleteNoteHandler(noteService *sr.NoteUsecase, users *usersvc.UsersUsecase)
 		}
 
 		needUser := u.UserToSafeUser(*foundUser)
-		if err := noteService.DeleteNote(idInt, *needUser); err != nil {
+		if err := noteService.DeleteNote(ctx, idInt, *needUser); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

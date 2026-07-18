@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"context"
 )
 
 type postgresRepository struct {
@@ -26,7 +27,7 @@ func New(db *sql.DB) classRepo.ClassRepository {
 	return &postgresRepository{db: db}
 }
 
-func (r *postgresRepository) EnsureClass(name string) error {
+func (r *postgresRepository) EnsureClass(ctx context.Context, name string) error {
 	name = normalizeClassName(name)
 	if name == "" {
 		return errors.New("class is required")
@@ -39,11 +40,11 @@ func (r *postgresRepository) EnsureClass(name string) error {
 	return r.syncClassLocked(name)
 }
 
-func (r *postgresRepository) AddParallel(name string, classesIDs []int) error {
+func (r *postgresRepository) AddParallel(ctx context.Context, name string, classesIDs []int) error {
 	return r.addParallelInternal(name, classesIDs)
 }
 
-func (r *postgresRepository) GetParallelClasses() ([]classModels.ParallelClass, error) {
+func (r *postgresRepository) GetParallelClasses(ctx context.Context) ([]classModels.ParallelClass, error) {
 	rows, err := r.db.Query(`SELECT Id, Name, BestClassID, ClassTotalRating FROM parallels ORDER BY Name`)
 	if err != nil {
 		return nil, err
@@ -84,7 +85,7 @@ func (r *postgresRepository) GetParallelClasses() ([]classModels.ParallelClass, 
 	return parallelClasses, nil
 }
 
-func (r *postgresRepository) QuarterComplete(parallelClassID int) ([]*classModels.Class, error) {
+func (r *postgresRepository) QuarterComplete(ctx context.Context, parallelClassID int) ([]*classModels.Class, error) {
 	if parallelClassID <= 0 {
 		return nil, errors.New("parallel class id is required")
 	}
@@ -148,7 +149,7 @@ func (r *postgresRepository) QuarterComplete(parallelClassID int) ([]*classModel
 	return top3, nil
 }
 
-func (r *postgresRepository) YearComplete() ([]*classModels.Class, error) {
+func (r *postgresRepository) YearComplete(ctx context.Context) ([]*classModels.Class, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return nil, err
@@ -303,7 +304,7 @@ func (r *postgresRepository) getParallelClassByIDLocked(parallelClassID int) (*c
 	return &parallelClass, nil
 }
 
-func (r *postgresRepository) DeleteParallelClassByID(parallelClassID int, login string) error {
+func (r *postgresRepository) DeleteParallelClassByID(ctx context.Context, parallelClassID int, login string) error {
 	if parallelClassID <= 0 {
 		return errors.New("parallel class id is required")
 	}
@@ -323,7 +324,7 @@ func (r *postgresRepository) DeleteParallelClassByID(parallelClassID int, login 
 	return err
 }
 
-func (r *postgresRepository) DeleteClassByID(classID int, login string) error {
+func (r *postgresRepository) DeleteClassByID(ctx context.Context, classID int, login string) error {
 	if classID <= 0 {
 		return errors.New("class id is required")
 	}
@@ -383,7 +384,7 @@ func (r *postgresRepository) DeleteClassByID(classID int, login string) error {
 	return r.syncAllClassesLocked()
 }
 
-func (r *postgresRepository) GetAllClassTeachers() ([]userModels.SafeUser, error) {
+func (r *postgresRepository) GetAllClassTeachers(ctx context.Context) ([]userModels.SafeUser, error) {
 	rows, err := r.db.Query(`
 		SELECT u.Id, u.Avatar, u.Name, u.FullName, u.LastName, u.Login, u.Rating, u.Role, u.Class, u.ClassID
 		FROM users u
@@ -398,7 +399,7 @@ func (r *postgresRepository) GetAllClassTeachers() ([]userModels.SafeUser, error
 	return scanSafeUsers(rows)
 }
 
-func (r *postgresRepository) AddClass(input classModels.ClassInput, login string) error {
+func (r *postgresRepository) AddClass(ctx context.Context, input classModels.ClassInput, login string) error {
 	check, err := r.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
 	if err != nil || !check {
 		return errors.New("no permission")
@@ -412,7 +413,7 @@ func (r *postgresRepository) AddClass(input classModels.ClassInput, login string
 	return r.saveClassInternal(input.Name, grade, letter, input.TeacherLogin)
 }
 
-func (r *postgresRepository) AddParallelByGradeRange(name string, minGrade, maxGrade int) error {
+func (r *postgresRepository) AddParallelByGradeRange(ctx context.Context, name string, minGrade, maxGrade int) error {
 	rows, err := r.db.Query("SELECT Id FROM classes WHERE Grade >= $1 AND Grade <= $2", minGrade, maxGrade)
 	if err != nil {
 		return err
@@ -477,7 +478,7 @@ func (r *postgresRepository) addParallelInternal(name string, classesIDs []int) 
 	return tx.Commit()
 }
 
-func (r *postgresRepository) UpdateClass(classID int, input classModels.ClassInput, login string) error {
+func (r *postgresRepository) UpdateClass(ctx context.Context, classID int, input classModels.ClassInput, login string) error {
 	check, err := r.hasUserRoleLocked(login, string(ratingModels.RoleOwner))
 	if err != nil || !check {
 		return errors.New("no permission")
@@ -519,7 +520,7 @@ func (r *postgresRepository) saveClassInternal(name string, grade int, letter st
 	return r.autoAssignClassToParallelLocked(int(classID))
 }
 
-func (r *postgresRepository) GetClassIDsByRange(minGrade, maxGrade int) ([]int, error) {
+func (r *postgresRepository) GetClassIDsByRange(ctx context.Context, minGrade, maxGrade int) ([]int, error) {
 	rows, err := r.db.Query("SELECT Id FROM classes WHERE Grade >= $1 AND Grade <= $2", minGrade, maxGrade)
 	if err != nil {
 		return nil, err
@@ -625,7 +626,7 @@ func (r *postgresRepository) saveClassTeacherLocked(name string, teacherLogin st
 	return r.syncClassLocked(name)
 }
 
-func (r *postgresRepository) GetClassesInParallel(id int) ([]classModels.Class, error) {
+func (r *postgresRepository) GetClassesInParallel(ctx context.Context, parallelID int) ([]classModels.Class, error) {
 	rows, err := r.db.Query(`
         SELECT c.Id, c.Name, c.Grade, c.Letter, c.TeacherLogin, c.Members,
                c.UserTotalRating, c.ClassTotalRating,
@@ -634,7 +635,7 @@ func (r *postgresRepository) GetClassesInParallel(id int) ([]classModels.Class, 
         JOIN parallel_classes pc ON pc.ClassID = c.Id
         WHERE pc.ParallelID = $1
         ORDER BY c.Name
-    `, id)
+    `, parallelID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -665,7 +666,7 @@ func (r *postgresRepository) GetClassesInParallel(id int) ([]classModels.Class, 
 	return classes, nil
 }
 
-func (r *postgresRepository) GetAllClasses() ([]classModels.Class, error) {
+func (r *postgresRepository) GetAllClasses(ctx context.Context) ([]classModels.Class, error) {
 	rows, err := r.db.Query(`
 		SELECT Id, Name, Grade, Letter, TeacherLogin, Members, UserTotalRating, ClassTotalRating,
 		FirstQuarterComplete, SecondQuarterComplete, ThirdQuarterComplete
@@ -707,7 +708,7 @@ func (r *postgresRepository) GetAllClasses() ([]classModels.Class, error) {
 	return classes, nil
 }
 
-func (r *postgresRepository) SaveClassTeacherByID(classID int, teacherLogin string) error {
+func (r *postgresRepository) SaveClassTeacherByID(ctx context.Context, classID int, teacherLogin string) error {
 	if classID <= 0 {
 		return errors.New("class id is required")
 	}
@@ -723,7 +724,7 @@ func (r *postgresRepository) SaveClassTeacherByID(classID int, teacherLogin stri
 	return r.saveClassTeacherLocked(class.Name, teacherLogin)
 }
 
-func (r *postgresRepository) GetClassByID(id int) (*classModels.Class, error) {
+func (r *postgresRepository) GetClassByID(ctx context.Context, id int) (*classModels.Class, error) {
 	if id <= 0 {
 		return nil, errors.New("class id is required")
 	}
@@ -731,30 +732,56 @@ func (r *postgresRepository) GetClassByID(id int) (*classModels.Class, error) {
 	return r.getClassByIDLocked(id)
 }
 
-func (r *postgresRepository) GetClassTeacherByID(classID int) (*userModels.SafeUser, error) {
+func (r *postgresRepository) GetClassTeacherByID(ctx context.Context, classID int) (*userModels.SafeUser, error) {
 	if classID <= 0 {
 		return nil, errors.New("class id is required")
 	}
 
-	class, err := r.getClassByIDLocked(classID)
+	// Single context-aware JOIN: resolve the class's teacher login and load that
+	// user in one round-trip. This is on the /api/me fan-out hot path, so it must
+	// (a) honour the request timeout/cancellation and (b) avoid the previous
+	// two-query dance (wide class scan + separate user lookup).
+	row := r.db.QueryRowContext(ctx, `
+		SELECT u.Id, u.Avatar, u.Name, u.FullName, u.LastName, u.Login, u.Rating, u.Role, u.Class, u.ClassID
+		FROM classes c
+		JOIN users u ON u.Login = c.TeacherLogin
+		WHERE c.id = $1 AND c.TeacherLogin IS NOT NULL AND c.TeacherLogin <> ''
+	`, classID)
+
+	var user userModels.SafeUser
+	var fullNameJSON sql.NullString
+	err := row.Scan(
+		&user.ID,
+		&user.Avatar,
+		&user.Name,
+		&fullNameJSON,
+		&user.LastName,
+		&user.Login,
+		&user.Rating,
+		&user.Role,
+		&user.Class,
+		&user.ClassID,
+	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // no class or no teacher assigned
+		}
 		return nil, err
 	}
-	if class == nil {
-		return nil, nil
+
+	if fullNameJSON.Valid && fullNameJSON.String != "" {
+		if err := json.Unmarshal([]byte(fullNameJSON.String), &user.FullName); err != nil {
+			return nil, err
+		}
+	}
+	if user.FullName == nil {
+		user.FullName = []userModels.FullName{}
 	}
 
-	if class.TeacherLogin == "" {
-		return nil, nil
-	}
-	if class.Teacher != nil {
-		return class.Teacher, nil
-	}
-
-	return r.getSafeUserByLoginLocked(class.TeacherLogin)
+	return &user, nil
 }
 
-func (r *postgresRepository) GetUsersByClassID(classID int) ([]userModels.SafeUser, error) {
+func (r *postgresRepository) GetUsersByClassID(ctx context.Context, classID int) ([]userModels.SafeUser, error) {
 	if classID <= 0 {
 		return nil, errors.New("class id is required")
 	}
@@ -1152,7 +1179,7 @@ func (r *postgresRepository) findTeacherCandidateLocked(classID int) (string, er
 	return login, nil
 }
 
-func (r *postgresRepository) InitializeParallelsFromConfig(parallels []classConfig.ParallelConfig) error {
+func (r *postgresRepository) InitializeParallelsFromConfig(ctx context.Context, parallels []classConfig.ParallelConfig) error {
 	if len(parallels) == 0 {
 		return nil
 	}

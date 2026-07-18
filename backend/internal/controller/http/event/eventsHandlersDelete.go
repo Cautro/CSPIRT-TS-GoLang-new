@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"context"
+	"strconv"
+	"time"
+
 	sr "cspirt/internal/usecase/event"
 	permissionService "cspirt/internal/controller/permission/usecase"
 	"cspirt/pkg/logger"
 	ratingModels "cspirt/internal/domain/rating"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,49 +23,52 @@ import (
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/{eventId}/params/delete [delete]
-func DeleteEventParamsHandler(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
+func DeleteEventParamsHandler(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		if err := eventService.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		err := perm.CheckUserRole(ctx.GetString("Login"), "owner")
+		err := perm.CheckUserRole(ctx, c.GetString("Login"), "owner")
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "delete_event_params",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "failed to check user role: " + err.Error(),
 			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
+			c.JSON(500, gin.H{"error": "Failed to check user role"})
 			return
 		}
 
-		eventID, err := strconv.Atoi(ctx.Param("eventId"))
+		eventID, err := strconv.Atoi(c.Param("eventId"))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_event_params",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid event id: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(400, gin.H{"error": "Invalid event ID"})
 			return
 		}
 
-		if err := eventService.DeleteEventParams(eventID); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to delete event params"})
+		if err := eventService.DeleteEventParams(ctx, eventID); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to delete event params"})
 			return
 		}
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "delete_event_params",
-			Login:   ctx.GetString("Login"),
+			Login:   c.GetString("Login"),
 			Message: "event params deleted successfully",
 		})
-		ctx.JSON(200, gin.H{"message": "Event params deleted successfully"})
+		c.JSON(200, gin.H{"message": "Event params deleted successfully"})
 	}
 }
 
@@ -76,49 +82,52 @@ func DeleteEventParamsHandler(eventService *sr.EventsUsecase, perm *permissionSe
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/delete/{id} [delete]
-func DeleteEventHandler(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(ctx *gin.Context) {
-	return func(ctx *gin.Context) {
+func DeleteEventHandler(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(c *gin.Context) {
+	return func(c *gin.Context) {
 		if err := eventService.ActivateDueEvents(); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to activate due events"})
+			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		err := perm.CheckUserRole(ctx.GetString("Login"), "owner")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		err := perm.CheckUserRole(ctx, c.GetString("Login"), "owner")
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "delete_event",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "failed to check user role: " + err.Error(),
 			})
-			ctx.JSON(500, gin.H{"error": "Failed to check user role"})
+			c.JSON(500, gin.H{"error": "Failed to check user role"})
 			return
 		}
 
-		eventID, err := strconv.Atoi(ctx.Param("id"))
+		eventID, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "delete_event",
-				Login:   ctx.GetString("Login"),
+				Login:   c.GetString("Login"),
 				Message: "invalid event id: " + err.Error(),
 			})
-			ctx.JSON(400, gin.H{"error": "Invalid event ID"})
+			c.JSON(400, gin.H{"error": "Invalid event ID"})
 			return
 		}
 
-		if err := eventService.DeleteEvent(eventID); err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to delete event"})
+		if err := eventService.DeleteEvent(ctx, eventID); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to delete event"})
 			return
 		}
 
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "info",
 			Action:  "delete_event",
-			Login:   ctx.GetString("Login"),
+			Login:   c.GetString("Login"),
 			Message: "event deleted successfully",
 		})
-		ctx.JSON(200, gin.H{"message": "Event deleted successfully"})
+		c.JSON(200, gin.H{"message": "Event deleted successfully"})
 	}
 }
 
@@ -134,14 +143,17 @@ func DeleteEventHandler(eventService *sr.EventsUsecase, perm *permissionService.
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /api/event/{eventId}/players/delete [delete]
-func DeletePlayersFromEvent(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(ctx *gin.Context) {
+func DeletePlayersFromEvent(eventService *sr.EventsUsecase, perm *permissionService.Usecase) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		if err := eventService.ActivateDueEvents(); err != nil {
 			c.JSON(500, gin.H{"error": "Failed to activate due events"})
 			return
 		}
 
-		err := perm.CheckUserRole(c.GetString("Login"), string(ratingModels.RoleOwner), string(ratingModels.RoleAdmin))
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		err := perm.CheckUserRole(ctx, c.GetString("Login"), string(ratingModels.RoleOwner), string(ratingModels.RoleAdmin))
 		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
@@ -179,7 +191,7 @@ func DeletePlayersFromEvent(eventService *sr.EventsUsecase, perm *permissionServ
 			return
 		}
 
-		if err := eventService.DeletePlayersFromEvent(eventID, req.PlayerIDs); err != nil {
+		if err := eventService.DeletePlayersFromEvent(ctx, eventID, req.PlayerIDs); err != nil {
 			c.JSON(500, gin.H{"error": "Failed to delete players from event"})
 			return
 		}

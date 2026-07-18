@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"context"
 )
 
 type postgresRepository struct {
@@ -19,7 +20,7 @@ func New(db *sql.DB) repo.NoteRepository {
 	return &postgresRepository{db: db}
 }
 
-func (r *postgresRepository) AddNote(login string, note models.Note, user models.SafeUser) error {
+func (r *postgresRepository) AddNote(ctx context.Context, login string, note models.Note, user models.SafeUser) error {
 	note.Content = strings.TrimSpace(note.Content)
 	if note.TargetID <= 0 || note.AuthorID <= 0 {
 		return errors.New("target and author are required")
@@ -56,7 +57,7 @@ func (r *postgresRepository) AddNote(login string, note models.Note, user models
 	return err
 }
 
-func (r *postgresRepository) DeleteNote(id int, user models.SafeUser) error {
+func (r *postgresRepository) DeleteNote(ctx context.Context, id int, user models.SafeUser) error {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_note",
@@ -91,7 +92,7 @@ func (r *postgresRepository) DeleteNote(id int, user models.SafeUser) error {
 	return err
 }
 
-func (r *postgresRepository) GetAllNotes() ([]models.Note, error) {
+func (r *postgresRepository) GetAllNotes(ctx context.Context) ([]models.Note, error) {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_all_notes",
@@ -155,14 +156,14 @@ func (r *postgresRepository) GetAllNotes() ([]models.Note, error) {
 	return notes, nil
 }
 
-func (r *postgresRepository) GetNotesByUserId(User_id int) ([]models.Note, error) {
+func (r *postgresRepository) GetNotesByUserId(ctx context.Context, User_id int) ([]models.Note, error) {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_note_by_user_id",
 		Message: "getting needed note by user id",
 	})
 
-	rows, err := r.db.Query(`
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM notes
 		WHERE TargetID = $1
@@ -222,7 +223,7 @@ func (r *postgresRepository) GetNotesByUserId(User_id int) ([]models.Note, error
 	return notes, nil
 }
 
-func (r *postgresRepository) GetNotesByClassID(classID int) ([]models.Note, error) {
+func (r *postgresRepository) GetNotesByClassID(ctx context.Context, classID int) ([]models.Note, error) {
 	if classID <= 0 {
 		return nil, errors.New("invalid class id")
 	}
@@ -288,7 +289,7 @@ func (r *postgresRepository) GetNotesByClassID(classID int) ([]models.Note, erro
 	return notes, nil
 }
 
-func (r *postgresRepository) GetNoteByID(id int) ([]models.Note, error) {
+func (r *postgresRepository) GetNoteByID(ctx context.Context, id int) ([]models.Note, error) {
 	rows, err := r.db.Query(`
 		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
 		FROM notes

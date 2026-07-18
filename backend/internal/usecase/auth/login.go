@@ -11,6 +11,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"context"
 )
 
 type AuthUsecase struct {
@@ -24,9 +25,6 @@ type LoginResult struct {
 	RefreshToken string
 }
 
-// NewAuthService builds the auth usecase. cache may be nil, in which case
-// rate limiting and token revocation are silently disabled (see
-// internal/adapter/redis/README.md).
 func NewAuthService(users repo.UserRepository, jwtSecret string, cache cacheRepo.CacheRepository) *AuthUsecase {
 	return &AuthUsecase{
 		users:     users,
@@ -35,17 +33,17 @@ func NewAuthService(users repo.UserRepository, jwtSecret string, cache cacheRepo
 	}
 }
 
-func (s *AuthUsecase) Login(in entity.LoginInput) (LoginResult, error) {
+func (s *AuthUsecase) Login(ctx context.Context, in entity.LoginInput) (LoginResult, error) {
 	in.Login = strings.TrimSpace(in.Login)
 	if in.Login == "" || in.Password == "" {
 		return LoginResult{}, nil
 	}
 
-	if s.checkLoginRateLimit(in.Login) {
+	if s.checkLoginRateLimit(ctx, in.Login) {
 		return LoginResult{}, ErrTooManyLoginAttempts
 	}
 
-	user, err := s.users.GetUserByLogin(in.Login)
+	user, err := s.users.GetUserByLogin(ctx, in.Login)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -70,11 +68,11 @@ func (s *AuthUsecase) Login(in entity.LoginInput) (LoginResult, error) {
 
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	if err := s.users.SaveRefreshToken(user.ID, refreshToken, expiresAt); err != nil {
+	if err := s.users.SaveRefreshToken(ctx, user.ID, refreshToken, expiresAt); err != nil {
 		return LoginResult{}, err
 	}
 
-	s.resetLoginRateLimit(in.Login)
+	s.resetLoginRateLimit(ctx, in.Login)
 
 	return LoginResult{
 		Token:        accessToken,
@@ -82,8 +80,8 @@ func (s *AuthUsecase) Login(in entity.LoginInput) (LoginResult, error) {
 	}, nil
 }
 
-func (s *AuthUsecase) Refresh(refreshToken string) (LoginResult, error) {
-	session, err := s.users.GetRefreshToken(refreshToken)
+func (s *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (LoginResult, error) {
+	session, err := s.users.GetRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -93,11 +91,11 @@ func (s *AuthUsecase) Refresh(refreshToken string) (LoginResult, error) {
 	}
 
 	if time.Now().After(session.ExpiresAt) {
-		_ = s.users.DeleteRefreshToken(refreshToken)
+		_ = s.users.DeleteRefreshToken(ctx, refreshToken)
 		return LoginResult{}, errors.New("refresh token expired")
 	}
 
-	user, err := s.users.GetUserByID(session.UserID)
+	user, err := s.users.GetUserByID(ctx, session.UserID)
 	if err != nil {
 		return LoginResult{}, err
 	}

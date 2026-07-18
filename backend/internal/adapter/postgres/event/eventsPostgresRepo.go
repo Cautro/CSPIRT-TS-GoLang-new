@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"context"
 
 	models "cspirt/internal/domain/event"
 	"cspirt/internal/domain/event/repo"
@@ -37,7 +38,7 @@ func (r *postgresRepository) ActivateDueEvents() error {
 	return err
 }
 
-func (r *postgresRepository) GetEventsByID(eventID int) (*models.Event, error) {
+func (r *postgresRepository) GetEventsByID(ctx context.Context, eventID int) (*models.Event, error) {
 	if eventID <= 0 {
 		return nil, errors.New("invalid event id")
 	}
@@ -65,14 +66,14 @@ func (r *postgresRepository) GetEventsByID(eventID int) (*models.Event, error) {
 	return &events[0], nil
 }
 
-func (r *postgresRepository) GetEvents() ([]models.Event, error) {
+func (r *postgresRepository) GetEvents(ctx context.Context) ([]models.Event, error) {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_all_events",
 		Message: "Getting all events",
 	})
 
-	rows, err := r.db.Query(`
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT Id, Title, Status, RatingReward, Description, CreatedAt, StartedAt, Players, Classes
 		FROM events
 		ORDER BY Id
@@ -90,7 +91,7 @@ func (r *postgresRepository) GetEvents() ([]models.Event, error) {
 	return scanEvents(rows)
 }
 
-func (r *postgresRepository) AddEvent(event models.Event) error {
+func (r *postgresRepository) AddEvent(ctx context.Context, event models.Event) error {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "add_event",
@@ -197,7 +198,7 @@ func (r *postgresRepository) AddEvent(event models.Event) error {
 	return nil
 }
 
-func (r *postgresRepository) GetEventParams(eventID int) ([]models.EventParams, error) {
+func (r *postgresRepository) GetEventParams(ctx context.Context, eventID int) ([]models.EventParams, error) {
 	if eventID <= 0 {
 		return nil, errors.New("invalid event id")
 	}
@@ -228,7 +229,7 @@ func (r *postgresRepository) GetEventParams(eventID int) ([]models.EventParams, 
 	return params, nil
 }
 
-func (r *postgresRepository) DeleteEventParams(eventID int) error {
+func (r *postgresRepository) DeleteEventParams(ctx context.Context, eventID int) error {
 	if eventID <= 0 {
 		return errors.New("invalid event id")
 	}
@@ -274,7 +275,7 @@ func (r *postgresRepository) DeleteEventParams(eventID int) error {
 	return nil
 }
 
-func (r *postgresRepository) AddEventParams(eventID int, params *models.EventParams) error {
+func (r *postgresRepository) AddEventParams(ctx context.Context, eventID int, params *models.EventParams) error {
 	if eventID <= 0 {
 		return errors.New("invalid event id")
 	}
@@ -324,7 +325,7 @@ func (r *postgresRepository) AddEventParams(eventID int, params *models.EventPar
 	return nil
 }
 
-func (r *postgresRepository) GetEventPlayers(eventID int) ([]userModels.SafeUser, error) {
+func (r *postgresRepository) GetEventPlayers(ctx context.Context, eventID int) ([]userModels.SafeUser, error) {
 	if eventID <= 0 {
 		return nil, errors.New("invalid event id")
 	}
@@ -359,7 +360,7 @@ func (r *postgresRepository) GetEventPlayers(eventID int) ([]userModels.SafeUser
 	return scanSafeUsersNoAvatar(rows)
 }
 
-func (r *postgresRepository) GetEventPlayersCount(eventID int) (int, error) {
+func (r *postgresRepository) GetEventPlayersCount(ctx context.Context, eventID int) (int, error) {
 	players, err := r.getEventPlayersLocked(eventID)
 	if err != nil {
 		return 0, err
@@ -368,7 +369,7 @@ func (r *postgresRepository) GetEventPlayersCount(eventID int) (int, error) {
 	return len(players), nil
 }
 
-func (r *postgresRepository) EventComplete(eventID int, ratingReward int, _ int) error {
+func (r *postgresRepository) EventComplete(ctx context.Context, eventID int, ratingReward int, _ int) error {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "complete_event",
@@ -523,8 +524,8 @@ func getEventClassRewardsTx(tx *sql.Tx, eventID int) (map[int]int, []int, error)
 	return rewards, classIDs, nil
 }
 
-func (r *postgresRepository) GetEventsByUserID(userID int) ([]models.Event, error) {
-	rows, err := r.db.Query(`
+func (r *postgresRepository) GetEventsByUserID(ctx context.Context, userID int) ([]models.Event, error) {
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT e.Id, e.Title, e.Status, e.RatingReward, e.Description, e.CreatedAt, e.StartedAt, e.Players, e.Classes
 		FROM events e
 		JOIN event_players ep ON ep.event_id = e.Id
@@ -539,7 +540,7 @@ func (r *postgresRepository) GetEventsByUserID(userID int) ([]models.Event, erro
 	return scanEvents(rows)
 }
 
-func (r *postgresRepository) GetEventsByClassID(classID int) ([]models.Event, error) {
+func (r *postgresRepository) GetEventsByClassID(ctx context.Context, classID int) ([]models.Event, error) {
 	rows, err := r.db.Query(`
 		SELECT e.Id, e.Title, e.Status, e.RatingReward, e.Description, e.CreatedAt, e.StartedAt, e.Players, e.Classes
 		FROM events e
@@ -555,7 +556,7 @@ func (r *postgresRepository) GetEventsByClassID(classID int) ([]models.Event, er
 	return scanEvents(rows)
 }
 
-func (r *postgresRepository) DeleteEvent(eventID int) error {
+func (r *postgresRepository) DeleteEvent(ctx context.Context, eventID int) error {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_event",
@@ -625,7 +626,7 @@ func (r *postgresRepository) DeleteEvent(eventID int) error {
 	return nil
 }
 
-func (r *postgresRepository) AddPlayersToEvent(eventID int, playerIDs []int, login string) error {
+func (r *postgresRepository) AddPlayersToEvent(ctx context.Context, eventID int, playerIDs []int, login string) error {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "add_event_players",
@@ -718,7 +719,7 @@ func (r *postgresRepository) AddPlayersToEvent(eventID int, playerIDs []int, log
 	return tx.Commit()
 }
 
-func (r *postgresRepository) UpdateEventParams(eventID int, params *models.EventParams) error {
+func (r *postgresRepository) UpdateEventParams(ctx context.Context, eventID int, params *models.EventParams) error {
 	if eventID <= 0 {
 		return errors.New("invalid event id")
 	}
@@ -767,7 +768,7 @@ func (r *postgresRepository) UpdateEventParams(eventID int, params *models.Event
 			Action:  "update_event_params",
 			Message: "event params not found, inserting new params",
 		})
-		if err := r.AddEventParams(eventID, params); err != nil {
+		if err := r.AddEventParams(ctx, eventID, params); err != nil {
 			return err
 		}
 	} else {
@@ -795,7 +796,7 @@ func (r *postgresRepository) UpdateEventParams(eventID int, params *models.Event
 	return nil
 }
 
-func (r *postgresRepository) UpdateEvent(eventID int, updatedEvent *models.Event) error {
+func (r *postgresRepository) UpdateEvent(ctx context.Context, eventID int, updatedEvent *models.Event) error {
 
 	if eventID <= 0 {
 		return errors.New("invalid event id")
@@ -805,7 +806,7 @@ func (r *postgresRepository) UpdateEvent(eventID int, updatedEvent *models.Event
 		return errors.New("invalid event data")
 	}
 
-	currentEvent, err := r.GetEventsByID(eventID)
+	currentEvent, err := r.GetEventsByID(ctx, eventID)
 	if err != nil {
 		return err
 	}
@@ -835,7 +836,7 @@ func (r *postgresRepository) UpdateEvent(eventID int, updatedEvent *models.Event
 	return tx.Commit()
 }
 
-func (r *postgresRepository) DeletePlayersFromEvent(eventID int, playerIDs []int) error {
+func (r *postgresRepository) DeletePlayersFromEvent(ctx context.Context, eventID int, playerIDs []int) error {
 
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",

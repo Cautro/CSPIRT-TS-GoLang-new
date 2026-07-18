@@ -12,6 +12,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"context"
 )
 
 type postgresRepository struct {
@@ -24,8 +25,11 @@ func New(db *sql.DB) repo.UserRepository {
 	}
 }
 
-func (r *postgresRepository) GetOnlyStaffUsers() ([]entity.SafeUser, error) {
-	rows, err := r.db.Query(`
+func (r *postgresRepository) GetOnlyStaffUsers(ctx context.Context) ([]entity.SafeUser, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT Id, Avatar, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
 		FROM users
 		WHERE LOWER(Role) IN ('admin', 'owner')
@@ -39,7 +43,10 @@ func (r *postgresRepository) GetOnlyStaffUsers() ([]entity.SafeUser, error) {
 	return scanSafeUsers(rows)
 }
 
-func (r *postgresRepository) UpdateAvatar(input entity.UpdateAvatarRequest, id int) error {
+func (r *postgresRepository) UpdateAvatar(ctx context.Context, input entity.UpdateAvatarRequest, id int) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	result, err := r.db.Exec(`
 		UPDATE users
 		SET Avatar = $1
@@ -64,7 +71,9 @@ func (r *postgresRepository) UpdateAvatar(input entity.UpdateAvatarRequest, id i
 	return nil
 }
 
-func (r *postgresRepository) AddUser(user entity.User) error {
+func (r *postgresRepository) AddUser(ctx context.Context, user entity.User) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
 	trimUserInput(&user)
 
@@ -166,7 +175,10 @@ func (r *postgresRepository) AddUser(user entity.User) error {
 	return nil
 }
 
-func (r *postgresRepository) SaveUser(user entity.SafeUser) error {
+func (r *postgresRepository) SaveUser(ctx context.Context, user entity.SafeUser) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	user.Login = normalizeLogin(user.Login)
 	user.Name = strings.TrimSpace(user.Name)
 	user.LastName = strings.TrimSpace(user.LastName)
@@ -192,7 +204,7 @@ func (r *postgresRepository) SaveUser(user entity.SafeUser) error {
 	}
 	user.Rating = clampRating(user.Rating)
 
-	oldUser, err := r.getUserByIDLocked(user.ID)
+	oldUser, err := r.getUserByIDLocked(ctx, user.ID)
 	if err != nil {
 		return err
 	}
@@ -275,12 +287,15 @@ func (r *postgresRepository) SaveUser(user entity.SafeUser) error {
 	return nil
 }
 
-func (r *postgresRepository) UpdateUser(id int, req entity.UpdateUserRequest, login string) error {
+func (r *postgresRepository) UpdateUser(ctx context.Context, id int, req entity.UpdateUserRequest, login string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if id <= 0 {
 		return errors.New("user id is required")
 	}
 
-	oldUser, err := r.getUserByIDLocked(id)
+	oldUser, err := r.getUserByIDLocked(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -403,14 +418,17 @@ func (r *postgresRepository) UpdateUser(id int, req entity.UpdateUserRequest, lo
 	return nil
 }
 
-func (r *postgresRepository) DeleteUser(id int) error {
+func (r *postgresRepository) DeleteUser(ctx context.Context, id int) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_user",
 		Message: "deleting user",
 	})
 
-	deletedUser, err := r.getUserByIDLocked(id)
+	deletedUser, err := r.getUserByIDLocked(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -448,14 +466,17 @@ func (r *postgresRepository) DeleteUser(id int) error {
 	return nil
 }
 
-func (r *postgresRepository) GetAllUsers() ([]entity.SafeUser, error) {
+func (r *postgresRepository) GetAllUsers(ctx context.Context) ([]entity.SafeUser, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_all_users",
 		Message: "getting all users",
 	})
 
-	rows, err := r.db.Query(`
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT Id, Avatar, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
 		FROM users
 		ORDER BY ClassID, LastName, Name, Login
@@ -483,24 +504,36 @@ func (r *postgresRepository) GetAllUsers() ([]entity.SafeUser, error) {
 	return users, nil
 }
 
-func (r *postgresRepository) GetUserByLogin(login string) (*entity.User, error) {
-	return r.getUserByLoginLocked(login)
+func (r *postgresRepository) GetUserByLogin(ctx context.Context, login string) (*entity.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	return r.getUserByLoginLocked(ctx, login)
 }
 
-func (r *postgresRepository) GetUserByID(id int) (*entity.User, error) {
-	return r.getUserByIDLocked(id)
+func (r *postgresRepository) GetUserByID(ctx context.Context, id int) (*entity.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	return r.getUserByIDLocked(ctx, id)
 }
 
-func (r *postgresRepository) GetUsersByClassID(classID int) ([]entity.SafeUser, error) {
+func (r *postgresRepository) GetUsersByClassID(ctx context.Context, classID int) ([]entity.SafeUser, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if classID <= 0 {
 		return nil, errors.New("class id is required")
 	}
 
-	return r.getUsersByClassIDLocked(classID)
+	return r.getUsersByClassIDLocked(ctx, classID)
 }
 
-func (r *postgresRepository) SaveRefreshToken(userID int, token string, expiresAt time.Time) error {
-	_, err := r.db.Exec(`
+func (r *postgresRepository) SaveRefreshToken(ctx context.Context, userID int, token string, expiresAt time.Time) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO refresh_tokens (user_id, token, expires_at)
 		VALUES ($1, $2, $3)
 	`, userID, token, expiresAt)
@@ -521,8 +554,11 @@ func (r *postgresRepository) SaveRefreshToken(userID int, token string, expiresA
 	return nil
 }
 
-func (r *postgresRepository) GetRefreshToken(token string) (*entity.RefreshToken, error) {
-	row := r.db.QueryRow(`
+func (r *postgresRepository) GetRefreshToken(ctx context.Context, token string) (*entity.RefreshToken, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	row := r.db.QueryRowContext(ctx, `
 		SELECT id, user_id, token, expires_at, created_at
 		FROM refresh_tokens
 		WHERE token = $1
@@ -552,8 +588,11 @@ func (r *postgresRepository) GetRefreshToken(token string) (*entity.RefreshToken
 	return &rt, nil
 }
 
-func (r *postgresRepository) DeleteRefreshToken(token string) error {
-	_, err := r.db.Exec(`
+func (r *postgresRepository) DeleteRefreshToken(ctx context.Context, token string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	_, err := r.db.ExecContext(ctx, `
 		DELETE FROM refresh_tokens
 		WHERE token = $1
 	`, token)
@@ -758,7 +797,7 @@ func (r *postgresRepository) syncClassByIDLocked(classID int) error {
 		return nil
 	}
 
-	members, err := r.getUsersByClassIDLocked(classID)
+	members, err := r.getUsersByClassIDLocked(context.Background(), classID)
 	if err != nil {
 		return err
 	}
@@ -788,7 +827,7 @@ func (r *postgresRepository) syncClassByIDLocked(classID int) error {
 	}
 
 	if teacherLogin.Valid && teacherLogin.String != "" {
-		teacher, err := r.getUserByLoginLocked(teacherLogin.String)
+		teacher, err := r.getUserByLoginLocked(context.Background(), teacherLogin.String)
 		if err != nil {
 			return err
 		}
@@ -846,7 +885,7 @@ func (r *postgresRepository) findTeacherCandidateLocked(classID int) (string, er
 }
 
 func (r *postgresRepository) getSafeUserByLoginLocked(login string) (*entity.SafeUser, error) {
-	user, err := r.getUserByLoginLocked(login)
+	user, err := r.getUserByLoginLocked(context.Background(), login)
 	if err != nil {
 		return nil, err
 	}
@@ -868,8 +907,8 @@ func (r *postgresRepository) getSafeUserByLoginLocked(login string) (*entity.Saf
 	}, nil
 }
 
-func (r *postgresRepository) getUserByLoginLocked(login string) (*entity.User, error) {
-	row := r.db.QueryRow(`
+func (r *postgresRepository) getUserByLoginLocked(ctx context.Context, login string) (*entity.User, error) {
+	row := r.db.QueryRowContext(ctx, `
 		SELECT Id, Avatar, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID
 		FROM users
 		WHERE Login = $1
@@ -878,8 +917,8 @@ func (r *postgresRepository) getUserByLoginLocked(login string) (*entity.User, e
 	return scanUser(row)
 }
 
-func (r *postgresRepository) getUserByIDLocked(id int) (*entity.User, error) {
-	row := r.db.QueryRow(`
+func (r *postgresRepository) getUserByIDLocked(ctx context.Context, id int) (*entity.User, error) {
+	row := r.db.QueryRowContext(ctx, `
 		SELECT Id, Avatar, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID
 		FROM users
 		WHERE Id = $1
@@ -888,8 +927,8 @@ func (r *postgresRepository) getUserByIDLocked(id int) (*entity.User, error) {
 	return scanUser(row)
 }
 
-func (r *postgresRepository) getUsersByClassIDLocked(classID int) ([]entity.SafeUser, error) {
-	rows, err := r.db.Query(`
+func (r *postgresRepository) getUsersByClassIDLocked(ctx context.Context, classID int) ([]entity.SafeUser, error) {
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT Id, Avatar, Name, FullName, LastName, Login, Rating, Role, Class, ClassID
 		FROM users
 		WHERE ClassID = $1

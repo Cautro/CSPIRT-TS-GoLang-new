@@ -7,6 +7,8 @@ import (
 	userModels "cspirt/internal/domain/user"
 	usersvc "cspirt/internal/usecase/user"
 	"net/http"
+	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +25,9 @@ import (
 // @Router /api/rating [get]
 func GetRatingsHandler(users *usersvc.UsersUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		login := c.GetString("Login")
 		if login == "" {
 			logger.WriteSafe(logger.LogEntry{
@@ -34,7 +39,7 @@ func GetRatingsHandler(users *usersvc.UsersUsecase) gin.HandlerFunc {
 			return
 		}
 
-		user, err := users.GetUserByLogin(login)
+		user, err := users.GetUserByLogin(ctx, login)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
 			return
@@ -71,38 +76,28 @@ func UpdateRatingsHandler(rs *rating.RatingsUsecase, users *usersvc.UsersUsecase
 	return func(c *gin.Context) {
 		var input models.RatingInput
 		if err := c.ShouldBindJSON(&input); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "update_rating",
-				Message: "invalid input: " + err.Error(),
-			})
+			logger.WriteSafe(logger.LogEntry{ Level: "info", Action: "update_rating", Message: "invalid input: " + err.Error() })
 			c.JSON(400, gin.H{"error": "Invalid input"})
 			return
 		}
 
 		login := c.GetString("Login")
 		if login == "" {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "update_rating",
-				Message: "invalid login or token",
-			})
+			logger.WriteSafe(logger.LogEntry{ Level: "info", Action: "update_rating", Message: "invalid login or token" })
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
 		if login == input.TargetLogin {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "info",
-				Action:  "update_rating",
-				Login:   login,
-				Message: "cannot rate yourself",
-			})
+			logger.WriteSafe(logger.LogEntry{ Level: "info", Action: "update_rating", Login: login, Message: "cannot rate yourself" })
 			c.JSON(400, gin.H{"error": "Cannot rate yourself"})
 			return
 		}
 
-		user, err := users.GetUserByLogin(login)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, err := users.GetUserByLogin(ctx, login)
 		if err != nil || user == nil {
 			c.JSON(500, gin.H{"error": "Login invalid or user dont found"})
 			return
@@ -120,14 +115,14 @@ func UpdateRatingsHandler(rs *rating.RatingsUsecase, users *usersvc.UsersUsecase
 			Rating:   user.Rating,
 		}
 
-		if err := rs.UpdateRating(login, &input, needUser); err != nil {
+		if err := rs.UpdateRating(ctx, login, &input, needUser); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})
 			return
 		}
 
-		targetUser, err := users.GetUserByLogin(input.TargetLogin)
+		targetUser, err := users.GetUserByLogin(ctx, input.TargetLogin)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Failed to retrieve updated target user"})
 			return

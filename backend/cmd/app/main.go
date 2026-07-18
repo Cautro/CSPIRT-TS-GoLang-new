@@ -17,6 +17,7 @@ import (
 	"cspirt/pkg/logger"
 	"log/slog"
 	"os"
+	"context"
 
 	userPostgres "cspirt/internal/adapter/postgres/user"
 	classPostgres "cspirt/internal/adapter/postgres/class"
@@ -86,7 +87,11 @@ func main() {
 	rRepo := ratingPostgres.New(store.DB)
 	schRepo := schedulePostgres.New(store.DB)
 
-	usersSvc := usersService.NewUsersUsecase(uRepo, nRepo, cRepo, clRepo, eRepo)
+	// Reuse the single cache built above. When Redis is unreachable it stays
+	// nil (fail-open); the usecases must tolerate a nil cache. Building a second
+	// rediscache.New(redisClient.Client) here used to panic on startup whenever
+	// redisClient was nil.
+	usersSvc := usersService.NewUsersUsecase(uRepo, nRepo, cRepo, clRepo, eRepo, cache)
 	classSvc := classService.NewClassUsecase(clRepo, uRepo)
 	noteSvc := noteService.NewNoteUsecase(nRepo)
 	complaintSvc := complaintService.NewComplaintsUsecase(cRepo)
@@ -102,7 +107,8 @@ func main() {
 			slog.Error("failed to parse PARALLELS config", "error", err)
 			return
 		}
-		if err := classSvc.InitializeParallelsFromConfig(parallelsConfig); err != nil {
+		var ctx = context.Background()
+		if err := classSvc.InitializeParallelsFromConfig(ctx, parallelsConfig); err != nil {
 			slog.Error("failed to initialize parallels", "error", err)
 			return
 		}
@@ -128,6 +134,7 @@ func main() {
 		Permission: permSvc,
 		Cache:      cache,
 		JWTSecret:  cfg.JWTSecret,
+		DB:         store.DB,
 	})
 
 	slog.Info("server listening", "addr", cfg.Port)

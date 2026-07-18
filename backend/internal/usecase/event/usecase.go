@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"context"
 )
 
 type EventsUsecase struct {
@@ -24,8 +25,8 @@ func (s *EventsUsecase) ActivateDueEvents() error {
 	return s.events.ActivateDueEvents()
 }
 
-func (s *EventsUsecase) GetEvents() ([]models.Event, error) {
-	events, err := s.events.GetEvents()
+func (s *EventsUsecase) GetEvents(ctx context.Context) ([]models.Event, error) {
+	events, err := s.events.GetEvents(ctx)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -41,12 +42,12 @@ func (s *EventsUsecase) GetEvents() ([]models.Event, error) {
 	return events, nil
 }
 
-func (s *EventsUsecase) GetEventsByUserID(userID int) ([]models.Event, error) {
+func (s *EventsUsecase) GetEventsByUserID(ctx context.Context, userID int) ([]models.Event, error) {
 	if userID <= 0 {
 		return nil, errors.New("invalid user id")
 	}
 
-	events, err := s.events.GetEventsByUserID(userID)
+	events, err := s.events.GetEventsByUserID(ctx, userID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -62,8 +63,8 @@ func (s *EventsUsecase) GetEventsByUserID(userID int) ([]models.Event, error) {
 	return events, nil
 }
 
-func (s *EventsUsecase) GetEventsByClassID(classID int) ([]models.Event, error) {
-	events, err := s.events.GetEventsByClassID(classID)
+func (s *EventsUsecase) GetEventsByClassID(ctx context.Context, classID int) ([]models.Event, error) {
+	events, err := s.events.GetEventsByClassID(ctx, classID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -79,7 +80,7 @@ func (s *EventsUsecase) GetEventsByClassID(classID int) ([]models.Event, error) 
 	return events, nil
 }
 
-func (s *EventsUsecase) AddEvent(event models.Event) error {
+func (s *EventsUsecase) AddEvent(ctx context.Context, event models.Event) error {
 	event.Status = strings.ToLower(strings.TrimSpace(event.Status))
 	if event.Status == "" {
 		event.Status = "scheduled"
@@ -93,7 +94,7 @@ func (s *EventsUsecase) AddEvent(event models.Event) error {
 		return errors.New("started at is required")
 	}
 
-	if err := s.events.AddEvent(event); err != nil {
+	if err := s.events.AddEvent(ctx, event); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_event",
@@ -110,12 +111,12 @@ func (s *EventsUsecase) AddEvent(event models.Event) error {
 	return nil
 }
 
-func (s *EventsUsecase) GetEventParams(eventID int) ([]models.EventParams, error) {
+func (s *EventsUsecase) GetEventParams(ctx context.Context, eventID int) ([]models.EventParams, error) {
 	if eventID <= 0 {
 		return nil, errors.New("invalid event id")
 	}
 
-	result, err := s.events.GetEventParams(eventID)
+	result, err := s.events.GetEventParams(ctx, eventID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -131,7 +132,7 @@ func (s *EventsUsecase) GetEventParams(eventID int) ([]models.EventParams, error
 	return result, nil
 }
 
-func (s *EventsUsecase) AddEventParams(EventId int, params *models.EventParams) error {
+func (s *EventsUsecase) AddEventParams(ctx context.Context, EventId int, params *models.EventParams) error {
 	if EventId <= 0 {
 		return errors.New("invalid event id")
 	}
@@ -139,7 +140,7 @@ func (s *EventsUsecase) AddEventParams(EventId int, params *models.EventParams) 
 		return errors.New("invalid event params")
 	}
 
-	if err := s.events.AddEventParams(EventId, params); err != nil {
+	if err := s.events.AddEventParams(ctx, EventId, params); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_event_params",
@@ -156,12 +157,12 @@ func (s *EventsUsecase) AddEventParams(EventId int, params *models.EventParams) 
 	return nil
 }
 
-func (s *EventsUsecase) DeleteEventParams(eventID int) error {
+func (s *EventsUsecase) DeleteEventParams(ctx context.Context, eventID int) error {
 	if eventID <= 0 {
 		return errors.New("invalid event id")
 	}
 
-	if err := s.events.DeleteEventParams(eventID); err != nil {
+	if err := s.events.DeleteEventParams(ctx, eventID); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_event_params",
@@ -178,16 +179,16 @@ func (s *EventsUsecase) DeleteEventParams(eventID int) error {
 	return nil
 }
 
-func (s *EventsUsecase) GetEventsByEventID(eventID int) (*models.Event, error) {
+func (s *EventsUsecase) GetEventsByEventID(ctx context.Context, eventID int) (*models.Event, error) {
 	if eventID <= 0 {
 		return nil, errors.New("invalid event id")
 	}
 
-	return s.events.GetEventsByID(eventID)
+	return s.events.GetEventsByID(ctx, eventID)
 }
 
-func (s *EventsUsecase) DeleteEvent(eventID int) error {
-	if err := s.events.DeleteEvent(eventID); err != nil {
+func (s *EventsUsecase) DeleteEvent(ctx context.Context, eventID int) error {
+	if err := s.events.DeleteEvent(ctx, eventID); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_event",
@@ -204,8 +205,8 @@ func (s *EventsUsecase) DeleteEvent(eventID int) error {
 	return nil
 }
 
-func (s *EventsUsecase) AddPlayersToEvent(eventID int, playerIDs []int, login string) error {
-	if err := s.events.AddPlayersToEvent(eventID, playerIDs, login); err != nil {
+func (s *EventsUsecase) AddPlayersToEvent(ctx context.Context, eventID int, playerIDs []int, login string) error {
+	if err := s.events.AddPlayersToEvent(ctx, eventID, playerIDs, login); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "add_event_players",
@@ -222,8 +223,8 @@ func (s *EventsUsecase) AddPlayersToEvent(eventID int, playerIDs []int, login st
 	return nil
 }
 
-func (s *EventsUsecase) UpdateEventParams(eventID int, params *models.EventParams) error {
-	if err := s.events.UpdateEventParams(eventID, params); err != nil {
+func (s *EventsUsecase) UpdateEventParams(ctx context.Context, eventID int, params *models.EventParams) error {
+	if err := s.events.UpdateEventParams(ctx, eventID, params); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "update_event_params",
@@ -240,8 +241,8 @@ func (s *EventsUsecase) UpdateEventParams(eventID int, params *models.EventParam
 	return nil
 }
 
-func (s *EventsUsecase) UpdateEvent(eventID int, event *models.Event) error {
-	if err := s.events.UpdateEvent(eventID, event); err != nil {
+func (s *EventsUsecase) UpdateEvent(ctx context.Context, eventID int, event *models.Event) error {
+	if err := s.events.UpdateEvent(ctx, eventID, event); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "update_event",
@@ -258,8 +259,8 @@ func (s *EventsUsecase) UpdateEvent(eventID int, event *models.Event) error {
 	return nil
 }
 
-func (s *EventsUsecase) DeletePlayersFromEvent(eventID int, playerIDs []int) error {
-	if err := s.events.DeletePlayersFromEvent(eventID, playerIDs); err != nil {
+func (s *EventsUsecase) DeletePlayersFromEvent(ctx context.Context, eventID int, playerIDs []int) error {
+	if err := s.events.DeletePlayersFromEvent(ctx, eventID, playerIDs); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "delete_event_players",
@@ -276,8 +277,8 @@ func (s *EventsUsecase) DeletePlayersFromEvent(eventID int, playerIDs []int) err
 	return nil
 }
 
-func (s *EventsUsecase) GetEventPlayers(eventID int) ([]userModels.SafeUser, error) {
-	players, err := s.events.GetEventPlayers(eventID)
+func (s *EventsUsecase) GetEventPlayers(ctx context.Context, eventID int) ([]userModels.SafeUser, error) {
+	players, err := s.events.GetEventPlayers(ctx, eventID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -293,8 +294,8 @@ func (s *EventsUsecase) GetEventPlayers(eventID int) ([]userModels.SafeUser, err
 	return players, nil
 }
 
-func (s *EventsUsecase) GetEventPlayersCount(eventID int) (int, error) {
-	count, err := s.events.GetEventPlayersCount(eventID)
+func (s *EventsUsecase) GetEventPlayersCount(ctx context.Context, eventID int) (int, error) {
+	count, err := s.events.GetEventPlayersCount(ctx, eventID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -307,8 +308,8 @@ func (s *EventsUsecase) GetEventPlayersCount(eventID int) (int, error) {
 	return count, nil
 }
 
-func (s *EventsUsecase) EventComplete(eventID int, ratingReward int, classReward int) error {
-	if err := s.events.EventComplete(eventID, ratingReward, classReward); err != nil {
+func (s *EventsUsecase) EventComplete(ctx context.Context, eventID int, ratingReward int, classReward int) error {
+	if err := s.events.EventComplete(ctx, eventID, ratingReward, classReward); err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
 			Action:  "complete_event",

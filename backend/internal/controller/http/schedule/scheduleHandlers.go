@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -33,7 +35,10 @@ import (
 // @Router /api/schedules [get]
 func GetSchedulesHandler(service *ScheduleUsecase.ScheduleUsecase, classes *classService.ClassUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := perm.AuthenticatedUser(c, "get_schedules")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, ok := perm.AuthenticatedUser(ctx, c, "get_schedules")
 		if !ok {
 			return
 		}
@@ -64,7 +69,7 @@ func GetSchedulesHandler(service *ScheduleUsecase.ScheduleUsecase, classes *clas
 			return
 		}
 		if classID > 0 {
-			class, err := classes.GetClassByID(classID)
+			class, err := classes.GetClassByID(ctx, classID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve class"})
 				return
@@ -118,7 +123,10 @@ func GetSchedulesHandler(service *ScheduleUsecase.ScheduleUsecase, classes *clas
 // @Router /api/schedules/teacher/current [get]
 func GetTeacherCurrentScheduleHandler(service *ScheduleUsecase.ScheduleUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := perm.AuthenticatedUser(c, "get_teacher_current_schedule")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, ok := perm.AuthenticatedUser(ctx, c, "get_teacher_current_schedule")
 		if !ok {
 			return
 		}
@@ -170,7 +178,10 @@ func GetTeacherCurrentScheduleHandler(service *ScheduleUsecase.ScheduleUsecase, 
 // @Router /api/schedules/update [patch]
 func UpdateSchedulesHandler(service *ScheduleUsecase.ScheduleUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := perm.AuthenticatedUser(c, "update_schedules")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, ok := perm.AuthenticatedUser(ctx, c, "update_schedules")
 		if !ok {
 			return
 		}
@@ -229,7 +240,10 @@ func UpdateSchedulesHandler(service *ScheduleUsecase.ScheduleUsecase, perm *perm
 // @Router /api/schedules/rollover [patch]
 func RolloverSchedulesHandler(service *ScheduleUsecase.ScheduleUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := perm.AuthenticatedUser(c, "rollover_schedules")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, ok := perm.AuthenticatedUser(ctx, c, "rollover_schedules")
 		if !ok {
 			return
 		}
@@ -265,7 +279,10 @@ func RolloverSchedulesHandler(service *ScheduleUsecase.ScheduleUsecase, perm *pe
 // @Router /api/schedules/planned/reset [patch]
 func ResetPlannedSchedulesHandler(service *ScheduleUsecase.ScheduleUsecase, perm *permissionService.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, ok := perm.AuthenticatedUser(c, "reset_planned_schedules")
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
+		user, ok := perm.AuthenticatedUser(ctx, c, "reset_planned_schedules")
 		if !ok {
 			return
 		}
