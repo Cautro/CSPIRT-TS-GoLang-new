@@ -47,6 +47,14 @@ func NewUsersUsecase(
 	}
 }
 
+func (u *UsersUsecase) RegisterDevice(ctx context.Context, userID int64, token, platform string) error {
+	return u.userRepo.SaveDeviceToken(ctx, userID, token, platform)
+}
+
+func (u *UsersUsecase) UnregisterDevice(ctx context.Context, userID int64, token string) error {
+	return u.userRepo.DeleteToken(ctx, token)
+}
+
 func (s *UsersUsecase) GetFullUserInfo(ctx context.Context, userID int) (models.UserWithFullInfo[eventDomain.Event], error) {
     emptyResponse := models.UserWithFullInfo[eventDomain.Event]{}
 

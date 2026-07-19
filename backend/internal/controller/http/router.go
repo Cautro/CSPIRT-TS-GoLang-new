@@ -3,29 +3,27 @@ package router
 import (
 	// handlers
 	authHandlers "cspirt/internal/controller/http/auth"
+	healthHandlers "cspirt/internal/controller/http/checker"
 	classHandlers "cspirt/internal/controller/http/class"
 	complaintHandlers "cspirt/internal/controller/http/complaint"
 	eventHandlers "cspirt/internal/controller/http/event"
-	healthHandlers "cspirt/internal/controller/http/checker"
+	"cspirt/internal/controller/http/middleware-JWT"
 	noteHandlers "cspirt/internal/controller/http/note"
 	ratingHandlers "cspirt/internal/controller/http/rating"
 	scheduleHandlers "cspirt/internal/controller/http/schedule"
 	userHandlers "cspirt/internal/controller/http/user"
-	"cspirt/internal/controller/http/middleware-JWT"
 
 	// usecase
-	ratingUsecase "cspirt/internal/usecase/rating"
 	permissionUsecase "cspirt/internal/controller/permission/usecase"
-	noteUsecase "cspirt/internal/usecase/note"
-	eventsUsecase "cspirt/internal/usecase/event"
-	complaintUsecase "cspirt/internal/usecase/complaint"
-	authUsecase "cspirt/internal/usecase/auth"
-	scheduleUsecase "cspirt/internal/usecase/schedule"
-	classUsecase "cspirt/internal/usecase/class"
-	usersUsecase "cspirt/internal/usecase/user"
 	cacheRepo "cspirt/internal/domain/cache/repo"
-
-	//ginLog "cspirt/internal/controller/http/ginLogger"
+	authUsecase "cspirt/internal/usecase/auth"
+	classUsecase "cspirt/internal/usecase/class"
+	complaintUsecase "cspirt/internal/usecase/complaint"
+	eventsUsecase "cspirt/internal/usecase/event"
+	noteUsecase "cspirt/internal/usecase/note"
+	ratingUsecase "cspirt/internal/usecase/rating"
+	scheduleUsecase "cspirt/internal/usecase/schedule"
+	usersUsecase "cspirt/internal/usecase/user"
 
 	"database/sql"
 	"os"
@@ -78,6 +76,12 @@ func registerAuthenticatedRoutes(router *gin.Engine, s Usecases) {
 	registerComplaintRoutes(auth, s)
 	registerEventRoutes(auth, s)
 	registerScheduleRoutes(auth, s)
+	registerNotificationRoutes(auth, s)
+}
+
+func registerNotificationRoutes(auth *gin.RouterGroup, s Usecases) {
+	auth.POST("device/register", authHandlers.RegisterDeviceHandler(s.Users))
+	auth.POST("device/unregister", authHandlers.UnregisterDeviceHandler(s.Users))
 }
 
 func registerUserRoutes(auth *gin.RouterGroup, s Usecases) {

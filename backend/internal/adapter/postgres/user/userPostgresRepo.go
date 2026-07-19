@@ -43,6 +43,40 @@ func (r *postgresRepository) GetOnlyStaffUsers(ctx context.Context) ([]entity.Sa
 	return scanSafeUsers(rows)
 }
 
+func (r *postgresRepository) SaveDeviceToken(ctx context.Context, userID int64, token, platform string) error {
+	query := `
+		INSERT INTO user_devices (user_id, device_token, platform) 
+		VALUES ($1, $2, $3) 
+		ON CONFLICT (device_token) DO NOTHING`
+	_, err := r.db.ExecContext(ctx, query, userID, token, platform)
+	return err
+}
+
+func (r *postgresRepository) DeleteToken(ctx context.Context, token string) error {
+	query := `DELETE FROM user_devices WHERE device_token = $1`
+	_, err := r.db.ExecContext(ctx, query, token)
+	return err
+}
+
+func (r *postgresRepository) GetTokensByUserID(ctx context.Context, userID int64) ([]string, error) {
+	query := `SELECT device_token FROM user_devices WHERE user_id = $1`
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tokens []string
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, token)
+	}
+	return tokens, nil
+}
+
 func (r *postgresRepository) UpdateAvatar(ctx context.Context, input entity.UpdateAvatarRequest, id int) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

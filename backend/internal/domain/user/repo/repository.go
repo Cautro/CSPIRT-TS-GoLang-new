@@ -7,6 +7,10 @@ import (
 )
 
 type UserRepository interface {
+	GetTokensByUserID(ctx context.Context, userID int64) ([]string, error)
+	DeleteToken(ctx context.Context, token string) error
+	SaveDeviceToken(ctx context.Context, userID int64, token, platform string) error
+
 	DeleteUser(ctx context.Context, id int) error
 	AddUser(ctx context.Context, user entity.User) error
 	SaveUser(ctx context.Context, user entity.SafeUser) error

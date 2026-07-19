@@ -29,6 +29,8 @@ import (
 
 	"github.com/joho/godotenv"
 
+	notification "cspirt/internal/usecase/notification"
+
 	redis "cspirt/internal/adapter/redis"
 	rediscache "cspirt/internal/adapter/redis/cache"
 	cacheRepo "cspirt/internal/domain/cache/repo"
@@ -62,10 +64,6 @@ func main() {
 	}
 	defer store.Close()
 
-	// Redis powers auth login rate limiting and the token blacklist (see
-	// internal/adapter/redis/README.md). It is an enhancement, not a hard
-	// dependency: if it's unreachable we log a warning and run with those
-	// features disabled (fail-open) instead of refusing to start.
 	var cache cacheRepo.CacheRepository
 	redisClient, err := redis.New(cfg.Redis)
 	if err != nil {
@@ -87,14 +85,16 @@ func main() {
 	rRepo := ratingPostgres.New(store.DB)
 	schRepo := schedulePostgres.New(store.DB)
 
-	// Reuse the single cache built above. When Redis is unreachable it stays
-	// nil (fail-open); the usecases must tolerate a nil cache. Building a second
-	// rediscache.New(redisClient.Client) here used to panic on startup whenever
-	// redisClient was nil.
+	ctx := context.Background()
+	notifSvc, err := notification.NewFCMNotificationService(ctx, "firebase-credentials.json", uRepo)
+	if err != nil {
+		slog.Warn("FCM service initialization failed", "error", err)
+	}
+
 	usersSvc := usersService.NewUsersUsecase(uRepo, nRepo, cRepo, clRepo, eRepo, cache)
 	classSvc := classService.NewClassUsecase(clRepo, uRepo)
 	noteSvc := noteService.NewNoteUsecase(nRepo)
-	complaintSvc := complaintService.NewComplaintsUsecase(cRepo)
+	complaintSvc := complaintService.NewComplaintsUsecase(cRepo, notifSvc)
 	eventsSvc := eventsService.NewEventsUsecase(eRepo)
 	ratingSvc := ratingService.NewRatingsUsecase(rRepo, uRepo)
 	scheduleSvc := scheduleService.NewScheduleUsecase(schRepo)

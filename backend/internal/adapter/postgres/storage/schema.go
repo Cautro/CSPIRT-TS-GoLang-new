@@ -7,6 +7,9 @@ func (s *Storage) initSchema() error {
 	if err := s.initClassStorage(); err != nil {
 		return err
 	}
+	if err := s.initNotificationStorage(); err != nil {
+		return err
+	}
 	if err := s.initParallelsStorage(); err != nil {
 		return err
 	}
@@ -40,6 +43,27 @@ func (s *Storage) initSchema() error {
 	if err := s.ensureCurrentSchedulesSeeded(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *Storage) initNotificationStorage() error {
+
+	query := `
+	CREATE TABLE user_devices (
+		id SERIAL PRIMARY KEY,
+		user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		device_token TEXT NOT NULL UNIQUE,
+		platform VARCHAR(10) NOT NULL, -- 'android' или 'ios'
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);`
+
+	if _, err := s.DB.Exec(query); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);`); err != nil {
+		return err
+	}
+
 	return nil
 }
 

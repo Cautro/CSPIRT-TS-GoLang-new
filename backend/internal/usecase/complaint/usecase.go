@@ -5,6 +5,7 @@ import (
 	"cspirt/internal/domain/complaint/repo"
 	"cspirt/pkg/logger"
 	userModels "cspirt/internal/domain/user"
+	repoNotification "cspirt/internal/domain/notification/repo"
 	"errors"
 	"time"
 	"context"
@@ -12,11 +13,13 @@ import (
 
 type ComplaintUsecase struct {
 	complaints repo.ComplaintRepository
+	notifService   repoNotification.NotificationService
 }
 
-func NewComplaintsUsecase(complaints repo.ComplaintRepository) *ComplaintUsecase {
+func NewComplaintsUsecase(complaints repo.ComplaintRepository, notification repoNotification.NotificationService) *ComplaintUsecase {
 	return &ComplaintUsecase{
 		complaints: complaints,
+		notifService: notification,
 	}
 }
 
@@ -78,6 +81,16 @@ func (s *ComplaintUsecase) AddNewComplaint(ctx context.Context, login string, in
 	if err != nil {
 		return err
 	}
+
+	go func() { 
+		if err := s.notifService.Send(context.Background(), int64(in.TargetID), "Новая жалоба", "На вас поступила новая жалоба в системе."); err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "send_push_notification",
+				Message: "Failed to send FCM notification: " + err.Error(),
+			})
+		}
+	}()
 
 	return nil
 }
