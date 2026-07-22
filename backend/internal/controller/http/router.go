@@ -7,6 +7,7 @@ import (
 	classHandlers "cspirt/internal/controller/http/class"
 	complaintHandlers "cspirt/internal/controller/http/complaint"
 	eventHandlers "cspirt/internal/controller/http/event"
+	globalEventHandlers "cspirt/internal/controller/http/globalEvent"
 	"cspirt/internal/controller/http/middleware-JWT"
 	noteHandlers "cspirt/internal/controller/http/note"
 	ratingHandlers "cspirt/internal/controller/http/rating"
@@ -24,6 +25,7 @@ import (
 	ratingUsecase "cspirt/internal/usecase/rating"
 	scheduleUsecase "cspirt/internal/usecase/schedule"
 	usersUsecase "cspirt/internal/usecase/user"
+	globalEventUsecase "cspirt/internal/usecase/globalEvent"
 
 	"database/sql"
 	"os"
@@ -40,6 +42,7 @@ type Usecases struct {
 	Events     *eventsUsecase.EventsUsecase
 	Rating     *ratingUsecase.RatingsUsecase
 	Schedule   *scheduleUsecase.ScheduleUsecase
+	GlobalEvent *globalEventUsecase.GlobalEventUsecase
 	Permission *permissionUsecase.Usecase
 	Cache      cacheRepo.CacheRepository
 	JWTSecret  string
@@ -77,6 +80,7 @@ func registerAuthenticatedRoutes(router *gin.Engine, s Usecases) {
 	registerEventRoutes(auth, s)
 	registerScheduleRoutes(auth, s)
 	registerNotificationRoutes(auth, s)
+	registerGlobalEvents(auth, s)
 }
 
 func registerNotificationRoutes(auth *gin.RouterGroup, s Usecases) {
@@ -154,4 +158,15 @@ func registerScheduleRoutes(auth *gin.RouterGroup, s Usecases) {
 	auth.PATCH("/schedules/planned/reset", scheduleHandlers.ResetPlannedSchedulesHandler(s.Schedule, s.Permission))
 	auth.GET("/schedules", scheduleHandlers.GetSchedulesHandler(s.Schedule, s.Class, s.Permission))
 	auth.PATCH("/schedules/update", scheduleHandlers.UpdateSchedulesHandler(s.Schedule, s.Permission))
+}
+
+func registerGlobalEvents(auth *gin.RouterGroup, s Usecases) {
+	auth.GET("/events/global", globalEventHandlers.GetGlobalEvents(s.GlobalEvent))
+	auth.POST("/event/global/info/add", globalEventHandlers.AddInfoGlobalEvent(s.GlobalEvent))
+	auth.POST("/event/global/quiz/add", globalEventHandlers.AddQuizGlobalEvent(s.GlobalEvent))
+	auth.DELETE("/event/global/info/delete", globalEventHandlers.DeleteInfoGlobalEvent(s.GlobalEvent))
+	auth.DELETE("/event/global/quiz/delete", globalEventHandlers.DeleteQuizGlobalEvent(s.GlobalEvent))
+
+	auth.PATCH("/event/global/quiz/:eventId/vote", globalEventHandlers.Vote(s.GlobalEvent))
+	//auth.PATCH("/event/global/update")
 }

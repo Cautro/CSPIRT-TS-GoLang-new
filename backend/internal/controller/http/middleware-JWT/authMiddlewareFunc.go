@@ -89,7 +89,9 @@ func AuthMiddleware(jwtSecret string, cache cacheRepo.CacheRepository) gin.Handl
 			return
 		}
 
+		c.Set("Id", claims.Id)
 		c.Set("Login", claims.Login)
+		c.Set("Role", claims.Role)
 		c.Next()
 	}
 }

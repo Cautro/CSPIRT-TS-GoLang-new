@@ -11,4 +11,5 @@ cookies.txt
 
 *.zip
 *.tar.gz
-
+*.sql
+*.json

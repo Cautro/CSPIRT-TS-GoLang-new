@@ -14,6 +14,7 @@ import (
 	scheduleService "cspirt/internal/usecase/schedule"
 	"cspirt/internal/adapter/postgres/storage"
 	usersService "cspirt/internal/usecase/user"
+	globalEventUsecase "cspirt/internal/usecase/globalEvent"
 	"cspirt/pkg/logger"
 	"log/slog"
 	"os"
@@ -26,6 +27,7 @@ import (
 	eventPostgres "cspirt/internal/adapter/postgres/event"
 	ratingPostgres "cspirt/internal/adapter/postgres/rating"
 	schedulePostgres "cspirt/internal/adapter/postgres/schedule"
+	GlobalEventsPostgres "cspirt/internal/adapter/postgres/globalEvent"
 
 	"github.com/joho/godotenv"
 
@@ -84,6 +86,7 @@ func main() {
 	eRepo := eventPostgres.New(store.DB)
 	rRepo := ratingPostgres.New(store.DB)
 	schRepo := schedulePostgres.New(store.DB)
+	gERepo := GlobalEventsPostgres.New(store.DB)
 
 	ctx := context.Background()
 	notifSvc, err := notification.NewFCMNotificationService(ctx, "firebase-credentials.json", uRepo)
@@ -92,14 +95,15 @@ func main() {
 	}
 
 	usersSvc := usersService.NewUsersUsecase(uRepo, nRepo, cRepo, clRepo, eRepo, cache)
-	classSvc := classService.NewClassUsecase(clRepo, uRepo)
+	classSvc := classService.NewClassUsecase(clRepo, uRepo, notifSvc)
 	noteSvc := noteService.NewNoteUsecase(nRepo)
 	complaintSvc := complaintService.NewComplaintsUsecase(cRepo, notifSvc)
-	eventsSvc := eventsService.NewEventsUsecase(eRepo)
+	eventsSvc := eventsService.NewEventsUsecase(eRepo, notifSvc)
 	ratingSvc := ratingService.NewRatingsUsecase(rRepo, uRepo)
 	scheduleSvc := scheduleService.NewScheduleUsecase(schRepo)
 	permSvc := permissionService.New(uRepo)
 	authSvc := authService.NewAuthService(uRepo, cfg.JWTSecret, cache)
+	globalEventSvc := globalEventUsecase.NewGlobalEventUsecase(gERepo)
 
 	if cfg.Parallels != "" {
 		parallelsConfig, err := classConfig.ParseParallelsConfig(cfg.Parallels)
@@ -131,6 +135,7 @@ func main() {
 		Events:     eventsSvc,
 		Rating:     ratingSvc,
 		Schedule:   scheduleSvc,
+		GlobalEvent: globalEventSvc,
 		Permission: permSvc,
 		Cache:      cache,
 		JWTSecret:  cfg.JWTSecret,

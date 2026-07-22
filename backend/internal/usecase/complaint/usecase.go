@@ -106,5 +106,15 @@ func (s *ComplaintUsecase) DeleteComplaint(ctx context.Context, id int, user use
 		return errors.New("server error")
 	}
 
+	go func() { 
+		if err := s.notifService.Send(context.Background(), int64(user.ID), "Жалоба удалена", "Одна из ваших жалоб была удалена."); err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "send_push_notification",
+				Message: "Failed to send FCM notification: " + err.Error(),
+			})
+		}
+	}()
+
 	return nil
 }

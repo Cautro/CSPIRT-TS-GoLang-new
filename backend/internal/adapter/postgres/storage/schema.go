@@ -1,5 +1,9 @@
 package storage
 
+import (
+	"fmt"
+)
+
 func (s *Storage) initSchema() error {
 	if err := s.initUserStorage(); err != nil {
 		return err
@@ -11,6 +15,15 @@ func (s *Storage) initSchema() error {
 		return err
 	}
 	if err := s.initParallelsStorage(); err != nil {
+		return err
+	}
+	if err := s.initGlobalEventInfoStorage(); err != nil {
+		return err
+	}
+	if err := s.initGlobalEventsQuizStorage(); err != nil {
+		return err
+	}
+	if err := s.initGlobalEventsQuizVotesStorage(); err != nil {
 		return err
 	}
 	if err := s.initNoteStorage(); err != nil {
@@ -46,25 +59,63 @@ func (s *Storage) initSchema() error {
 	return nil
 }
 
-func (s *Storage) initNotificationStorage() error {
+func (s *Storage) initGlobalEventInfoStorage() error {
+    query := `CREATE TABLE IF NOT EXISTS global_events_info (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL
+    );`
 
+    _, err := s.DB.Exec(query)
+    return err
+}
+
+func (s *Storage) initGlobalEventsQuizVotesStorage() error {
 	query := `
-	CREATE TABLE user_devices (
-		id SERIAL PRIMARY KEY,
-		user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		device_token TEXT NOT NULL UNIQUE,
-		platform VARCHAR(10) NOT NULL, -- 'android' или 'ios'
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	CREATE TABLE IF NOT EXISTS global_event_quiz_votes (
+		id BIGSERIAL PRIMARY KEY,
+		quiz_id BIGINT NOT NULL REFERENCES global_event_quizzes(id) ON DELETE CASCADE,
+		user_id BIGINT NOT NULL REFERENCES users(Id) ON DELETE CASCADE,
+		option_index INT NOT NULL,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(quiz_id, user_id)
 	);`
 
-	if _, err := s.DB.Exec(query); err != nil {
-		return err
-	}
-	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);`); err != nil {
-		return err
-	}
+	_, err := s.DB.Exec(query)
+	return err
+}
 
-	return nil
+func (s *Storage) initGlobalEventsQuizStorage() error {
+	query := `
+	CREATE TABLE IF NOT EXISTS global_event_quizzes (
+		id BIGSERIAL PRIMARY KEY,
+		title TEXT NOT NULL,
+		description TEXT NOT NULL,
+		options JSONB NOT NULL DEFAULT '[]'::jsonb
+	);`
+
+	_, err := s.DB.Exec(query)
+	return err
+}
+
+func (s *Storage) initNotificationStorage() error {
+    query := `
+    CREATE TABLE IF NOT EXISTS user_devices (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        device_token TEXT NOT NULL UNIQUE,
+        platform VARCHAR(10) NOT NULL, -- 'android' или 'ios'
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );`
+
+    if _, err := s.DB.Exec(query); err != nil {
+        return err
+    }
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);`); err != nil {
+        return err
+    }
+
+    return nil
 }
 
 func (s *Storage) initBaseSchedulesStorage() error {
@@ -576,20 +627,22 @@ func (s *Storage) ensureCurrentSchedulesSeeded() error {
 }
 
 func (s *Storage) ensureColumn(table string, column string, definition string) error {
-	var exists bool
-	err := s.DB.QueryRow(`
-		SELECT EXISTS (
-			SELECT 1 FROM information_schema.columns
-			WHERE table_name = lower($1) AND column_name = lower($2)
-		)
-	`, table, column).Scan(&exists)
-	
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
+    var exists bool
+    err := s.DB.QueryRow(`
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = lower($1) AND column_name = lower($2)
+        )
+    `, table, column).Scan(&exists)
 
-	return err
+    if err != nil {
+        return err
+    }
+    if exists {
+        return nil
+    }
+
+    alterQuery := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;", table, column, definition)
+    _, err = s.DB.Exec(alterQuery)
+    return err
 }

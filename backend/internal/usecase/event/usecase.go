@@ -5,6 +5,7 @@ import (
 	"cspirt/internal/domain/event/repo"
 	"cspirt/pkg/logger"
 	userModels "cspirt/internal/domain/user"
+	repoNotif "cspirt/internal/domain/notification/repo"
 	"errors"
 	"strings"
 	"time"
@@ -13,11 +14,13 @@ import (
 
 type EventsUsecase struct {
 	events repo.EventsRepository
+	notifService repoNotif.NotificationService
 }
 
-func NewEventsUsecase(events repo.EventsRepository) *EventsUsecase {
+func NewEventsUsecase(events repo.EventsRepository, notifService repoNotif.NotificationService) *EventsUsecase {
 	return &EventsUsecase{
 		events: events,
+		notifService: notifService,
 	}
 }
 
@@ -108,6 +111,15 @@ func (s *EventsUsecase) AddEvent(ctx context.Context, event models.Event) error 
 		Action:  "add_event",
 		Message: "event added",
 	})
+
+	// if err := s.notifService.Send(ctx, int64(event.UserID), "Событие добавлено", "Ваше событие было успешно добавлено"); err != nil {
+	// 	logger.WriteSafe(logger.LogEntry{
+	// 		Level:   "error",
+	// 		Action:  "send_push_notification",
+	// 		Message: "failed to send push notification: " + err.Error(),
+	// 	})
+	// }
+
 	return nil
 }
 

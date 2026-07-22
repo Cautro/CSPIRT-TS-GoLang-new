@@ -1,25 +1,31 @@
 package usecase
 
 import (
+	"context"
 	config "cspirt/internal/controller/http/class/config"
 	permission "cspirt/internal/controller/permission/usecase"
 	classModels "cspirt/internal/domain/class"
 	"cspirt/internal/domain/class/repo"
+	repoNotification "cspirt/internal/domain/notification/repo"
 	userModels "cspirt/internal/domain/user"
 	userRepo "cspirt/internal/domain/user/repo"
+	logger "cspirt/pkg/logger"
+	"errors"
 	"fmt"
-	"context"
+	//"strconv"
 )
 
 type ClassUsecase struct { 
 	classRepo repo.ClassRepository
 	userRepo  userRepo.UserRepository
+	notifService  repoNotification.NotificationService
 }
 
-func NewClassUsecase(classRepo repo.ClassRepository, user userRepo.UserRepository) *ClassUsecase {
+func NewClassUsecase(classRepo repo.ClassRepository, user userRepo.UserRepository, notif repoNotification.NotificationService) *ClassUsecase {
 	return &ClassUsecase{
 		classRepo: classRepo,
 		userRepo: user,
+		notifService: notif,
 	}
 }
 
@@ -129,17 +135,78 @@ func (s *ClassUsecase) GetBestClassInParallel(ctx context.Context, parallelID in
 }
 
 func (s *ClassUsecase) YearComplete(ctx context.Context, login string) ([]*classModels.Class, error) {
-	user, err := s.userRepo.GetUserByLogin(ctx, login); if err != nil { return []*classModels.Class{}, err }
-	check := permission.CanManageClasses(user.Role); if !check { return []*classModels.Class{}, err }
+    user, err := s.userRepo.GetUserByLogin(ctx, login)
+    if err != nil { 
+        return []*classModels.Class{}, err 
+    }
 
-	return s.classRepo.YearComplete(ctx)
+    if !permission.CanManageClasses(user.Role) { 
+        return []*classModels.Class{}, errors.New("permission denied") 
+    }
+
+    classes, err := s.classRepo.YearComplete(ctx)
+    if err != nil {
+        return []*classModels.Class{}, err 
+    }
+
+    users, err := s.userRepo.GetAllUsers(ctx)
+    if err != nil { 
+        logger.WriteSafe(logger.LogEntry{
+            Level:   "error",
+            Action:  "get_users_for_notifications",
+            Message: "Year completed in DB, but failed to fetch users for pushes: " + err.Error(),
+        })
+        return classes, nil 
+    }
+
+    go func(usersList []userModels.SafeUser) {
+        bgCtx := context.Background()
+        
+        for _, u := range usersList {
+            if err := s.notifService.Send(bgCtx, int64(u.ID), "Год был завершен", "Заходи, чтобы узнать итоги года!"); err != nil {
+                logger.WriteSafe(logger.LogEntry{
+                    Level:   "error",
+                    Action:  "send_push_notification_bulk",
+                    Message: fmt.Sprintf("Failed to send FCM to user %d: %s", u.ID, err.Error()),
+                })
+            }
+        }
+    }(users)
+
+    return classes, nil
 }
 
 func (s *ClassUsecase) CompleteQuarter(ctx context.Context, parallelClassId int, login string) ([]*classModels.Class, error) {
 	user, err := s.userRepo.GetUserByLogin(ctx, login); if err != nil { return []*classModels.Class{}, err }
-	check := permission.CanManageClasses(user.Role); if !check { return []*classModels.Class{}, err }
+	check := permission.CanManageClasses(user.Role); if !check { return []*classModels.Class{}, errors.New("permission denied") }
 
-	return s.classRepo.QuarterComplete(ctx, parallelClassId)
+	classes, err := s.classRepo.QuarterComplete(ctx, parallelClassId); if err != nil { return []*classModels.Class{}, err }
+	
+	users, err := s.userRepo.GetAllUsers(ctx)
+    if err != nil { 
+        logger.WriteSafe(logger.LogEntry{
+            Level:   "error",
+            Action:  "get_users_for_notifications",
+            Message: "Year completed in DB, but failed to fetch users for pushes: " + err.Error(),
+        })
+        return classes, nil 
+    }
+
+    go func(usersList []userModels.SafeUser) {
+        bgCtx := context.Background()
+        
+        for _, u := range usersList {
+            if err := s.notifService.Send(bgCtx, int64(u.ID), "Четверть была завершена", "Заходи, чтобы узнать итоги!"); err != nil {
+                logger.WriteSafe(logger.LogEntry{
+                    Level:   "error",
+                    Action:  "send_push_notification_bulk",
+                    Message: fmt.Sprintf("Failed to send FCM to user %d: %s", u.ID, err.Error()),
+                })
+            }
+        }
+    }(users)
+
+	return classes, nil
 }
 
 func (s *ClassUsecase) DeleteParallelClass(ctx context.Context, parallelClassID int, login string) error {
