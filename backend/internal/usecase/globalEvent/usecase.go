@@ -4,6 +4,8 @@ import (
 	"context"
 	entity "cspirt/internal/domain/globalEvent"
 	repo "cspirt/internal/domain/globalEvent/repo"
+	permission "cspirt/internal/controller/permission/usecase"
+	ratingEntity "cspirt/internal/domain/rating"
 	"time"
 )
 
@@ -27,35 +29,43 @@ func (u *GlobalEventUsecase) GetAllGlobalEvents(ctx context.Context) ([]entity.G
 	return output, nil
 }
 
-func (u *GlobalEventUsecase) AddInfoGlobalEvent(ctx context.Context, input entity.GlobalEventInfoDTO) error {
+func (u *GlobalEventUsecase) AddInfoGlobalEvent(ctx context.Context, input entity.GlobalEventInfoDTO, perm permission.Usecase, login string) error {
 	ctx, cancel := context.WithTimeout(ctx, Timeout)
 	defer cancel()
+
+	if err := perm.CheckUserRole(ctx, login, string(ratingEntity.RoleOwner)); err != nil { return err }
 
 	if err := u.globalEventRepo.AddInfoGlobalEvent(ctx, input); err != nil { return err }
     return nil
 }
 
-func (u *GlobalEventUsecase) AddQuizGlobalEvent(ctx context.Context, input entity.GlobalEventQuizDTO) error {
+func (u *GlobalEventUsecase) AddQuizGlobalEvent(ctx context.Context, input entity.GlobalEventQuizDTO, perm permission.Usecase, login string) error {
 	ctx, cancel := context.WithTimeout(ctx, Timeout)
 	defer cancel()
+
+	if err := perm.CheckUserRole(ctx, login, string(ratingEntity.RoleOwner)); err != nil { return err }
 
 	if err := u.globalEventRepo.AddQuizGlobalEvent(ctx, input); err != nil { return err }
 
 	return nil
 }
 
-func (u *GlobalEventUsecase) DeleteInfoGlobalEvent(ctx context.Context, id int) error {
+func (u *GlobalEventUsecase) DeleteInfoGlobalEvent(ctx context.Context, id int, perm permission.Usecase, login string) error {
 	ctx, cancel := context.WithTimeout(ctx, Timeout)
 	defer cancel()
+
+	if err := perm.CheckUserRole(ctx, login, string(ratingEntity.RoleOwner)); err != nil { return err }
 
 	if err := u.globalEventRepo.DeleteInfoGlobalEvent(ctx, id); err != nil { return err }
 
 	return nil
 }
 
-func (u *GlobalEventUsecase) DeleteQuizGlobalEvent(ctx context.Context, id int) error {
+func (u *GlobalEventUsecase) DeleteQuizGlobalEvent(ctx context.Context, id int, perm permission.Usecase, login string) error {
 	ctx, cancel := context.WithTimeout(ctx, Timeout)
 	defer cancel()
+
+	if err := perm.CheckUserRole(ctx, login, string(ratingEntity.RoleOwner)); err != nil { return err }
 
 	if err := u.globalEventRepo.DeleteQuizGlobalEvent(ctx, id); err != nil { return err }
 

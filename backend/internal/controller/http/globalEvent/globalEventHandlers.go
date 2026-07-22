@@ -3,6 +3,7 @@ package globalevent
 import (
 	entity "cspirt/internal/domain/globalEvent"
 	usecase "cspirt/internal/usecase/globalEvent"
+	permission "cspirt/internal/controller/permission/usecase"
 	log "cspirt/pkg/logger"
 	
 	"time"
@@ -29,33 +30,33 @@ func GetGlobalEvents(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
 	}
 }
 
-func AddInfoGlobalEvent(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
+func AddInfoGlobalEvent(usecase *usecase.GlobalEventUsecase, perm permission.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context)  {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
 
 		var input entity.GlobalEventInfoDTO
 		if err := c.ShouldBindJSON(&input); err != nil { c.JSON(400, gin.H{"error":"Bad request"}); return }
-		if err := usecase.AddInfoGlobalEvent(ctx, input); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
+		if err := usecase.AddInfoGlobalEvent(ctx, input, perm, c.GetString("Login")); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 
 		c.JSON(200, gin.H{"status":"ok"})
 	}
 }
 
-func AddQuizGlobalEvent(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
+func AddQuizGlobalEvent(usecase *usecase.GlobalEventUsecase, perm permission.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context)  {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
 
 		var input entity.GlobalEventQuizDTO
 		if err := c.ShouldBindJSON(&input); err != nil { c.JSON(400, gin.H{"error":"Bad request"}); return }
-		if err := usecase.AddQuizGlobalEvent(ctx, input); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
+		if err := usecase.AddQuizGlobalEvent(ctx, input, perm, c.GetString("Login")); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 
 		c.JSON(200, gin.H{"status":"ok"})
 	}
 }
 
-func DeleteInfoGlobalEvent(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
+func DeleteInfoGlobalEvent(usecase *usecase.GlobalEventUsecase, perm permission.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context)  {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
@@ -63,13 +64,13 @@ func DeleteInfoGlobalEvent(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc 
 		idStr := c.Query("Id"); if idStr == "" { c.JSON(400, gin.H{"error":"Bad request"}); return }
 		id, err := strconv.Atoi(idStr); if err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 
-		if err := usecase.DeleteInfoGlobalEvent(ctx, id); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
+		if err := usecase.DeleteInfoGlobalEvent(ctx, id, perm, c.GetString("Login")); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 	
 		c.JSON(200, gin.H{"status":"ok"})
 	}
 }
 
-func DeleteQuizGlobalEvent(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
+func DeleteQuizGlobalEvent(usecase *usecase.GlobalEventUsecase, perm permission.Usecase) gin.HandlerFunc {
 	return func(c *gin.Context)  {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
@@ -77,7 +78,7 @@ func DeleteQuizGlobalEvent(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc 
 		idStr := c.Query("Id"); if idStr == "" { c.JSON(400, gin.H{"error":"Bad request"}); return }
 		id, err := strconv.Atoi(idStr); if err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 
-		if err := usecase.DeleteQuizGlobalEvent(ctx, id); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
+		if err := usecase.DeleteQuizGlobalEvent(ctx, id, perm, c.GetString("Login")); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 	
 		c.JSON(200, gin.H{"status":"ok"})
 	}
@@ -88,14 +89,12 @@ func Vote(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
 
-		// 1. Безопасно извлекаем User ID из контекста мидлвары
 		userID, ok := getUserID(c)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user_id not found in context"})
 			return
 		}
 
-		// 2. Получаем eventId из URL
 		quizIdStr := c.Param("eventId")
 		quizID, err := strconv.Atoi(quizIdStr)
 		if err != nil || quizID <= 0 {
@@ -103,16 +102,13 @@ func Vote(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
 			return
 		}
 
-		// 3. Парсим JSON тело запроса
 		var input entity.VoteToPutinDTO
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 			return
 		}
 
-		// 4. Вызываем юзкейс
 		if err := usecase.Vote(ctx, userID, quizID, input.VoteItemId); err != nil {
-			// Если уже голосовал или некорректный ID варианта
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

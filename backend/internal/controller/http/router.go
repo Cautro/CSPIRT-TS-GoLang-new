@@ -162,10 +162,10 @@ func registerScheduleRoutes(auth *gin.RouterGroup, s Usecases) {
 
 func registerGlobalEvents(auth *gin.RouterGroup, s Usecases) {
 	auth.GET("/events/global", globalEventHandlers.GetGlobalEvents(s.GlobalEvent))
-	auth.POST("/event/global/info/add", globalEventHandlers.AddInfoGlobalEvent(s.GlobalEvent))
-	auth.POST("/event/global/quiz/add", globalEventHandlers.AddQuizGlobalEvent(s.GlobalEvent))
-	auth.DELETE("/event/global/info/delete", globalEventHandlers.DeleteInfoGlobalEvent(s.GlobalEvent))
-	auth.DELETE("/event/global/quiz/delete", globalEventHandlers.DeleteQuizGlobalEvent(s.GlobalEvent))
+	auth.POST("/event/global/info/add", globalEventHandlers.AddInfoGlobalEvent(s.GlobalEvent, *s.Permission))
+	auth.POST("/event/global/quiz/add", globalEventHandlers.AddQuizGlobalEvent(s.GlobalEvent, *s.Permission))
+	auth.DELETE("/event/global/info/delete", globalEventHandlers.DeleteInfoGlobalEvent(s.GlobalEvent, *s.Permission))
+	auth.DELETE("/event/global/quiz/delete", globalEventHandlers.DeleteQuizGlobalEvent(s.GlobalEvent, *s.Permission))
 
 	auth.PATCH("/event/global/quiz/:eventId/vote", globalEventHandlers.Vote(s.GlobalEvent))
 	//auth.PATCH("/event/global/update")
