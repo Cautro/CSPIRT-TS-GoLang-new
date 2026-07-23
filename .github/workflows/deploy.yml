@@ -3,7 +3,7 @@ name: Deploy Go Application
 on:
   push:
     branches:
-      - main  
+      - main
 
 jobs:
   deploy:
@@ -16,12 +16,21 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.5' 
+        go-version: '1.25.5'
 
     - name: Build application
       run: |
         go mod download
         GOOS=linux GOARCH=amd64 go build -o cspirt ./cmd/app
+
+    - name: Stop Systemd Service
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          sudo systemctl stop cspirt.service
 
     - name: Deploy to Server
       uses: appleboy/scp-action@v0.1.7
@@ -32,13 +41,13 @@ jobs:
         source: "cspirt"
         target: "/opt/cspirt/bin"
         overwrite: true
-        strip_components: 0 
+        strip_components: 0
 
-    - name: Restart Systemd Service
+    - name: Start Systemd Service
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
-          sudo systemctl restart cspirt.service
+          sudo systemctl start cspirt.service
