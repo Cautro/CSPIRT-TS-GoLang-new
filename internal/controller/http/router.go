@@ -31,6 +31,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Usecases struct {
@@ -52,11 +53,13 @@ type Usecases struct {
 func NewRouter(s Usecases) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(MetricsMiddleware())
 
 	if os.Getenv("PROFILE") == "1" {
 		router.Use(DiagnosticsMiddleware(s.DB))
 	}
 
+	RegisterMetrics()
 	registerPublicRoutes(router, s)
 	registerAuthenticatedRoutes(router, s)
 
@@ -67,6 +70,8 @@ func registerPublicRoutes(router *gin.Engine, s Usecases) {
 	router.GET("/health", healthHandlers.HealthHandler)
 	router.POST("/login", authHandlers.LoginHandler(s.Auth))
 	router.POST("/api/refresh", authHandlers.RefreshHandler(s.Auth))
+
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 }
 
 func registerAuthenticatedRoutes(router *gin.Engine, s Usecases) {

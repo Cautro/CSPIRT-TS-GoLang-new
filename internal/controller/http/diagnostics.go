@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"cspirt/pkg/profiler"
-
 	"github.com/gin-gonic/gin"
 )
 
