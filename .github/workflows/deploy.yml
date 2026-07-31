@@ -10,44 +10,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.25.5'
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
 
-    - name: Build application
-      run: |
-        go mod download
-        GOOS=linux GOARCH=amd64 go build -o /opt/cspirt/bin/cspirt ./cmd/app
+      - name: Download dependencies
+        run: go mod download
 
-    - name: Stop Systemd Service
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-          sudo systemctl stop cspirt.service
+      - name: Build application
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+          go build -o cspirt ./cmd/app
 
-    - name: Deploy to Server
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        source: "cspirt"
-        target: "/opt/cspirt/bin"
-        overwrite: true
-        strip_components: 0
+      - name: Verify binary
+        run: |
+          ls -lah
+          file cspirt
 
-    - name: Start Systemd Service
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-          sudo systemctl start cspirt.service
+      - name: Upload binary
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "cspirt"
+          target: "/tmp"
+          overwrite: true
+
+      - name: Deploy and restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            sudo systemctl stop cspirt.service
+            sudo mv /tmp/cspirt /opt/cspirt/bin/cspirt
+            sudo chmod +x /opt/cspirt/bin/cspirt
+            sudo systemctl start cspirt.service
+            sudo systemctl status cspirt.service --no-pager
