@@ -1,18 +1,19 @@
-package handlers
+package auth
 
 import (
 	"bufio"
+	"context"
+	"cspirt/internal/controller/http/middleware-JWT"
 	models "cspirt/internal/domain/auth"
 	sr "cspirt/internal/usecase/auth"
 	"cspirt/pkg/logger"
-	"cspirt/internal/controller/http/middleware-JWT"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	metrics "cspirt/internal/controller/http/metrics"
 	"strings"
 	"time"
-	"context"
 
 	"github.com/gin-gonic/gin"
 )
@@ -33,6 +34,7 @@ func LoginHandler(authService *sr.AuthUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input models.LoginInput
 		if err := c.ShouldBindJSON(&input); err != nil {
+			metrics.AuthAttempts.WithLabelValues("login", "invalid_credentials").Inc()
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "login",
@@ -47,6 +49,7 @@ func LoginHandler(authService *sr.AuthUsecase) gin.HandlerFunc {
 
 		result, err := authService.Login(ctx, input)
 		if err != nil {
+			metrics.AuthAttempts.WithLabelValues("login", "invalid_credentials").Inc()
 			if errors.Is(err, sr.ErrTooManyLoginAttempts) {
 				logger.WriteSafe(logger.LogEntry{
 					Level:   "info",
@@ -84,6 +87,7 @@ func LoginHandler(authService *sr.AuthUsecase) gin.HandlerFunc {
 
 		updateNetscapeCookiesFile(result.Token, result.RefreshToken)
 
+		metrics.AuthAttempts.WithLabelValues("login", "success").Inc()
 		c.JSON(200, gin.H{
 			"accessToken": result.Token,
 		})
@@ -109,6 +113,7 @@ func RefreshHandler(authService *sr.AuthUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		refreshToken, err := c.Cookie("refresh_token")
 		if err != nil {
+			metrics.AuthAttempts.WithLabelValues("refresh", "invalid_credentials").Inc()
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "refresh_token",
@@ -123,6 +128,7 @@ func RefreshHandler(authService *sr.AuthUsecase) gin.HandlerFunc {
 
 		result, err := authService.Refresh(ctx, refreshToken)
 		if err != nil {
+			metrics.AuthAttempts.WithLabelValues("refresh", "invalid_credentials").Inc()
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "info",
 				Action:  "refresh_token",
@@ -141,6 +147,7 @@ func RefreshHandler(authService *sr.AuthUsecase) gin.HandlerFunc {
 
 		updateNetscapeCookiesFile(result.Token, result.RefreshToken)
 
+		metrics.AuthAttempts.WithLabelValues("refresh", "success").Inc()
 		c.JSON(200, gin.H{
 			"token": result.Token,
 		})

@@ -27,6 +27,8 @@ import (
 	usersUsecase "cspirt/internal/usecase/user"
 	globalEventUsecase "cspirt/internal/usecase/globalEvent"
 
+	metrics "cspirt/internal/controller/http/metrics"
+
 	"database/sql"
 	"os"
 
@@ -53,13 +55,14 @@ type Usecases struct {
 func NewRouter(s Usecases) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(MetricsMiddleware())
+	router.Use(metrics.MetricsMiddleware())
 
 	if os.Getenv("PROFILE") == "1" {
 		router.Use(DiagnosticsMiddleware(s.DB))
 	}
 
-	RegisterMetrics()
+	metrics.RegisterDBMetrics(s.DB)
+	metrics.RegisterMetrics()
 	registerPublicRoutes(router, s)
 	registerAuthenticatedRoutes(router, s)
 

@@ -1,15 +1,16 @@
 package globalevent
 
 import (
+	permission "cspirt/internal/controller/permission/usecase"
 	entity "cspirt/internal/domain/globalEvent"
 	usecase "cspirt/internal/usecase/globalEvent"
-	permission "cspirt/internal/controller/permission/usecase"
+	metrics "cspirt/internal/controller/http/metrics"
 	log "cspirt/pkg/logger"
-	
-	"time"
-	"net/http"
+
 	"context"
+	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,6 +27,7 @@ func GetGlobalEvents(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
 			return 
 		}
 
+		metrics.GlobalEventsActionsTotal.WithLabelValues("get_all_global_event").Inc()
 		c.JSON(200, output)
 	}
 }
@@ -39,6 +41,7 @@ func AddInfoGlobalEvent(usecase *usecase.GlobalEventUsecase, perm permission.Use
 		if err := c.ShouldBindJSON(&input); err != nil { c.JSON(400, gin.H{"error":"Bad request"}); return }
 		if err := usecase.AddInfoGlobalEvent(ctx, input, perm, c.GetString("Login")); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 
+		metrics.GlobalEventsActionsTotal.WithLabelValues("add_info").Inc()
 		c.JSON(200, gin.H{"status":"ok"})
 	}
 }
@@ -52,6 +55,7 @@ func AddQuizGlobalEvent(usecase *usecase.GlobalEventUsecase, perm permission.Use
 		if err := c.ShouldBindJSON(&input); err != nil { c.JSON(400, gin.H{"error":"Bad request"}); return }
 		if err := usecase.AddQuizGlobalEvent(ctx, input, perm, c.GetString("Login")); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 
+		metrics.GlobalEventsActionsTotal.WithLabelValues("add_quiz").Inc()
 		c.JSON(200, gin.H{"status":"ok"})
 	}
 }
@@ -66,6 +70,7 @@ func DeleteInfoGlobalEvent(usecase *usecase.GlobalEventUsecase, perm permission.
 
 		if err := usecase.DeleteInfoGlobalEvent(ctx, id, perm, c.GetString("Login")); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 	
+		metrics.GlobalEventsActionsTotal.WithLabelValues("delete_info").Inc()
 		c.JSON(200, gin.H{"status":"ok"})
 	}
 }
@@ -80,6 +85,7 @@ func DeleteQuizGlobalEvent(usecase *usecase.GlobalEventUsecase, perm permission.
 
 		if err := usecase.DeleteQuizGlobalEvent(ctx, id, perm, c.GetString("Login")); err != nil { c.JSON(500, gin.H{"error":"Server error"}); return }
 	
+		metrics.GlobalEventsActionsTotal.WithLabelValues("delete_quiz").Inc()
 		c.JSON(200, gin.H{"status":"ok"})
 	}
 }
@@ -113,6 +119,7 @@ func Vote(usecase *usecase.GlobalEventUsecase) gin.HandlerFunc {
 			return
 		}
 
+		metrics.GlobalEventsActionsTotal.WithLabelValues("vote").Inc()
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	}
 }
