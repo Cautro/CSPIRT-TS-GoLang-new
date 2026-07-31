@@ -21,7 +21,7 @@ jobs:
     - name: Build application
       run: |
         go mod download
-        GOOS=linux GOARCH=amd64 go build -o cspirt ./cmd/app
+        GOOS=linux GOARCH=amd64 go build -o /opt/cspirt/bin/cspirt ./cmd/app
 
     - name: Stop Systemd Service
       uses: appleboy/ssh-action@v1.0.3

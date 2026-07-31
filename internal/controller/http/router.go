@@ -122,6 +122,7 @@ func registerClassRoutes(auth *gin.RouterGroup, s Usecases) {
 func registerRatingRoutes(auth *gin.RouterGroup, s Usecases) {
 	auth.GET("/rating", ratingHandlers.GetRatingsHandler(s.Users))
 	auth.PATCH("/rating/update", ratingHandlers.UpdateRatingsHandler(s.Rating, s.Users))
+	auth.PATCH("/rating/class/update", ratingHandlers.UpdateClassRatingHandler(s.Rating))
 }
 
 func registerNoteRoutes(auth *gin.RouterGroup, s Usecases) {
@@ -168,5 +169,7 @@ func registerGlobalEvents(auth *gin.RouterGroup, s Usecases) {
 	auth.DELETE("/event/global/quiz/delete", globalEventHandlers.DeleteQuizGlobalEvent(s.GlobalEvent, *s.Permission))
 
 	auth.PATCH("/event/global/quiz/:eventId/vote", globalEventHandlers.Vote(s.GlobalEvent))
+
+	auth.PATCH("/event/global/quiz/:eventId/:outId/:inId")
 	//auth.PATCH("/event/global/update")
 }

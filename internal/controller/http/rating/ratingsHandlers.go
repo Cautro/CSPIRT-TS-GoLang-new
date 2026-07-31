@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"cspirt/pkg/logger"
-	models "cspirt/internal/domain/rating"
-	rating "cspirt/internal/usecase/rating"
-	userModels "cspirt/internal/domain/user"
-	usersvc "cspirt/internal/usecase/user"
-	"net/http"
 	"context"
+	models "cspirt/internal/domain/rating"
+	userModels "cspirt/internal/domain/user"
+	rating "cspirt/internal/usecase/rating"
+	usersvc "cspirt/internal/usecase/user"
+	"cspirt/pkg/logger"
+	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -137,5 +138,33 @@ func UpdateRatingsHandler(rs *rating.RatingsUsecase, users *usersvc.UsersUsecase
 			"target":     targetUser.Login,
 			"new_rating": targetUser.Rating,
 		})
+	}
+}
+
+func UpdateClassRatingHandler(usecase *rating.RatingsUsecase) gin.HandlerFunc {
+	return func(c *gin.Context)  {
+		userIdStr := c.GetString("Id")
+		if userIdStr == "" {
+			c.JSON(401, gin.H{"error":"Unauthorized"})
+			return 
+		}
+		userId, err := strconv.Atoi(userIdStr)
+		if err != nil {
+			c.JSON(500, gin.H{"error":"Server error"})
+			return 
+		}
+
+		var input models.ClassRatingInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(500, gin.H{"error":"Server error"})
+			return 
+		}
+
+		if err := usecase.UpdateClassRating(c.Request.Context(), input.ClassId, userId, input.Delta); err != nil {
+			c.JSON(500, gin.H{"error":"Server error"})
+			return 
+		}
+
+		c.JSON(200, gin.H{"status":"ok"})
 	}
 }

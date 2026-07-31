@@ -115,3 +115,7 @@ func (s *RatingsUsecase) UpdateRating(ctx context.Context, login string, in *mod
 
 	return nil
 }
+
+func (s *RatingsUsecase) UpdateClassRating(ctx context.Context, classId, userId, delta int) error {
+	return s.UpdateClassRating(ctx, classId, userId, delta)
+}

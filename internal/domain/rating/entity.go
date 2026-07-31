@@ -15,3 +15,8 @@ type RatingInput struct {
 	TargetLogin string `json:"target_login"`
 	Reason string `json:"reason"`
 }
+
+type ClassRatingInput struct {
+    Delta int `json:"delta"`
+    ClassId int `json:"classId"`
+}

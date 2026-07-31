@@ -24,6 +24,7 @@ type GlobalEventInfoEntity struct {
 }
 
 type QuizOptionDTO struct {
+	ID          int      `json:"id" validate:"required"`
     Title       string   `json:"title" validate:"required"`
 	Votes       int      `json:"votes" validate:"required"`
 }

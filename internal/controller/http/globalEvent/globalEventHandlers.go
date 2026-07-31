@@ -137,3 +137,43 @@ func getUserID(c *gin.Context) (int, bool) {
 	}
 	return 0, false
 }
+
+// func VotesBroadcast(u usecase.GlobalEventUsecase) gin.HandlerFunc {
+// 	return func(c *gin.Context)  {
+// 		deltaStr := c.DefaultQuery("delta", "0")
+// 		delta, err := strToInt(deltaStr) 
+// 		if err != nil { 
+// 			c.JSON(400, gin.H{"error":"Bad request"})
+// 			return 
+// 		}
+
+// 		eventIdStr := c.Param("eventId") 
+// 		eventId, err := strToInt(eventIdStr)
+// 		if err != nil {
+// 			c.JSON(400, gin.H{"error":"Bad request"})
+// 			return
+// 		}
+
+// 		outIdStr := c.Param("outId")
+// 		outId, err := strToInt(outIdStr)
+// 		if err != nil {
+// 			c.JSON(400, gin.H{"error":"Bad request"})
+// 			return
+// 		}
+		
+// 		inIdStr := c.Param("inId")
+// 		inId, err := strToInt(inIdStr)
+// 		if err != nil {
+// 			c.JSON(400, gin.H{"error":"Bad request"})
+// 			return
+// 		}
+
+
+// 	}
+// }
+
+func strToInt(str string) (int, error) {
+	intOutput, err := strconv.Atoi(str)
+	if err != nil { return 0, err }
+	return intOutput, nil
+}

@@ -1,13 +1,17 @@
 package repo
 
 import (
-	userModels "cspirt/internal/domain/user"
-	"cspirt/internal/domain/rating/repo"
+	"context"
+	perm "cspirt/internal/controller/permission/usecase"
 	"cspirt/internal/controller/utils"
+	"cspirt/internal/domain/rating/repo"
+	ratingModel "cspirt/internal/domain/rating"
+	userModels "cspirt/internal/domain/user"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 )
 
 type postgresRepository struct {
@@ -46,6 +50,30 @@ func (r *postgresRepository) UpdateRating(login string, rating int) error {
 	return r.syncClassByIDLocked(classID)
 }
 
+func (r *postgresRepository) UpdateClassRating(ctx context.Context, classId, userId, delta int, perm perm.Usecase) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if classId <= 0 || userId <= 0 {
+		return errors.New("Bad request")
+	}
+
+	user, err := r.getUserByID(ctx, userId)
+	if err := perm.CheckUserRole(ctx, user.Login, string(ratingModel.RoleOwner)); err != nil {
+		return errors.New("Don't have permission for this action")
+	}
+
+	query := `UPDATE classes 
+		SET ClassTotalRating = $1
+		WHERE Id = $2`
+	_, err = r.db.ExecContext(ctx, query, delta, classId)
+	if err != nil {
+		return errors.New("SQL error")
+	}
+
+	return nil
+}
+
 func clampRating(rating int) int {
 	if rating < 0 {
 		return 0
@@ -53,9 +81,6 @@ func clampRating(rating int) int {
 	return rating
 }
 
-// syncClassByIDLocked recomputes the class's cached Members/UserTotalRating/
-// TeacherLogin snapshot after a rating change — mirrors users/repo's
-// syncClassByIDLocked exactly, since repos don't depend on one another.
 func (r *postgresRepository) syncClassByIDLocked(classID int) error {
 	if classID <= 0 {
 		return nil
@@ -176,6 +201,48 @@ func (r *postgresRepository) getUsersByClassIDLocked(classID int) ([]userModels.
 	}
 
 	return users, nil
+}
+
+func (r *postgresRepository) getUserByID(ctx context.Context, id int) (*userModels.User, error) {
+	query := `SELECT Id, Avatar, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID
+		FROM users
+		WHERE Id = $1`
+
+	row:= r.db.QueryRowContext(ctx, query, id)
+
+	var user userModels.User
+	var fullNameJSON sql.NullString
+
+	err := row.Scan(
+		&user.ID,
+		&user.Avatar,
+		&user.Name,
+		&fullNameJSON,
+		&user.LastName,
+		&user.Login,
+		&user.Password,
+		&user.Rating,
+		&user.Role,
+		&user.Class,
+		&user.ClassID,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if fullNameJSON.Valid && fullNameJSON.String != "" {
+		if err := json.Unmarshal([]byte(fullNameJSON.String), &user.FullName); err != nil {
+			return nil, err
+		}
+	}
+	if user.FullName == nil {
+		user.FullName = []userModels.FullName{}
+	}
+
+	return &user, nil
 }
 
 func (r *postgresRepository) getUserByLoginLocked(login string) (*userModels.User, error) {
