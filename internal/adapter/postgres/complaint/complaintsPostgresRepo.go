@@ -1,17 +1,16 @@
-package repo
+package postgres
 
 import (
-	ratingModels "cspirt/internal/domain/rating"
-	"cspirt/internal/domain/complaint/repo"
-	models "cspirt/internal/domain/user"
-	"cspirt/internal/controller/utils"
-	"cspirt/pkg/logger"
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
-	"context"
 	"time"
+
+	"cspirt/internal/domain/complaint/repo"
+	models "cspirt/internal/domain/user"
+	"cspirt/pkg/logger"
 )
 
 type postgresRepository struct {
@@ -22,65 +21,101 @@ func New(db *sql.DB) repo.ComplaintRepository {
 	return &postgresRepository{db: db}
 }
 
-func (r *postgresRepository) AddComplaint(ctx context.Context, login string, complaint models.Complaint, user models.SafeUser) error {
-	if login == "" {
-		return errors.New("invalid login or token")
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanComplaint(s rowScanner) (models.Complaint, error) {
+	var (
+		c                models.Complaint
+		createdAt        any
+		moderateAt       sql.NullTime
+		moderatorID      sql.NullInt64
+		moderationStatus sql.NullString
+	)
+
+	err := s.Scan(
+		&c.ID,
+		&c.TargetID,
+		&c.TargetName,
+		&c.AuthorID,
+		&c.AuthorName,
+		&c.Content,
+		&createdAt,
+		&moderateAt,
+		&moderatorID,
+		&moderationStatus,
+	)
+	if err != nil {
+		return models.Complaint{}, err
 	}
 
+	parsedTime, err := parseEventTime(createdAt)
+	if err != nil {
+		return models.Complaint{}, err
+	}
+	c.CreatedAt = parsedTime
+
+	if moderateAt.Valid {
+		c.ModerateAt = moderateAt.Time
+	}
+	if moderatorID.Valid {
+		c.ModeratorId = int(moderatorID.Int64)
+	}
+	if moderationStatus.Valid {
+		c.ModerationStatus = moderationStatus.String
+	}
+
+	return c, nil
+}
+
+func (r *postgresRepository) AddComplaint(ctx context.Context, login string, complaint models.Complaint, user models.SafeUser) error {
 	complaint.Content = strings.TrimSpace(complaint.Content)
-	if complaint.TargetID <= 0 {
+	if complaint.TargetID <= 0 || complaint.AuthorID <= 0 {
 		return errors.New("target and author are required")
 	}
 	if complaint.Content == "" {
 		return errors.New("content is required")
 	}
 
-	targetUser, err := r.getUserByIDLocked(complaint.TargetID)
-	if err != nil {
-		return err
-	}
-	if targetUser == nil {
-		return errors.New("target user not found")
+	var moderatorID any
+	if complaint.ModeratorId > 0 {
+		moderatorID = complaint.ModeratorId
 	}
 
-	if utils.IsSystemRole(targetUser.Role) {
-		return errors.New("system users cannot be complained about")
+	var moderateAt any
+	if !complaint.ModerateAt.IsZero() {
+		moderateAt = complaint.ModerateAt
 	}
 
-	logger.WriteSafe(logger.LogEntry{
-		Level:   "info",
-		Action:  "add_complaint",
-		Login:   user.Login,
-		Role:    user.Role,
-		Message: "adding new complaint",
-	})
+	createdAt := complaint.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
 
-	if targetUser.Login == login {
-		return errors.New("users cannot complain about themselves")
-	}
-	if complaint.TargetID == complaint.AuthorID {
-		return errors.New("author and target cannot be the same")
-	}
-	if len(complaint.Content) > 1000 {
-		return errors.New("content exceeds maximum length of 1000 characters")
+	moderationStatus := complaint.ModerationStatus
+	if moderationStatus == "" {
+		moderationStatus = string(models.WaitStatus)
 	}
 
 	query := `
 		INSERT INTO complaints
-		(TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		(TargetID, AuthorID, TargetName, AuthorName, Content, CreatedAt, ModerateAt, ModeratorId, ModerationStatus)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
-	CreateAt := time.Now()
-
-	_, err = r.db.Exec(
+	_, err := r.db.ExecContext(
+		ctx,
 		query,
 		complaint.TargetID,
-		targetUser.Name,
-		user.ID,
-		user.Name,
+		complaint.AuthorID,
+		complaint.TargetName,
+		complaint.AuthorName,
 		complaint.Content,
-		CreateAt,
+		createdAt,
+		moderateAt,
+		moderatorID,
+		moderationStatus,
 	)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
@@ -90,15 +125,51 @@ func (r *postgresRepository) AddComplaint(ctx context.Context, login string, com
 			Role:    user.Role,
 			Message: "failed to insert complaint: " + err.Error(),
 		})
+	}
+
+	return err
+}
+
+func (r *postgresRepository) UpdateModerationStatus(ctx context.Context, id int, status string, moderatorID int, user models.SafeUser) error {
+	validStatuses := map[string]bool{
+		string(models.WaitStatus):    true, // "wait"
+		string(models.CancelStatus):  true, // "cancel"
+		string(models.DeleteStatus):  true, // "deleted"
+		string(models.SuccessStatus): true, // "success"
+	}
+
+	if !validStatuses[status] {
+		return fmt.Errorf("invalid moderation status: %s", status)
+	}
+
+	query := `
+		UPDATE complaints
+		SET ModerationStatus = $1, ModerateAt = $2, ModeratorId = $3
+		WHERE Id = $4
+	`
+	result, err := r.db.ExecContext(ctx, query, status, time.Now(), moderatorID, id)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "update_complaint_moderation_status",
+			Login:   user.Login,
+			Role:    user.Role,
+			Message: "failed to update moderation status: " + err.Error(),
+		})
 		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err == nil && affected == 0 {
+		return errors.New("complaint not found")
 	}
 
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
-		Action:  "add_complaint",
+		Action:  "update_complaint_moderation_status",
 		Login:   user.Login,
 		Role:    user.Role,
-		Message: "complaint inserted",
+		Message: fmt.Sprintf("complaint %d status updated to %s", id, status),
 	})
 
 	return nil
@@ -108,22 +179,17 @@ func (r *postgresRepository) DeleteComplaint(ctx context.Context, id int, user m
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "delete_complaint",
+		Message: "deleting complaint",
 		Login:   user.Login,
 		Role:    user.Role,
-		Message: "deleting complaint",
 	})
 
-	query := `DELETE FROM complaints WHERE Id = $1`
-
-	check, err := r.hasUserRoleLocked(user.Login, string(ratingModels.RoleAdmin), string(ratingModels.RoleOwner))
-	if err != nil {
-		return err
-	}
-	if !check {
-		return errors.New("only admins can delete complaints")
-	}
-
-	result, err := r.db.Exec(query, id)
+	query := `
+		UPDATE complaints
+		SET ModerationStatus = $1, ModerateAt = $2
+		WHERE Id = $3
+	`
+	result, err := r.db.ExecContext(ctx, query, string(models.DeleteStatus), time.Now(), id)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -134,6 +200,7 @@ func (r *postgresRepository) DeleteComplaint(ctx context.Context, id int, user m
 		})
 		return err
 	}
+
 	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
 		return errors.New("complaint not found")
 	}
@@ -143,10 +210,43 @@ func (r *postgresRepository) DeleteComplaint(ctx context.Context, id int, user m
 		Action:  "delete_complaint",
 		Login:   user.Login,
 		Role:    user.Role,
-		Message: "complaint deleted",
+		Message: "complaint soft deleted",
 	})
-
 	return nil
+}
+
+func (r *postgresRepository) GetComplaintsByModerationStatus(ctx context.Context, status string) ([]models.Complaint, error) {
+	query := `
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt, ModerateAt, ModeratorId, ModerationStatus
+		FROM complaints
+		WHERE ModerationStatus = $1
+		ORDER BY Id DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query, status)
+	if err != nil {
+		logger.WriteSafe(logger.LogEntry{
+			Level:   "error",
+			Action:  "get_complaints_by_status",
+			Message: "failed to query complaints by status: " + err.Error(),
+		})
+		return nil, err
+	}
+	defer rows.Close()
+
+	complaints := make([]models.Complaint, 0)
+	for rows.Next() {
+		c, err := scanComplaint(rows)
+		if err != nil {
+			return nil, err
+		}
+		complaints = append(complaints, c)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return complaints, nil
 }
 
 func (r *postgresRepository) GetAllComplaints(ctx context.Context) ([]models.Complaint, error) {
@@ -156,10 +256,12 @@ func (r *postgresRepository) GetAllComplaints(ctx context.Context) ([]models.Com
 		Message: "getting all complaints",
 	})
 
-	rows, err := r.db.Query(`
-		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
+	query := `
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt, ModerateAt, ModeratorId, ModerationStatus
 		FROM complaints
-	`)
+		ORDER BY Id DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -171,20 +273,9 @@ func (r *postgresRepository) GetAllComplaints(ctx context.Context) ([]models.Com
 	defer rows.Close()
 
 	complaints := make([]models.Complaint, 0)
-
 	for rows.Next() {
-		var complaint models.Complaint
-		var createdAt interface{}
-
-		if err := rows.Scan(
-			&complaint.ID,
-			&complaint.TargetID,
-			&complaint.TargetName,
-			&complaint.AuthorID,
-			&complaint.AuthorName,
-			&complaint.Content,
-			&createdAt,
-		); err != nil {
+		c, err := scanComplaint(rows)
+		if err != nil {
 			logger.WriteSafe(logger.LogEntry{
 				Level:   "error",
 				Action:  "get_all_complaints",
@@ -192,107 +283,30 @@ func (r *postgresRepository) GetAllComplaints(ctx context.Context) ([]models.Com
 			})
 			return nil, err
 		}
-
-		parsedTime, err := parseEventTime(createdAt)
-		if err != nil {
-			return nil, err
-		}
-		complaint.CreatedAt = parsedTime
-
-		complaints = append(complaints, complaint)
+		complaints = append(complaints, c)
 	}
 
 	if err := rows.Err(); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_all_complaints",
-			Message: "row iteration failed: " + err.Error(),
-		})
 		return nil, err
 	}
 
 	return complaints, nil
 }
 
-func (r *postgresRepository) GetComplaintByID(ctx context.Context, id int) ([]models.Complaint, error) {
-	logger.WriteSafe(logger.LogEntry{
-		Level:   "info",
-		Action:  "get_complaint_by_id",
-		Message: "getting needed complaint by id",
-	})
-
-	rows, err := r.db.Query(`
-		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
-		FROM complaints
-		WHERE Id = $1
-	`, id)
-	if err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_complaint_by_id",
-			Message: "failed to query complaints: " + err.Error(),
-		})
-		return nil, err
-	}
-	defer rows.Close()
-
-	complaints := make([]models.Complaint, 0)
-
-	for rows.Next() {
-		var complaint models.Complaint
-		var createdAt interface{}
-
-		if err := rows.Scan(
-			&complaint.ID,
-			&complaint.TargetID,
-			&complaint.TargetName,
-			&complaint.AuthorID,
-			&complaint.AuthorName,
-			&complaint.Content,
-			&createdAt,
-		); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_complaint_by_id",
-				Message: "failed to scan complaint: " + err.Error(),
-			})
-			return nil, err
-		}
-
-		parsedTime, err := parseEventTime(createdAt)
-		if err != nil {
-			return nil, err
-		}
-		complaint.CreatedAt = parsedTime
-
-		complaints = append(complaints, complaint)
-	}
-
-	if err := rows.Err(); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_complaint_by_id",
-			Message: "row iteration failed: " + err.Error(),
-		})
-		return nil, err
-	}
-
-	return complaints, nil
-}
-
-func (r *postgresRepository) GetComplaintsByUserId(ctx context.Context, User_id int) ([]models.Complaint, error) {
+func (r *postgresRepository) GetComplaintsByUserId(ctx context.Context, userID int) ([]models.Complaint, error) {
 	logger.WriteSafe(logger.LogEntry{
 		Level:   "info",
 		Action:  "get_complaint_by_user_id",
 		Message: "getting needed complaint by user id",
 	})
 
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt
+	query := `
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt, ModerateAt, ModeratorId, ModerationStatus
 		FROM complaints
 		WHERE TargetID = $1
-	`, User_id)
-
+		ORDER BY Id DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -304,43 +318,15 @@ func (r *postgresRepository) GetComplaintsByUserId(ctx context.Context, User_id 
 	defer rows.Close()
 
 	complaints := make([]models.Complaint, 0)
-
 	for rows.Next() {
-		var c models.Complaint
-		var createdAt interface{}
-
-		if err := rows.Scan(
-			&c.ID,
-			&c.TargetID,
-			&c.TargetName,
-			&c.AuthorID,
-			&c.AuthorName,
-			&c.Content,
-			&createdAt,
-		); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_complaint_by_user_id",
-				Message: "Server error: " + err.Error(),
-			})
-			return []models.Complaint{}, err
-		}
-
-		parsedTime, err := parseEventTime(createdAt)
+		c, err := scanComplaint(rows)
 		if err != nil {
 			return nil, err
 		}
-		c.CreatedAt = parsedTime
-
 		complaints = append(complaints, c)
 	}
 
 	if err := rows.Err(); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_complaints_by_user_id",
-			Message: "row iteration failed: " + err.Error(),
-		})
 		return nil, err
 	}
 
@@ -352,13 +338,14 @@ func (r *postgresRepository) GetComplaintsByClassID(ctx context.Context, classID
 		return nil, errors.New("invalid class id")
 	}
 
-	rows, err := r.db.Query(`
-		SELECT c.Id, c.TargetID, c.TargetName, c.AuthorID, c.AuthorName, c.Content, c.CreatedAt
+	query := `
+		SELECT c.Id, c.TargetID, c.TargetName, c.AuthorID, c.AuthorName, c.Content, c.CreatedAt, c.ModerateAt, c.ModeratorId, c.ModerationStatus
 		FROM complaints c
 		JOIN users u ON u.Id = c.TargetID
 		WHERE u.ClassID = $1
 		ORDER BY c.Id DESC
-	`, classID)
+	`
+	rows, err := r.db.QueryContext(ctx, query, classID)
 	if err != nil {
 		logger.WriteSafe(logger.LogEntry{
 			Level:   "error",
@@ -370,100 +357,47 @@ func (r *postgresRepository) GetComplaintsByClassID(ctx context.Context, classID
 	defer rows.Close()
 
 	complaints := make([]models.Complaint, 0)
-
 	for rows.Next() {
-		var c models.Complaint
-		var createdAt interface{}
-
-		if err := rows.Scan(
-			&c.ID,
-			&c.TargetID,
-			&c.TargetName,
-			&c.AuthorID,
-			&c.AuthorName,
-			&c.Content,
-			&createdAt,
-		); err != nil {
-			logger.WriteSafe(logger.LogEntry{
-				Level:   "error",
-				Action:  "get_complaints_by_class",
-				Message: "failed to scan complaint: " + err.Error(),
-			})
-			return nil, err
-		}
-
-		parsedTime, err := parseEventTime(createdAt)
+		c, err := scanComplaint(rows)
 		if err != nil {
 			return nil, err
 		}
-		c.CreatedAt = parsedTime
-
 		complaints = append(complaints, c)
 	}
 
 	if err := rows.Err(); err != nil {
-		logger.WriteSafe(logger.LogEntry{
-			Level:   "error",
-			Action:  "get_complaints_by_class",
-			Message: "row iteration failed: " + err.Error(),
-		})
 		return nil, err
 	}
 
 	return complaints, nil
 }
 
-func (r *postgresRepository) getUserByIDLocked(id int) (*models.User, error) {
-	row := r.db.QueryRow(`
-		SELECT Id, Avatar, Name, FullName, LastName, Login, Password, Rating, Role, Class, ClassID
-		FROM users
+func (r *postgresRepository) GetComplaintByID(ctx context.Context, id int) ([]models.Complaint, error) {
+	query := `
+		SELECT Id, TargetID, TargetName, AuthorID, AuthorName, Content, CreatedAt, ModerateAt, ModeratorId, ModerationStatus
+		FROM complaints
 		WHERE Id = $1
-	`, id)
-
-	var user models.User
-	var fullNameJSON sql.NullString
-
-	err := row.Scan(
-		&user.ID,
-		&user.Avatar,
-		&user.Name,
-		&fullNameJSON,
-		&user.LastName,
-		&user.Login,
-		&user.Password,
-		&user.Rating,
-		&user.Role,
-		&user.Class,
-		&user.ClassID,
-	)
+	`
+	rows, err := r.db.QueryContext(ctx, query, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
+		return nil, err
+	}
+	defer rows.Close()
+
+	complaints := make([]models.Complaint, 0)
+	for rows.Next() {
+		c, err := scanComplaint(rows)
+		if err != nil {
+			return nil, err
 		}
+		complaints = append(complaints, c)
+	}
+
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return &user, nil
-}
-
-func (r *postgresRepository) hasUserRoleLocked(login string, roles ...string) (bool, error) {
-	var role string
-	err := r.db.QueryRow(`SELECT Role FROM users WHERE Login = $1`, strings.TrimSpace(login)).Scan(&role)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return false, errors.New("user not found")
-		}
-		return false, err
-	}
-
-	userRole := strings.ToLower(strings.TrimSpace(role))
-	for _, r := range roles {
-		if userRole == strings.ToLower(strings.TrimSpace(r)) {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return complaints, nil
 }
 
 func parseEventTime(value interface{}) (time.Time, error) {

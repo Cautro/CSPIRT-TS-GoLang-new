@@ -1,9 +1,15 @@
 package complaint
 
+import "time"
+
 type AddNewComplaintResponse struct {
-	ID        int    `json:"ID"`
-    TargetID  int	 `json:"TargetID"`
-    TargetName string `json:"TargetName"`
-    Content   string `json:"Content"`
-    CreatedAt string `json:"CreatedAt"`
+	ID         int    `json:"ID"`
+	TargetID   int    `json:"TargetID"`
+	TargetName string `json:"TargetName"`
+	Content    string `json:"Content"`
+	CreatedAt  string `json:"CreatedAt"`
+
+	ModerateAt       time.Time `json:"ModerateAt"`
+	ModeratorId      int       `json:"ModeratorId"`
+	ModerationStatus string    `json:"ModerationStatus"`
 }

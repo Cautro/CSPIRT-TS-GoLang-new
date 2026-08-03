@@ -79,7 +79,20 @@ type Note struct {
 	AuthorName string  `json:"AuthorName"`
 	Content   string   `json:"Content"`
 	CreatedAt time.Time`json:"CreatedAt"`
+
+	ModerateAt       time.Time `json:"ModerateAt"`
+    ModeratorId      int `json:"ModeratorId"`
+	ModerationStatus string `json:"ModerationStatus"`
 }
+
+type ModerationStatusType string
+
+const (
+	WaitStatus ModerationStatusType = "wait"
+	DeleteStatus ModerationStatusType = "delete"
+	CancelStatus ModerationStatusType = "cancel"
+	SuccessStatus ModerationStatusType = "success"
+)
 
 type Complaint struct {
 	ID        int     `json:"ID"`
@@ -89,4 +102,8 @@ type Complaint struct {
 	AuthorName string `json:"AuthorName"`
 	Content   string  `json:"Content"`
 	CreatedAt time.Time `json:"CreatedAt"`
+
+	ModerateAt       time.Time `json:"ModerateAt"`
+    ModeratorId      int `json:"ModeratorId"`
+	ModerationStatus string `json:"ModerationStatus"`
 }

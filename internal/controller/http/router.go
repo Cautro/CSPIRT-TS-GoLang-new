@@ -13,6 +13,7 @@ import (
 	ratingHandlers "cspirt/internal/controller/http/rating"
 	scheduleHandlers "cspirt/internal/controller/http/schedule"
 	userHandlers "cspirt/internal/controller/http/user"
+	modHandlers "cspirt/internal/controller/http/moderate"
 
 	// usecase
 	permissionUsecase "cspirt/internal/controller/permission/usecase"
@@ -21,11 +22,12 @@ import (
 	classUsecase "cspirt/internal/usecase/class"
 	complaintUsecase "cspirt/internal/usecase/complaint"
 	eventsUsecase "cspirt/internal/usecase/event"
+	globalEventUsecase "cspirt/internal/usecase/globalEvent"
 	noteUsecase "cspirt/internal/usecase/note"
 	ratingUsecase "cspirt/internal/usecase/rating"
 	scheduleUsecase "cspirt/internal/usecase/schedule"
 	usersUsecase "cspirt/internal/usecase/user"
-	globalEventUsecase "cspirt/internal/usecase/globalEvent"
+	modUsecase "cspirt/internal/usecase/moderate"
 
 	metrics "cspirt/internal/controller/http/metrics"
 
@@ -46,6 +48,7 @@ type Usecases struct {
 	Rating     *ratingUsecase.RatingsUsecase
 	Schedule   *scheduleUsecase.ScheduleUsecase
 	GlobalEvent *globalEventUsecase.GlobalEventUsecase
+	Moderate   *modUsecase.ModerateUsecase
 	Permission *permissionUsecase.Usecase
 	Cache      cacheRepo.CacheRepository
 	JWTSecret  string
@@ -180,4 +183,13 @@ func registerGlobalEvents(auth *gin.RouterGroup, s Usecases) {
 
 	auth.PATCH("/event/global/quiz/:eventId/:outId/:inId")
 	//auth.PATCH("/event/global/update")
+}
+
+func registerModeration(auth *gin.RouterGroup, router *gin.Engine, s Usecases) {
+	mod := router.Group("/api/moderate")
+
+	mod.GET("/complaints", modHandlers.GetAllWaitComplaints(*s.Moderate)) // all complaints wait to moderate
+	mod.GET("/notes", modHandlers.GetAllWaitNotes(*s.Moderate)) // all notes wait to moderate
+	mod.PATCH("/complaint/:complaint_id", modHandlers.UpdateComplaintModerateWait(*s.Moderate, *s.Permission)) // moderate complaint with :complaint_id (moderate status "wait" is required)
+	mod.PATCH("/note/:note_id", modHandlers.UpdateNoteModerateWait(*s.Moderate, *s.Permission)) // moderate note with :note_id (moderate status "wait" is required)
 }

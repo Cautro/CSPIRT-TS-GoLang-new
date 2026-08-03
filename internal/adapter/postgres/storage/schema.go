@@ -29,7 +29,13 @@ func (s *Storage) initSchema() error {
 	if err := s.initNoteStorage(); err != nil {
 		return err
 	}
+	if err := s.initDeletedNotesStorage(); err != nil {
+		return err
+	}
 	if err := s.initComplaintStorage(); err != nil {
+		return err
+	}
+	if err := s.initDeletedComplaintsStorage(); err != nil {
 		return err
 	}
 	if err := s.initHTTPOnlyStorage(); err != nil {
@@ -53,10 +59,27 @@ func (s *Storage) initSchema() error {
 	if err := s.initPlannedSchedulesStorage(); err != nil {
 		return err
 	}
+	if err := s.initModerationLogs(); err != nil {
+		return err
+	}
 	if err := s.ensureCurrentSchedulesSeeded(); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *Storage) initModerationLogs() error {
+	query := `CREATE TABLE IF NOT EXISTS moderation_logs (
+		id SERIAL PRIMARY KEY,
+		target_id BIGINT NOT NULL,
+		target_status TEXT NOT NULL,
+		target_moderator_id BIGINT NOT NULL,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		moderate_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);`
+
+	_, err := s.DB.Exec(query)
+	return err
 }
 
 func (s *Storage) initGlobalEventInfoStorage() error {
@@ -446,7 +469,41 @@ func (s *Storage) initNoteStorage() error {
 		TargetName TEXT NOT NULL,
 		AuthorName TEXT NOT NULL,
 		Content TEXT NOT NULL,
-		CreatedAt TEXT NOT NULL
+		CreatedAt TEXT NOT NULL,
+
+		ModerateAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		ModeratorId BIGINT NOT NULL,
+		ModerationStatus TEXT NOT NULL
+	);`
+
+	if _, err := s.DB.Exec(query); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_target_id ON notes(TargetID);`); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_author_id ON notes(AuthorID);`); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Storage) initDeletedNotesStorage() error {
+
+	query := `
+	CREATE TABLE IF NOT EXISTS deleted_notes (
+		Id BIGSERIAL PRIMARY KEY,
+		TargetID INTEGER NOT NULL,
+		AuthorID INTEGER NOT NULL,
+		TargetName TEXT NOT NULL,
+		AuthorName TEXT NOT NULL,
+		Content TEXT NOT NULL,
+		CreatedAt TEXT NOT NULL,
+		
+		ModerateAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		ModeratorId BIGINT NOT NULL,
+		ModerationStatus TEXT NOT NULL
 	);`
 
 	if _, err := s.DB.Exec(query); err != nil {
@@ -495,6 +552,44 @@ func (s *Storage) initComplaintStorage() error {
 		AuthorName TEXT NOT NULL,
 		Content TEXT NOT NULL,
 		CreatedAt TIMESTAMPTZ NOT NULL,
+
+		ModerateAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		ModeratorId BIGINT NOT NULL,
+		ModerationStatus TEXT NOT NULL,
+
+		FOREIGN KEY (TargetID) REFERENCES users(Id) ON DELETE CASCADE,
+		FOREIGN KEY (AuthorID) REFERENCES users(Id) ON DELETE CASCADE
+	);`
+
+	if _, err := s.DB.Exec(query); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_complaints_target_id ON complaints(TargetID);`); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_complaints_author_id ON complaints(AuthorID);`); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Storage) initDeletedComplaintsStorage() error {
+
+	query := `
+	CREATE TABLE IF NOT EXISTS deleted_complaints (
+		Id BIGSERIAL PRIMARY KEY,
+		TargetID INTEGER NOT NULL,
+		TargetName TEXT NOT NULL,
+		AuthorID INTEGER NOT NULL,
+		AuthorName TEXT NOT NULL,
+		Content TEXT NOT NULL,
+		CreatedAt TIMESTAMPTZ NOT NULL,
+
+		ModerateAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		ModeratorId BIGINT NOT NULL,
+		ModerationStatus TEXT NOT NULL,
+
 		FOREIGN KEY (TargetID) REFERENCES users(Id) ON DELETE CASCADE,
 		FOREIGN KEY (AuthorID) REFERENCES users(Id) ON DELETE CASCADE
 	);`
