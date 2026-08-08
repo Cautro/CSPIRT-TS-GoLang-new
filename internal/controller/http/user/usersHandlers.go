@@ -1,17 +1,18 @@
 package handlers
 
 import (
-	"cspirt/pkg/logger"
 	permissionService "cspirt/internal/controller/permission/usecase"
 	ratMod "cspirt/internal/domain/rating"
 	models "cspirt/internal/domain/user"
 	authUsecase "cspirt/internal/usecase/auth"
 	sr "cspirt/internal/usecase/user"
+	"cspirt/pkg/logger"
+	"log/slog"
 
+	"context"
 	"net/http"
 	"os"
 	"strconv"
-	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -406,6 +407,7 @@ func GetMeHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		login := c.GetString("Login")
 		if login == "" {
+			slog.Error("LOGIN IS EMPTY")
 			logger.WriteSafe(logger.LogEntry{ Level: "info", Action: "get_me", Message: "invalid login or token" })
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
@@ -416,6 +418,11 @@ func GetMeHandler(userService *sr.UsersUsecase) gin.HandlerFunc {
 
 		fullInfo, err := userService.GetFullUserInfoByLogin(ctx, login)
 		if err != nil {
+			logger.WriteSafe(logger.LogEntry{
+				Level:   "error",
+				Action:  "get_me",
+				Message: "failed to get full user info: " + err.Error(),
+			})
 			c.JSON(403, gin.H{"error": "Bad request"})
 			return
 		}
