@@ -486,6 +486,24 @@ func (s *Storage) initNoteStorage() error {
 		return err
 	}
 
+
+	if err := s.ensureColumn("notes", "ModerateAt", "TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP"); err != nil {
+        return err
+    }
+    if err := s.ensureColumn("notes", "ModeratorId", "BIGINT NOT NULL DEFAULT 0"); err != nil {
+        return err
+    }
+    if err := s.ensureColumn("notes", "ModerationStatus", "TEXT NOT NULL DEFAULT 'wait'"); err != nil {
+        return err
+    }
+
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_target_id ON notes(TargetID);`); err != nil {
+        return err
+    }
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_author_id ON notes(AuthorID);`); err != nil {
+        return err
+    }
+
 	return nil
 }
 
@@ -515,6 +533,23 @@ func (s *Storage) initDeletedNotesStorage() error {
 	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_author_id ON notes(AuthorID);`); err != nil {
 		return err
 	}
+
+	if err := s.ensureColumn("deleted_notes", "ModerateAt", "TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP"); err != nil {
+        return err
+    }
+    if err := s.ensureColumn("deleted_notes", "ModeratorId", "BIGINT NOT NULL DEFAULT 0"); err != nil {
+        return err
+    }
+    if err := s.ensureColumn("deleted_notes", "ModerationStatus", "TEXT NOT NULL DEFAULT 'wait'"); err != nil {
+        return err
+    }
+
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_target_id ON notes(TargetID);`); err != nil {
+        return err
+    }
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_author_id ON notes(AuthorID);`); err != nil {
+        return err
+    }
 
 	return nil
 }
@@ -571,6 +606,23 @@ func (s *Storage) initComplaintStorage() error {
 		return err
 	}
 
+	if err := s.ensureColumn("complaints", "ModerateAt", "TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP"); err != nil {
+        return err
+    }
+    if err := s.ensureColumn("complaints", "ModeratorId", "BIGINT NOT NULL DEFAULT 0"); err != nil {
+        return err
+    }
+    if err := s.ensureColumn("complaints", "ModerationStatus", "TEXT NOT NULL DEFAULT 'wait'"); err != nil {
+        return err
+    }
+
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_target_id ON notes(TargetID);`); err != nil {
+        return err
+    }
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_author_id ON notes(AuthorID);`); err != nil {
+        return err
+    }
+
 	return nil
 }
 
@@ -603,6 +655,23 @@ func (s *Storage) initDeletedComplaintsStorage() error {
 	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_complaints_author_id ON complaints(AuthorID);`); err != nil {
 		return err
 	}
+
+	if err := s.ensureColumn("deleted_complaints", "ModerateAt", "TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP"); err != nil {
+        return err
+    }
+    if err := s.ensureColumn("deleted_complaints", "ModeratorId", "BIGINT NOT NULL DEFAULT 0"); err != nil {
+        return err
+    }
+    if err := s.ensureColumn("deleted_complaints", "ModerationStatus", "TEXT NOT NULL DEFAULT 'wait'"); err != nil {
+        return err
+    }
+
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_target_id ON notes(TargetID);`); err != nil {
+        return err
+    }
+    if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_author_id ON notes(AuthorID);`); err != nil {
+        return err
+    }
 
 	return nil
 }
